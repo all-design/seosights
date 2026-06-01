@@ -45,24 +45,33 @@ interface AppState {
   analysis: SEOAnalysis | null
   analysisProgress: number
   analysisStep: string
+  analysisError: string
   setView: (view: AppView) => void
   setTargetUrl: (url: string) => void
   setAnalysis: (analysis: SEOAnalysis | null) => void
   setAnalysisProgress: (progress: number) => void
   setAnalysisStep: (step: string) => void
+  setAnalysisError: (error: string) => void
   reset: () => void
+  startAnalysis: (url: string) => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   view: 'landing',
   targetUrl: '',
   analysis: null,
   analysisProgress: 0,
   analysisStep: '',
+  analysisError: '',
   setView: (view) => set({ view }),
   setTargetUrl: (url) => set({ targetUrl: url }),
   setAnalysis: (analysis) => set({ analysis }),
   setAnalysisProgress: (progress) => set({ analysisProgress: progress }),
-  setAnalysisStep: (step) => set({ analysisStep }),
-  reset: () => set({ view: 'landing', targetUrl: '', analysis: null, analysisProgress: 0, analysisStep: '' }),
+  setAnalysisStep: (step) => set({ analysisStep: step }),
+  setAnalysisError: (error) => set({ analysisError: error }),
+  reset: () => set({ view: 'landing', targetUrl: '', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '' }),
+  startAnalysis: (url: string) => {
+    // Set URL and switch to analyzing view immediately
+    set({ targetUrl: url, view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null })
+  },
 }))

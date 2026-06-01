@@ -1,8 +1,9 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { useAppStore } from '@/lib/store'
-import { Globe, Loader2 } from 'lucide-react'
+import { useAppStore, SEOAnalysis } from '@/lib/store'
+import { Globe, Loader2, AlertTriangle, ArrowLeft } from 'lucide-react'
 
 const steps = [
   { label: 'Scanning your website', icon: '🔍' },
@@ -14,11 +15,118 @@ const steps = [
 ]
 
 export default function AnalyzingView() {
-  const { targetUrl, analysisProgress, analysisStep } = useAppStore()
+  const { targetUrl, analysisProgress, analysisStep, analysisError, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError } = useAppStore()
+  const hasStarted = useRef(false)
+
+  useEffect(() => {
+    // Prevent double-call in React strict mode
+    if (hasStarted.current || !targetUrl) return
+    hasStarted.current = true
+
+    let aborted = false
+
+    const runAnalysis = async () => {
+      setAnalysisProgress(8)
+      setAnalysisStep('Connecting to analysis engine...')
+
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl }),
+        })
+
+        if (!response.ok) {
+          let errMsg = 'Analysis failed'
+          try {
+            const errData = await response.json()
+            errMsg = errData.error || errMsg
+          } catch {
+            // response might be streaming, just use generic message
+          }
+          throw new Error(errMsg)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error('No response stream')
+
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        while (!aborted) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            const data = line.slice(6)
+            if (data === '[DONE]') continue
+
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.type === 'progress') {
+                setAnalysisProgress(parsed.progress)
+                setAnalysisStep(parsed.step)
+              } else if (parsed.type === 'complete') {
+                setAnalysis(parsed.analysis as SEOAnalysis)
+                setAnalysisProgress(100)
+                setAnalysisStep('Analysis complete!')
+                // Small delay so user sees 100%
+                setTimeout(() => {
+                  if (!aborted) setView('dashboard')
+                }, 600)
+              } else if (parsed.type === 'error') {
+                setAnalysisError(parsed.message || 'Analysis failed')
+              }
+            } catch {
+              // skip non-JSON lines
+            }
+          }
+        }
+      } catch (err) {
+        if (!aborted) {
+          setAnalysisError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')
+        }
+      }
+    }
+
+    runAnalysis()
+
+    return () => {
+      aborted = true
+    }
+  }, [targetUrl, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError])
 
   const currentStepIndex = steps.findIndex(
     (s) => analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
   )
+
+  // Error state
+  if (analysisError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-rose-950/5 to-background" />
+        <div className="relative z-10 max-w-md mx-auto px-4 text-center">
+          <div className="w-20 h-20 rounded-3xl bg-rose-500/20 flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-10 h-10 text-rose-400" />
+          </div>
+          <h2 className="text-2xl font-bold mb-3">Analysis Failed</h2>
+          <p className="text-muted-foreground mb-6">{analysisError}</p>
+          <button
+            onClick={() => useAppStore.getState().reset()}
+            className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-6 py-3 rounded-xl transition-all duration-300"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -66,7 +174,7 @@ export default function AnalyzingView() {
           <motion.div
             className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full"
             initial={{ width: '0%' }}
-            animate={{ width: `${analysisProgress}%` }}
+            animate={{ width: `${Math.max(analysisProgress, 2)}%` }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
           />
         </div>
@@ -81,7 +189,7 @@ export default function AnalyzingView() {
         <div className="space-y-3">
           {steps.map((step, i) => {
             const isActive = i === currentStepIndex
-            const isDone = i < currentStepIndex || analysisProgress > 90
+            const isDone = (i < currentStepIndex && currentStepIndex !== -1) || analysisProgress >= (i + 1) * 17
             return (
               <motion.div
                 key={step.label}

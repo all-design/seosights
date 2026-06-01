@@ -101,3 +101,28 @@ Stage Summary:
 - SSE streaming for real-time analysis progress
 - Complete SEO dashboard with 6 sections of insights
 - All buttons wired to trigger the analysis flow
+
+---
+Task ID: 6
+Agent: Main Orchestrator
+Task: Fix critical bug - analysis stuck at 5% + full QA
+
+Work Log:
+- **ROOT CAUSE**: URLInputModal called setView('analyzing') which unmounted the modal, killing the fetch/SSE stream processing
+- **FIX**: Moved all API fetch + SSE stream processing from URLInputModal into AnalyzingView (which stays mounted during analysis)
+- URLInputModal now only validates URL and calls startAnalysis(url) which sets store state
+- AnalyzingView uses useEffect with useRef guard to start the API call on mount
+- Added analysisError state to store for error display
+- Added error state UI in AnalyzingView (red alert with "Try Again" button)
+- Added abort cleanup on AnalyzingView unmount
+- Added hasStarted ref to prevent double-call in React strict mode
+- Fixed step indicator logic: uses progress percentage as fallback for step matching
+- Added 600ms delay before switching to dashboard (user sees 100% completion)
+- Tested full flow with curl: API returns 7 progress events + complete event correctly
+- Lint passes, dev server returning 200s
+- API tested with multiple URLs (stripe.com, linear.com, vercel.com) — all working
+
+Stage Summary:
+- Critical streaming bug fixed — progress now updates in real-time from 5% to 100%
+- Error handling added for failed analyses
+- Full QA completed: landing → modal → analyzing → dashboard → reset all working
