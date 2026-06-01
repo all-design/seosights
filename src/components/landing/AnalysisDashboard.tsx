@@ -67,7 +67,7 @@ function ScoreRing({ score, label, icon: Icon, color }: { score: number; label: 
   )
 }
 
-export default function AnalysisDashboard() {
+export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () => void }) {
   const { analysis, reset } = useAppStore()
   const data = analysis as SEOAnalysis | null
 
@@ -397,7 +397,10 @@ export default function AnalysisDashboard() {
                   Get the Agent OS installed free — Hermes, OpenClaw, or Claude — and start building the backlinks that make AI cite you.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <button className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg px-8 py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300">
+                  <button
+                    onClick={onStartFree}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg px-8 py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
+                  >
                     Get Free Agent OS Setup
                   </button>
                   <button

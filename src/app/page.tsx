@@ -18,12 +18,24 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { view } = useAppStore()
 
+  const openModal = () => setIsModalOpen(true)
+
   if (view === 'analyzing') {
-    return <AnalyzingView />
+    return (
+      <>
+        <AnalyzingView />
+        <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      </>
+    )
   }
 
   if (view === 'dashboard') {
-    return <AnalysisDashboard />
+    return (
+      <>
+        <AnalysisDashboard onStartFree={openModal} />
+        <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      </>
+    )
   }
 
   return (

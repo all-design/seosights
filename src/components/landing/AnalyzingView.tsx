@@ -15,15 +15,30 @@ const steps = [
 ]
 
 export default function AnalyzingView() {
-  const { targetUrl, analysisProgress, analysisStep, analysisError, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError } = useAppStore()
-  const hasStarted = useRef(false)
+  const {
+    targetUrl,
+    analysisProgress,
+    analysisStep,
+    analysisError,
+    setAnalysisProgress,
+    setAnalysisStep,
+    setAnalysis,
+    setView,
+    setAnalysisError,
+  } = useAppStore()
+
+  // Use a ref to track the URL being analyzed, not a boolean flag
+  // This way, when strict mode remounts, it can detect the URL is the same
+  // and skip re-running the analysis
+  const analyzedUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
-    // Prevent double-call in React strict mode
-    if (hasStarted.current || !targetUrl) return
-    hasStarted.current = true
+    // If we've already started analyzing this exact URL, don't restart
+    if (analyzedUrlRef.current === targetUrl || !targetUrl) return
+    analyzedUrlRef.current = targetUrl
 
-    let aborted = false
+    const abortController = new AbortController()
+    const { signal } = abortController
 
     const runAnalysis = async () => {
       setAnalysisProgress(8)
@@ -34,6 +49,7 @@ export default function AnalyzingView() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: targetUrl }),
+          signal,
         })
 
         if (!response.ok) {
@@ -53,7 +69,9 @@ export default function AnalyzingView() {
         const decoder = new TextDecoder()
         let buffer = ''
 
-        while (!aborted) {
+        while (true) {
+          if (signal.aborted) break
+
           const { done, value } = await reader.read()
           if (done) break
 
@@ -77,7 +95,7 @@ export default function AnalyzingView() {
                 setAnalysisStep('Analysis complete!')
                 // Small delay so user sees 100%
                 setTimeout(() => {
-                  if (!aborted) setView('dashboard')
+                  setView('dashboard')
                 }, 600)
               } else if (parsed.type === 'error') {
                 setAnalysisError(parsed.message || 'Analysis failed')
@@ -88,21 +106,23 @@ export default function AnalyzingView() {
           }
         }
       } catch (err) {
-        if (!aborted) {
-          setAnalysisError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')
-        }
+        if (signal.aborted) return // Ignore abort errors
+        setAnalysisError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')
       }
     }
 
     runAnalysis()
 
     return () => {
-      aborted = true
+      abortController.abort()
+      // Reset the ref so if the component remounts with the same URL,
+      // it can restart (this handles strict mode properly)
+      analyzedUrlRef.current = null
     }
   }, [targetUrl, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError])
 
-  const currentStepIndex = steps.findIndex(
-    (s) => analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
+  const currentStepIndex = steps.findIndex((s) =>
+    analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
   )
 
   // Error state
@@ -189,7 +209,9 @@ export default function AnalyzingView() {
         <div className="space-y-3">
           {steps.map((step, i) => {
             const isActive = i === currentStepIndex
-            const isDone = (i < currentStepIndex && currentStepIndex !== -1) || analysisProgress >= (i + 1) * 17
+            const isDone =
+              (i < currentStepIndex && currentStepIndex !== -1) ||
+              analysisProgress >= (i + 1) * 17
             return (
               <motion.div
                 key={step.label}
@@ -205,7 +227,11 @@ export default function AnalyzingView() {
                 transition={{ delay: i * 0.1 }}
               >
                 <span className="text-lg">{step.icon}</span>
-                <span className={`text-sm ${isActive ? 'text-emerald-400 font-medium' : 'text-muted-foreground'}`}>
+                <span
+                  className={`text-sm ${
+                    isActive ? 'text-emerald-400 font-medium' : 'text-muted-foreground'
+                  }`}
+                >
                   {step.label}
                 </span>
                 {isActive && <Loader2 className="w-4 h-4 text-emerald-400 animate-spin ml-auto" />}
