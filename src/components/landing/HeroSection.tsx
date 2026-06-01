@@ -5,7 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRight, Sparkles, TrendingUp, Zap, Bot, Brain, Search } from 'lucide-react'
 
-export default function HeroSection() {
+interface HeroSectionProps {
+  onStartFree?: () => void
+}
+
+export default function HeroSection({ onStartFree }: HeroSectionProps) {
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id)
     if (el) el.scrollIntoView({ behavior: 'smooth' })
@@ -97,9 +101,9 @@ export default function HeroSection() {
           <Button
             size="lg"
             className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg px-8 py-6 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
-            onClick={() => scrollToSection('cta')}
+            onClick={onStartFree}
           >
-            Get Free Agent OS Setup
+            Analyze My Site
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button

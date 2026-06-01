@@ -12,7 +12,7 @@ const navLinks = [
   { label: 'Get Started', href: '#cta' },
 ]
 
-export default function Navbar() {
+export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -75,9 +75,9 @@ export default function Navbar() {
               <Button
                 size="sm"
                 className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300"
-                onClick={() => scrollToSection('#cta')}
+                onClick={onStartFree}
               >
-                Start Free
+                Analyze Site
               </Button>
             </div>
 
@@ -130,10 +130,9 @@ export default function Navbar() {
                 ))}
                 <div className="pt-2">
                   <Button
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold"
-                    onClick={() => scrollToSection('#cta')}
+                    onClick={onStartFree}
                   >
-                    Start Free
+                    Analyze Site
                   </Button>
                 </div>
               </div>

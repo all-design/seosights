@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { ShieldCheck, Settings, CreditCard } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
-export default function CTASection() {
+export default function CTASection({ onStartFree }: { onStartFree?: () => void }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
   const { toast } = useToast()
@@ -138,12 +138,12 @@ export default function CTASection() {
                 />
               </div>
               <Button
-                type="submit"
+                type="button"
                 size="lg"
-                disabled={isLoading}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg py-6 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300 disabled:opacity-50"
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg py-6 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
+                onClick={onStartFree}
               >
-                {isLoading ? 'Submitting...' : 'Get My Free Citation Gap Audit'}
+                Analyze My Site — Free
               </Button>
             </form>
           </div>
