@@ -149,7 +149,8 @@ Be specific, actionable, and data-driven. Make the scores realistic (not too gen
 
     const completion = await zai.chat.completions.create({
       messages: [
-        { role: 'assistant', content: seoPrompt },
+        { role: 'assistant', content: 'You are an elite AI SEO strategist who specializes in helping websites rank on Google AND get cited by ChatGPT, Claude, and Perplexity. You have deep expertise in backlink strategy, AI citation optimization, and content strategy. Always respond with valid JSON only, no markdown formatting.' },
+        { role: 'user', content: seoPrompt },
       ],
       thinking: { type: 'disabled' },
     })
