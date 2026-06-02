@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore, SEOAnalysis } from '@/lib/store'
 import { Globe, Loader2, AlertTriangle, ArrowLeft, MapPin, RefreshCw, Clock } from 'lucide-react'
@@ -21,6 +21,25 @@ const phases = [
 
 const ANALYSIS_TIMEOUT = 180_000 // 3 minutes
 
+// Simulated progress steps — used as visual fallback when SSE events lag
+const SIMULATED_STEPS = [
+  { progress: 5, step: 'Connecting to analysis engine...', delay: 0 },
+  { progress: 8, step: 'Scanning your website...', delay: 500 },
+  { progress: 15, step: 'Reading page content...', delay: 3000 },
+  { progress: 20, step: 'Analyzing technical SEO & AEO readiness...', delay: 6000 },
+  { progress: 28, step: 'Searching competitor landscape...', delay: 9000 },
+  { progress: 35, step: 'Checking GEO visibility & AI citations...', delay: 12000 },
+  { progress: 42, step: 'Running E-E-A-T & content quality analysis...', delay: 16000 },
+  { progress: 50, step: 'Running AI analysis engine...', delay: 20000 },
+  { progress: 58, step: 'Deep AI analysis in progress...', delay: 28000 },
+  { progress: 65, step: 'Building audit results...', delay: 35000 },
+  { progress: 72, step: 'Creating strategy recommendations...', delay: 42000 },
+  { progress: 78, step: 'Structuring your strategy...', delay: 50000 },
+  { progress: 85, step: 'Creating content briefs & answer blocks...', delay: 55000 },
+  { progress: 90, step: 'Parsing analysis results...', delay: 62000 },
+  { progress: 95, step: 'Finalizing your strategy...', delay: 68000 },
+]
+
 export default function AnalyzingView() {
   const {
     targetUrl,
@@ -39,6 +58,14 @@ export default function AnalyzingView() {
   const [elapsed, setElapsed] = useState(0)
   const [retryCount, setRetryCount] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const simulationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const sseProgressRef = useRef<number>(0) // Track latest SSE progress
+
+  // Clear all simulation timers
+  const clearSimulationTimers = useCallback(() => {
+    simulationTimersRef.current.forEach((t) => clearTimeout(t))
+    simulationTimersRef.current = []
+  }, [])
 
   // Elapsed time counter
   useEffect(() => {
@@ -55,9 +82,26 @@ export default function AnalyzingView() {
     }
   }, [analysisError, retryCount])
 
+  // Start simulated progress — this gives visual feedback even if SSE lags
+  const startSimulatedProgress = useCallback(() => {
+    clearSimulationTimers()
+    SIMULATED_STEPS.forEach(({ progress, step, delay }) => {
+      const timer = setTimeout(() => {
+        // Only update if SSE hasn't already advanced past this point
+        const currentSSE = sseProgressRef.current
+        if (currentSSE < progress) {
+          setAnalysisProgress(progress)
+          setAnalysisStep(step)
+        }
+      }, delay)
+      simulationTimersRef.current.push(timer)
+    })
+  }, [clearSimulationTimers, setAnalysisProgress, setAnalysisStep])
+
   useEffect(() => {
     if (analyzedUrlRef.current === targetUrl || !targetUrl) return
     analyzedUrlRef.current = targetUrl
+    sseProgressRef.current = 0
 
     const abortController = new AbortController()
     const { signal } = abortController
@@ -65,13 +109,16 @@ export default function AnalyzingView() {
     // Client-side timeout
     const timeoutId = setTimeout(() => {
       abortController.abort()
+      clearSimulationTimers()
       setAnalysisError('Analysis timed out. The server took too long to respond. Please try again.')
     }, ANALYSIS_TIMEOUT)
 
-    const runAnalysis = async () => {
-      setAnalysisProgress(5)
-      setAnalysisStep('Connecting to analysis engine...')
+    // Start simulated progress immediately
+    setAnalysisProgress(5)
+    setAnalysisStep('Connecting to analysis engine...')
+    startSimulatedProgress()
 
+    const runAnalysis = async () => {
       try {
         const response = await fetch('/api/analyze', {
           method: 'POST',
@@ -96,7 +143,7 @@ export default function AnalyzingView() {
 
         const decoder = new TextDecoder()
         let buffer = ''
-        let lastProgressTime = Date.now()
+        let receivedSSE = false
 
         while (true) {
           if (signal.aborted) break
@@ -116,11 +163,15 @@ export default function AnalyzingView() {
             try {
               const parsed = JSON.parse(data)
               if (parsed.type === 'progress') {
-                lastProgressTime = Date.now()
+                receivedSSE = true
+                sseProgressRef.current = parsed.progress
+                // SSE progress always overrides simulated progress
                 setAnalysisProgress(parsed.progress)
                 setAnalysisStep(parsed.step)
               } else if (parsed.type === 'complete') {
                 clearTimeout(timeoutId)
+                clearSimulationTimers()
+                sseProgressRef.current = 100
                 setAnalysis(parsed.analysis as SEOAnalysis)
                 setAnalysisProgress(100)
                 setAnalysisStep('Analysis complete!')
@@ -129,6 +180,7 @@ export default function AnalyzingView() {
                 }, 600)
               } else if (parsed.type === 'error') {
                 clearTimeout(timeoutId)
+                clearSimulationTimers()
                 setAnalysisError(parsed.message || 'Analysis failed. Please try again.')
               }
             } catch {
@@ -137,11 +189,17 @@ export default function AnalyzingView() {
           }
         }
 
-        // If we reach here without completing, check if we got data
-        // (stream ended without 'complete' event)
+        // If we received SSE events but no 'complete' event, that's a problem
+        // But if we got some progress events, the analysis might still be running
+        // The timeout will handle this case
+        if (!receivedSSE && !signal.aborted) {
+          // We got a 200 response but no SSE events at all — unusual
+          console.warn('[AnalyzingView] No SSE events received from stream')
+        }
       } catch (err) {
         if (signal.aborted) return
         clearTimeout(timeoutId)
+        clearSimulationTimers()
         const message = err instanceof Error ? err.message : 'Analysis failed. Please try again.'
         setAnalysisError(message)
       }
@@ -152,9 +210,10 @@ export default function AnalyzingView() {
     return () => {
       abortController.abort()
       clearTimeout(timeoutId)
+      clearSimulationTimers()
       analyzedUrlRef.current = null
     }
-  }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError, retryCount])
+  }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError, retryCount, startSimulatedProgress, clearSimulationTimers])
 
   const currentStepIndex = phases.findIndex((s) =>
     analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
@@ -164,6 +223,7 @@ export default function AnalyzingView() {
     const url = targetUrl
     const market = targetMarket
     analyzedUrlRef.current = null
+    sseProgressRef.current = 0
     useAppStore.getState().reset()
     setRetryCount((prev) => prev + 1)
     // Re-trigger analysis after a short delay

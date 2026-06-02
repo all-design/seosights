@@ -119,7 +119,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 })
     }
 
-    const encoder = new TextEncoder()
     const targetMarket = market || 'Global'
 
     // Use async generator for reliable SSE streaming
@@ -350,30 +349,45 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text.`
         yield sendProgress(50, 'Running AI analysis engine...')
         await flush()
 
-        const [auditResult, strategyResult] = await Promise.all([
-          zai.chat.completions.create({
-            messages: [
-              { role: 'system', content: auditSystemPrompt },
-              { role: 'user', content: auditUserPrompt },
-            ],
-          }),
-          zai.chat.completions.create({
-            messages: [
-              { role: 'system', content: strategySystemPrompt },
-              { role: 'user', content: strategyUserPrompt },
-            ],
-          }),
-        ])
+        let auditResult: { choices?: Array<{ message?: { content?: string } }> } | null = null
+        let strategyResult: { choices?: Array<{ message?: { content?: string } }> } | null = null
+
+        try {
+          ;[auditResult, strategyResult] = await Promise.all([
+            zai.chat.completions.create({
+              messages: [
+                { role: 'system', content: auditSystemPrompt },
+                { role: 'user', content: auditUserPrompt },
+              ],
+            }),
+            zai.chat.completions.create({
+              messages: [
+                { role: 'system', content: strategySystemPrompt },
+                { role: 'user', content: strategyUserPrompt },
+              ],
+            }),
+          ])
+        } catch (llmError) {
+          console.error('[analyze] LLM call failed:', llmError instanceof Error ? llmError.message : 'Unknown')
+          yield sendError('AI analysis service temporarily unavailable. Please try again in a moment.')
+          return
+        }
 
         // ── Phase 3: Parse & Merge ──────────────────────────────────
         yield sendProgress(75, 'Phase 3: Building your strategy...')
         await flush()
 
-        const auditRaw = auditResult.choices[0]?.message?.content || ''
-        const strategyRaw = strategyResult.choices[0]?.message?.content || ''
+        const auditRaw = auditResult?.choices?.[0]?.message?.content || ''
+        const strategyRaw = strategyResult?.choices?.[0]?.message?.content || ''
 
         console.log('[analyze] Audit response length:', auditRaw.length)
         console.log('[analyze] Strategy response length:', strategyRaw.length)
+
+        if (!auditRaw && !strategyRaw) {
+          console.error('[analyze] Both LLM responses empty')
+          yield sendError('AI returned empty responses. Please try again.')
+          return
+        }
 
         let auditData: Record<string, unknown>
         let strategyData: Record<string, unknown>
@@ -473,23 +487,24 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text.`
       }
     }
 
-    const encoder2 = new TextEncoder()
+    const encoder = new TextEncoder()
     const stream = new ReadableStream({
       async start(controller) {
         try {
           for await (const event of generateEvents()) {
-            controller.enqueue(encoder2.encode(event))
+            controller.enqueue(encoder.encode(event))
           }
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Stream error'
+          console.error('[analyze] Stream error:', msg)
           try {
-            controller.enqueue(encoder2.encode(sendError(msg)))
+            controller.enqueue(encoder.encode(sendError(msg)))
           } catch {
             // Controller already closed
           }
         } finally {
           try {
-            controller.enqueue(encoder2.encode('data: [DONE]\n\n'))
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'))
             controller.close()
           } catch {
             // Controller already closed
