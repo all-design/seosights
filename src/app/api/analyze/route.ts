@@ -17,6 +17,42 @@ function sendError(message: string): string {
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
+/**
+ * Retry wrapper with exponential backoff for 429 errors
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 3000,
+  label: string = 'API'
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error: unknown) {
+      const is429 = error instanceof Error && (
+        error.message.includes('429') ||
+        error.message.includes('Too many requests') ||
+        error.message.includes('rate limit')
+      )
+      const is500 = error instanceof Error && (
+        error.message.includes('500') ||
+        error.message.includes('502') ||
+        error.message.includes('503')
+      )
+
+      if ((is429 || is500) && attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000
+        console.log(`[analyze] ${label} got ${is429 ? '429' : '5xx'}, retry ${attempt + 1}/${maxRetries} in ${Math.round(delay)}ms`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      throw error
+    }
+  }
+  throw new Error('Max retries exceeded')
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
     promise,
@@ -153,19 +189,24 @@ export async function POST(request: NextRequest) {
         const zai = await ZAI.create()
 
         // ════════════════════════════════════════════════════════════════
-        // Phase 1: Data Gathering (3 calls max to avoid rate limits)
+        // Phase 1: Data Gathering — SEQUENTIAL to avoid rate limits
         // ════════════════════════════════════════════════════════════════
 
         // Step 1: Page scan
-        yield sendProgress(8, 'Scanning website content & structure...')
+        yield sendProgress(5, 'Scanning website content & structure...')
         await flush()
 
         let siteData: { title?: string; html?: string; url?: string; text?: string } = { title: url, url, text: '' }
         try {
-          const pageResult = await withTimeout(
-            zai.functions.invoke('page_reader', { url }),
-            15000,
-            null
+          const pageResult = await retryWithBackoff(
+            () => withTimeout(
+              zai.functions.invoke('page_reader', { url }),
+              15000,
+              null
+            ),
+            2,
+            2000,
+            'page_reader'
           )
           if (pageResult) {
             const rawData = pageResult.data || pageResult
@@ -189,42 +230,67 @@ export async function POST(request: NextRequest) {
           siteData = { title: url, url, text: '' }
         }
 
-        // Step 2: Competitor & AI citation search (combined)
-        yield sendProgress(22, 'Analyzing competitive landscape & AI citation signals...')
+        // Step 2: Competitor search (sequential, not parallel)
+        yield sendProgress(18, 'Analyzing competitive landscape...')
         await flush()
 
         let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
-        let aiSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
-
         try {
-          const [compResults, aiResults] = await Promise.all([
-            withTimeout(
+          // Delay before next API call to avoid rate limit
+          await new Promise(resolve => setTimeout(resolve, 1500))
+          const compResults = await retryWithBackoff(
+            () => withTimeout(
               zai.functions.invoke('web_search', { query: `best ${siteData.title || domain} alternatives competitors`, num: 5 }),
               12000,
               []
             ),
-            withTimeout(
+            2,
+            3000,
+            'web_search_competitors'
+          )
+          searchResults = Array.isArray(compResults) ? compResults : []
+        } catch {
+          searchResults = []
+        }
+
+        // Step 3: AI citation search (after delay)
+        yield sendProgress(28, 'Checking AI citation signals...')
+        await flush()
+
+        let aiSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+        try {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          const aiResults = await retryWithBackoff(
+            () => withTimeout(
               zai.functions.invoke('web_search', { query: `${domain} AI citation authority ChatGPT Perplexity`, num: 3 }),
               12000,
               []
             ),
-          ])
-          searchResults = Array.isArray(compResults) ? compResults : []
+            2,
+            3000,
+            'web_search_ai'
+          )
           aiSearchResults = Array.isArray(aiResults) ? aiResults : []
         } catch {
-          // Continue without search data
+          aiSearchResults = []
         }
 
-        // Step 3: Local SEO search (only if non-global market)
+        // Step 4: Local SEO search (only if non-global market, after delay)
         let localSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
         if (targetMarket !== 'Global') {
-          yield sendProgress(30, `Analyzing local SEO for ${targetMarket}...`)
+          yield sendProgress(32, `Analyzing local SEO for ${targetMarket}...`)
           await flush()
           try {
-            const localResults = await withTimeout(
-              zai.functions.invoke('web_search', { query: `${domain} ${targetMarket} local SEO business`, num: 3 }),
-              10000,
-              []
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            const localResults = await retryWithBackoff(
+              () => withTimeout(
+                zai.functions.invoke('web_search', { query: `${domain} ${targetMarket} local SEO business`, num: 3 }),
+                10000,
+                []
+              ),
+              2,
+              3000,
+              'web_search_local'
             )
             localSearchResults = Array.isArray(localResults) ? localResults : []
           } catch {
@@ -233,7 +299,7 @@ export async function POST(request: NextRequest) {
         }
 
         // ════════════════════════════════════════════════════════════════
-        // Phase 2: LLM Analysis (2 calls, sequential with delay)
+        // Phase 2: LLM Analysis — SEQUENTIAL with delays + retry
         // ════════════════════════════════════════════════════════════════
 
         yield sendProgress(38, 'Running comprehensive AI analysis...')
@@ -383,43 +449,53 @@ QUANTITY: 3 topicClusters (1-2 supportingKeywords each), 4-5 keywordGaps, 3-4 co
 
 IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Code snippets must be valid and copy-paste ready.`
 
-        // ── Run LLM calls sequentially with delay to avoid rate limiting ──
+        // ── Run LLM calls SEQUENTIALLY with delays + retry ──
         let auditResult: { choices?: Array<{ message?: { content?: string } }> } | null = null
         let strategyResult: { choices?: Array<{ message?: { content?: string } }> } | null = null
 
         // Call 1: Audit
-        yield sendProgress(45, 'Running AI audit engine...')
+        yield sendProgress(42, 'Running AI audit engine...')
         await flush()
         try {
-          auditResult = await zai.chat.completions.create({
-            messages: [
-              { role: 'system', content: auditSystemPrompt },
-              { role: 'user', content: auditUserPrompt },
-            ],
-          })
+          auditResult = await retryWithBackoff(
+            () => zai.chat.completions.create({
+              messages: [
+                { role: 'system', content: auditSystemPrompt },
+                { role: 'user', content: auditUserPrompt },
+              ],
+            }),
+            3,
+            4000,
+            'LLM_audit'
+          )
         } catch (llmError) {
-          console.error('[analyze] Audit LLM call failed:', llmError instanceof Error ? llmError.message : 'Unknown')
+          console.error('[analyze] Audit LLM call failed after retries:', llmError instanceof Error ? llmError.message : 'Unknown')
         }
 
-        // Call 2: Strategy (with delay)
-        yield sendProgress(62, 'Building SEO/AEO/GEO strategy...')
+        // Call 2: Strategy (with delay between calls)
+        yield sendProgress(60, 'Building SEO/AEO/GEO strategy...')
         await flush()
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await new Promise((resolve) => setTimeout(resolve, 3000))
         try {
-          strategyResult = await zai.chat.completions.create({
-            messages: [
-              { role: 'system', content: strategySystemPrompt },
-              { role: 'user', content: strategyUserPrompt },
-            ],
-          })
+          strategyResult = await retryWithBackoff(
+            () => zai.chat.completions.create({
+              messages: [
+                { role: 'system', content: strategySystemPrompt },
+                { role: 'user', content: strategyUserPrompt },
+              ],
+            }),
+            3,
+            4000,
+            'LLM_strategy'
+          )
         } catch (llmError) {
-          console.error('[analyze] Strategy LLM call failed:', llmError instanceof Error ? llmError.message : 'Unknown')
+          console.error('[analyze] Strategy LLM call failed after retries:', llmError instanceof Error ? llmError.message : 'Unknown')
         }
 
         // Check if at least one call succeeded
         if (!auditResult && !strategyResult) {
-          console.error('[analyze] All LLM calls failed')
-          yield sendError('AI analysis service temporarily unavailable. Please try again in a moment.')
+          console.error('[analyze] All LLM calls failed after retries')
+          yield sendError('AI analysis service is currently busy. Please try again in 30 seconds.')
           return
         }
 
@@ -427,7 +503,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Code snippets mu
         // Phase 3: Parse & Merge
         // ════════════════════════════════════════════════════════════════
 
-        yield sendProgress(78, 'Phase 3: Parsing analysis results...')
+        yield sendProgress(75, 'Parsing analysis results...')
         await flush()
 
         const auditRaw = auditResult?.choices?.[0]?.message?.content || ''
@@ -476,6 +552,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Code snippets mu
           strategyData = repairAndParseJSON(strategyRaw)
         } catch (e) {
           console.error('[analyze] Strategy JSON parse failed:', e instanceof Error ? e.message : 'Unknown error')
+          const auditScores = auditData.overallScores as Record<string, number>
           strategyData = {
             structure: {
               topicClusters: [{ cluster: 'Core Topic', pillarKeyword: 'primary keyword', supportingKeywords: ['secondary'], seoOpportunity: 'Optimize existing pages', aeoOpportunity: 'Add FAQ section', geoOpportunity: 'Create cite-worthy content' }],
@@ -510,10 +587,10 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Code snippets mu
             },
             roadmap: {
               quarters: [
-                { label: 'Q1: Foundation', seoGoal: 'Fix critical issues, optimize meta tags', aeoGoal: 'Add FAQ schema, structured data', geoGoal: 'Create cite-worthy content, add llms.txt', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 15 || 45), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 12 || 35), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 10 || 30) } },
-                { label: 'Q2: Growth', seoGoal: 'Build backlinks, expand topic clusters', aeoGoal: 'Optimize answer blocks, target snippets', geoGoal: 'Increase AI citation presence', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 25 || 55), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 22 || 45), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 20 || 40) } },
-                { label: 'Q3: Authority', seoGoal: 'Dominate niche keywords', aeoGoal: 'Voice search optimization', geoGoal: 'Multi-platform AI visibility', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 35 || 65), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 32 || 55), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 30 || 50) } },
-                { label: 'Q4: Scale', seoGoal: 'Scale content production', aeoGoal: 'Cross-platform AEO coverage', geoGoal: 'AI-first content strategy', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 45 || 75), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 40 || 65), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 38 || 60) } },
+                { label: 'Q1: Foundation', seoGoal: 'Fix critical issues, optimize meta tags', aeoGoal: 'Add FAQ schema, structured data', geoGoal: 'Create cite-worthy content, add llms.txt', targetScores: { seo: Math.min(100, auditScores?.seo + 15 || 45), aeo: Math.min(100, auditScores?.aeo + 12 || 35), geo: Math.min(100, auditScores?.geo + 10 || 30) } },
+                { label: 'Q2: Growth', seoGoal: 'Build backlinks, expand topic clusters', aeoGoal: 'Optimize answer blocks, target snippets', geoGoal: 'Increase AI citation presence', targetScores: { seo: Math.min(100, auditScores?.seo + 25 || 55), aeo: Math.min(100, auditScores?.aeo + 22 || 45), geo: Math.min(100, auditScores?.geo + 20 || 40) } },
+                { label: 'Q3: Authority', seoGoal: 'Dominate niche keywords', aeoGoal: 'Voice search optimization', geoGoal: 'Multi-platform AI visibility', targetScores: { seo: Math.min(100, auditScores?.seo + 35 || 65), aeo: Math.min(100, auditScores?.aeo + 32 || 55), geo: Math.min(100, auditScores?.geo + 30 || 50) } },
+                { label: 'Q4: Scale', seoGoal: 'Scale content production', aeoGoal: 'Cross-platform AEO coverage', geoGoal: 'AI-first content strategy', targetScores: { seo: Math.min(100, auditScores?.seo + 45 || 75), aeo: Math.min(100, auditScores?.aeo + 40 || 65), geo: Math.min(100, auditScores?.geo + 38 || 60) } },
               ],
             },
             trafficInsights: {
@@ -561,7 +638,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Code snippets mu
           url,
         }
 
-        yield sendProgress(90, 'Parsing analysis results...')
+        yield sendProgress(90, 'Compiling results...')
         await flush()
         await new Promise((resolve) => setTimeout(resolve, 200))
 

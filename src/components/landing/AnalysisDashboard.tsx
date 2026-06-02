@@ -50,6 +50,10 @@ import {
   Swords,
   Milestone,
   Info,
+  Copy,
+  Code2,
+  Grid3X3,
+  Check,
 } from 'lucide-react'
 
 const container = {
@@ -196,6 +200,13 @@ function Sparkline({ data, color = '#10b981', width = 120, height = 32 }: { data
       <circle cx={width} cy={height - ((data[data.length - 1] - min) / range) * (height - 4) - 2} r="3" fill={color} />
     </svg>
   )
+}
+
+// ── Safe Array Helper ─────────────────────────────────────────
+function safeArr(val: unknown): string[] {
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string') return [val]
+  return []
 }
 
 // ── Strategy Action Item ──────────────────────────────────────
@@ -601,6 +612,8 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
   const [exporting, setExporting] = useState(false)
   const [playbookTab, setPlaybookTab] = useState<'seo' | 'aeo' | 'geo'>('seo')
   const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null)
+  const [copiedSnippet, setCopiedSnippet] = useState<number | null>(null)
+  const [copiedWin, setCopiedWin] = useState<number | null>(null)
 
   const quickWins = useMemo(() => data ? deriveQuickWins(data) : [], [data])
   const seoStrategy = useMemo(() => data ? deriveSEOStrategy(data) : [], [data])
@@ -758,14 +771,30 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-3">
                     {quickWins.map((win, i) => (
-                      <div key={i} className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20">
+                      <div
+                        key={i}
+                        className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20 cursor-pointer hover:border-emerald-400/40 transition-all group"
+                        onClick={() => {
+                          navigator.clipboard.writeText(win.description)
+                          setCopiedWin(i)
+                          setTimeout(() => setCopiedWin(null), 2000)
+                        }}
+                        title="Click to copy fix description"
+                      >
                         <div className="flex items-start gap-3">
                           <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
                             <Clock className="w-4 h-4 text-emerald-400" />
                             <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] font-bold">{win.time}</Badge>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-foreground">{win.title}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground">{win.title}</p>
+                              {copiedWin === i ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5 text-emerald-400/0 group-hover:text-emerald-400/60 shrink-0 transition-colors" />
+                              )}
+                            </div>
                             <p className="text-xs text-muted-foreground mt-0.5">{win.description}</p>
                           </div>
                         </div>
@@ -935,6 +964,488 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* ══════════════════════════════════════════════════
+              PILLAR CORRELATION MATRIX
+              ══════════════════════════════════════════════════ */}
+          <motion.div variants={item}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                <Grid3X3 className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Pillar Correlation Matrix</h2>
+                <p className="text-sm text-muted-foreground">How SEO, AEO, and GEO scores influence each other</p>
+              </div>
+            </div>
+            {(() => {
+              const s = seoScore / 100
+              const a = aeoScore / 100
+              const g = geoScore / 100
+              const correlations = [
+                { row: 'SEO', col: 'SEO', val: 1, derived: 1 },
+                { row: 'SEO', col: 'AEO', val: Math.round((s * 0.4 + a * 0.6) * 100) / 100, derived: s * a > 0.5 ? 'strong' : s * a > 0.25 ? 'moderate' : 'weak' },
+                { row: 'SEO', col: 'GEO', val: Math.round((s * 0.3 + g * 0.7) * 100) / 100, derived: s * g > 0.5 ? 'strong' : s * g > 0.25 ? 'moderate' : 'weak' },
+                { row: 'AEO', col: 'SEO', val: Math.round((a * 0.4 + s * 0.6) * 100) / 100, derived: a * s > 0.5 ? 'strong' : a * s > 0.25 ? 'moderate' : 'weak' },
+                { row: 'AEO', col: 'AEO', val: 1, derived: 'self' },
+                { row: 'AEO', col: 'GEO', val: Math.round((a * 0.5 + g * 0.5) * 100) / 100, derived: a * g > 0.5 ? 'strong' : a * g > 0.25 ? 'moderate' : 'weak' },
+                { row: 'GEO', col: 'SEO', val: Math.round((g * 0.3 + s * 0.7) * 100) / 100, derived: g * s > 0.5 ? 'strong' : g * s > 0.25 ? 'moderate' : 'weak' },
+                { row: 'GEO', col: 'AEO', val: Math.round((g * 0.5 + a * 0.5) * 100) / 100, derived: g * a > 0.5 ? 'strong' : g * a > 0.25 ? 'moderate' : 'weak' },
+                { row: 'GEO', col: 'GEO', val: 1, derived: 'self' },
+              ]
+              const cellColor = (d: string) => {
+                if (d === 'self') return 'bg-emerald-500/30 border-emerald-500/40'
+                if (d === 'strong') return 'bg-emerald-500/20 border-emerald-500/30'
+                if (d === 'moderate') return 'bg-amber-500/15 border-amber-500/25'
+                return 'bg-rose-500/10 border-rose-500/20'
+              }
+              const cellText = (d: string) => {
+                if (d === 'self') return 'text-emerald-400'
+                if (d === 'strong') return 'text-emerald-400'
+                if (d === 'moderate') return 'text-amber-400'
+                return 'text-rose-400'
+              }
+              return (
+                <Card className="bg-white/5 backdrop-blur-sm border-white/10">
+                  <CardContent className="p-6">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr>
+                            <th className="p-2 text-xs text-muted-foreground font-medium" />
+                            <th className="p-2 text-xs text-emerald-400 font-bold text-center">SEO</th>
+                            <th className="p-2 text-xs text-cyan-400 font-bold text-center">AEO</th>
+                            <th className="p-2 text-xs text-amber-400 font-bold text-center">GEO</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {['SEO', 'AEO', 'GEO'].map((row) => (
+                            <tr key={row}>
+                              <td className={`p-2 text-xs font-bold ${row === 'SEO' ? 'text-emerald-400' : row === 'AEO' ? 'text-cyan-400' : 'text-amber-400'}`}>{row}</td>
+                              {['SEO', 'AEO', 'GEO'].map((col) => {
+                                const cell = correlations.find(c => c.row === row && c.col === col)!
+                                return (
+                                  <td key={col} className="p-2 text-center">
+                                    <div className={`rounded-lg p-2.5 border ${cellColor(cell.derived)}`}>
+                                      <p className={`text-sm font-bold ${cellText(cell.derived)}`}>
+                                        {cell.derived === 'self' ? '—' : `${Math.round(cell.val * 100)}%`}
+                                      </p>
+                                      <p className={`text-[9px] ${cellText(cell.derived)} opacity-70`}>
+                                        {cell.derived === 'self' ? 'Self' : cell.derived}
+                                      </p>
+                                    </div>
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-white/5">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="w-3 h-3 rounded bg-emerald-500/30" /> Strong correlation
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="w-3 h-3 rounded bg-amber-500/20" /> Moderate correlation
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="w-3 h-3 rounded bg-rose-500/15" /> Weak correlation
+                      </div>
+                    </div>
+                    {seoScore > 60 && aeoScore < 40 && (
+                      <div className="mt-3 bg-cyan-500/5 rounded-lg p-3 border border-cyan-500/10">
+                        <p className="text-xs text-cyan-400"><strong>Insight:</strong> Strong SEO but weak AEO suggests content isn&apos;t structured for answer engines. Adding FAQ schema and direct-answer paragraphs would boost AEO significantly.</p>
+                      </div>
+                    )}
+                    {seoScore > 60 && geoScore < 40 && (
+                      <div className="mt-3 bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
+                        <p className="text-xs text-amber-400"><strong>Insight:</strong> Good SEO but low GEO indicates AI engines can&apos;t cite you. Focus on llms.txt, entity markup, and quotable content to close the gap.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })()}
+          </motion.div>
+
+          {/* ══════════════════════════════════════════════════
+              ALGORITHM UPDATES TRACKER (ENHANCED)
+              ══════════════════════════════════════════════════ */}
+          {data.algorithmUpdates && data.algorithmUpdates.recentUpdates?.length > 0 && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Algorithm Updates Tracker</h2>
+                  <p className="text-sm text-muted-foreground">Recent Google algorithm changes that may affect your site</p>
+                </div>
+                <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-[10px] font-bold">{data.algorithmUpdates.recentUpdates.length} updates</Badge>
+              </div>
+              <div className="space-y-3">
+                {data.algorithmUpdates.recentUpdates.map((update, i) => (
+                  <div key={i} className="bg-white/[0.02] rounded-xl border border-white/5 overflow-hidden">
+                    <button
+                      onClick={() => setExpandedUpdate(expandedUpdate === i ? null : i)}
+                      className="w-full px-5 py-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Impact severity bar */}
+                        <div className={`w-1.5 h-10 rounded-full shrink-0 ${update.impact === 'high' ? 'bg-rose-500' : update.impact === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                        <div className="text-left">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold">{update.name}</span>
+                            <ImpactBadge level={update.impact} />
+                            <PillarBadge pillar={update.affectedPillar} />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{update.date}</span>
+                        </div>
+                      </div>
+                      {expandedUpdate === i ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+                    </button>
+                    {expandedUpdate === i && (
+                      <div className="px-5 pb-5 border-t border-white/5 pt-4">
+                        <p className="text-sm text-muted-foreground mb-3">{update.description}</p>
+                        <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Info className="w-4 h-4 text-amber-400" />
+                            <span className="text-xs font-bold text-amber-400">What This Means For You</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{getUpdateInsight(update)}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              DEEP STRATEGY / TECHNICAL IMPLEMENTATION
+              ══════════════════════════════════════════════════ */}
+          {data.deepStrategy && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                  <Code2 className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Deep Strategy & Technical Implementation</h2>
+                  <p className="text-sm text-muted-foreground">Copy-paste code snippets, backlink targets, and AI citation strategies</p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                {/* Technical Implementations with Code Snippets */}
+                {data.deepStrategy.technicalImplementations && data.deepStrategy.technicalImplementations.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="w-4 h-4 text-emerald-400" />
+                        <span className="text-sm font-semibold">Technical Implementations</span>
+                        <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{data.deepStrategy.technicalImplementations.length}</Badge>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const allCode = data.deepStrategy!.technicalImplementations.map((impl, idx) => `// ${impl.description}\n${impl.codeSnippet}`).join('\n\n')
+                          navigator.clipboard.writeText(allCode)
+                          setCopiedSnippet(-1)
+                          setTimeout(() => setCopiedSnippet(null), 2000)
+                        }}
+                        className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-1 rounded-md hover:bg-emerald-500/10"
+                      >
+                        {copiedSnippet === -1 ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedSnippet === -1 ? 'Copied All!' : 'Copy All'}
+                      </button>
+                    </div>
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(16,185,129,0.3) transparent' }}>
+                      {data.deepStrategy.technicalImplementations.map((impl, i) => (
+                        <div key={i} className="bg-white/[0.02] rounded-xl border border-white/5 overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                            <div className="flex items-center gap-2">
+                              <SeverityBadge severity={impl.priority} />
+                              <PillarBadge pillar={impl.pillar} />
+                              <span className="text-xs text-muted-foreground capitalize">{impl.type}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(impl.codeSnippet)
+                                setCopiedSnippet(i)
+                                setTimeout(() => setCopiedSnippet(null), 2000)
+                              }}
+                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-emerald-400 transition-colors"
+                            >
+                              {copiedSnippet === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              {copiedSnippet === i ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <div className="p-4">
+                            <p className="text-sm text-muted-foreground mb-2">{impl.description}</p>
+                            <div className="relative rounded-lg bg-gray-950 border border-white/5 overflow-hidden">
+                              <pre className="p-4 text-xs text-emerald-300/90 overflow-x-auto font-mono leading-relaxed" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(16,185,129,0.2) transparent' }}>
+                                <code>{impl.codeSnippet}</code>
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Backlink Outreach Targets */}
+                {data.deepStrategy.backlinkOutreach && data.deepStrategy.backlinkOutreach.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Link2 className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-semibold">Backlink Outreach Targets</span>
+                      <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400">{data.deepStrategy.backlinkOutreach.length}</Badge>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {data.deepStrategy.backlinkOutreach.map((target, i) => (
+                        <div key={i} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <ExternalLink className="w-4 h-4 text-amber-400 shrink-0" />
+                            <span className="text-sm font-semibold truncate">{target.targetSite}</span>
+                            <ImpactBadge level={target.priority} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-1.5"><strong>Strategy:</strong> {target.strategy}</p>
+                          <p className="text-xs text-cyan-400/80"><strong>Content Angle:</strong> {target.contentAngle}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Citation Strategy */}
+                {data.deepStrategy.aiCitationStrategy && data.deepStrategy.aiCitationStrategy.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Brain className="w-4 h-4 text-purple-400" />
+                      <span className="text-sm font-semibold">AI Citation Strategy</span>
+                      <Badge variant="outline" className="text-[10px] border-purple-500/30 text-purple-400">{data.deepStrategy.aiCitationStrategy.length}</Badge>
+                    </div>
+                    <div className="space-y-3">
+                      {data.deepStrategy.aiCitationStrategy.map((technique, i) => (
+                        <div key={i} className="bg-purple-500/5 rounded-xl p-4 border border-purple-500/10">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="text-[10px] border-purple-500/30 text-purple-400">{technique.targetEngine}</Badge>
+                            <span className="text-sm font-semibold text-purple-300">{technique.technique}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-1.5">{technique.implementation}</p>
+                          <p className="text-xs text-emerald-400/80">Expected: {technique.expectedResult}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              12-MONTH ROADMAP TIMELINE (ENHANCED)
+              ══════════════════════════════════════════════════ */}
+          {data.roadmap && data.roadmap.quarters?.length > 0 && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                  <Milestone className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">12-Month Roadmap</h2>
+                  <p className="text-sm text-muted-foreground">Quarterly milestones with target scores and deliverables</p>
+                </div>
+              </div>
+              {/* Horizontal Timeline */}
+              <div className="relative mb-6">
+                {/* Horizontal Timeline Line */}
+                <div className="h-1 bg-gradient-to-r from-emerald-500/50 via-cyan-500/50 to-amber-500/50 rounded-full" />
+                <div className="flex justify-between -mt-3">
+                  {data.roadmap.quarters.map((q, i) => {
+                    const dotColors = ['bg-emerald-500 border-emerald-400', 'bg-cyan-500 border-cyan-400', 'bg-amber-500 border-amber-400', 'bg-violet-500 border-violet-400']
+                    return (
+                      <div key={i} className="flex flex-col items-center">
+                        <div className={`w-6 h-6 rounded-full border-2 ${dotColors[i % 4]} flex items-center justify-center bg-background z-10`}>
+                          <span className="text-[8px] font-bold text-foreground">{i + 1}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground mt-1.5 font-medium">{q.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              {/* Quarter Cards */}
+              <div className="relative">
+                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-emerald-500/50 via-cyan-500/50 to-amber-500/50 hidden sm:block" />
+                <div className="space-y-6">
+                  {data.roadmap.quarters.map((q, i) => {
+                    const quarterColors = [
+                      { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+                      { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/20' },
+                      { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/20' },
+                      { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/20' },
+                    ]
+                    const qc = quarterColors[i % 4]
+                    const quarterWeeks = data.measure.weeklyActions?.slice(i * 4, (i + 1) * 4) || []
+                    const deliverables = quarterWeeks.flatMap(w => w.tasks?.filter(t => t.priority === 'high').map(t => t.task) || []).slice(0, 3)
+
+                    return (
+                      <div key={i} className="relative sm:pl-14">
+                        <div className={`absolute left-3 top-3 w-5 h-5 rounded-full ${qc.bg} border-2 ${qc.border} hidden sm:flex items-center justify-center`}>
+                          <div className={`w-2 h-2 rounded-full ${qc.text}`} style={{ backgroundColor: i === 0 ? '#10b981' : i === 1 ? '#06b6d4' : i === 2 ? '#f59e0b' : '#8b5cf6' }} />
+                        </div>
+                        <div className="bg-white/[0.02] rounded-xl p-5 border border-white/5">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${qc.bg}`}>
+                              <span className={`text-xs font-bold ${qc.text}`}>Q{i + 1}</span>
+                            </div>
+                            <span className="text-sm font-semibold">{q.label}</span>
+                          </div>
+                          {/* Goal Cards */}
+                          <div className="grid sm:grid-cols-3 gap-3 mb-4">
+                            <div className="bg-emerald-500/5 rounded-lg p-3 border border-emerald-500/10">
+                              <p className="text-[10px] text-emerald-400 font-bold mb-1">SEO Goal</p>
+                              <p className="text-xs text-muted-foreground">{q.seoGoal}</p>
+                            </div>
+                            <div className="bg-cyan-500/5 rounded-lg p-3 border border-cyan-500/10">
+                              <p className="text-[10px] text-cyan-400 font-bold mb-1">AEO Goal</p>
+                              <p className="text-xs text-muted-foreground">{q.aeoGoal}</p>
+                            </div>
+                            <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
+                              <p className="text-[10px] text-amber-400 font-bold mb-1">GEO Goal</p>
+                              <p className="text-xs text-muted-foreground">{q.geoGoal}</p>
+                            </div>
+                          </div>
+                          {/* Target Score Progress Bars */}
+                          <div className="space-y-2.5 mb-4">
+                            {[
+                              { label: 'SEO', score: q.targetScores.seo, color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+                              { label: 'AEO', score: q.targetScores.aeo, color: 'bg-cyan-500', textColor: 'text-cyan-400' },
+                              { label: 'GEO', score: q.targetScores.geo, color: 'bg-amber-500', textColor: 'text-amber-400' },
+                            ].map((target, j) => (
+                              <div key={j} className="flex items-center gap-3">
+                                <span className={`text-[10px] font-bold ${target.textColor} w-10 shrink-0`}>{target.label}</span>
+                                <div className="flex-1 bg-white/5 rounded-full h-2.5 overflow-hidden relative">
+                                  <div className={`h-full ${target.color} rounded-full transition-all`} style={{ width: `${target.score}%` }} />
+                                </div>
+                                <span className="text-xs font-mono w-8 text-right shrink-0" style={{ color: target.score >= 70 ? '#10b981' : target.score >= 40 ? '#f59e0b' : '#ef4444' }}>{target.score}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Deliverables */}
+                          {deliverables.length > 0 && (
+                            <div className="bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                              <p className="text-[10px] text-muted-foreground font-bold mb-1.5">KEY DELIVERABLES</p>
+                              <div className="space-y-1">
+                                {deliverables.map((d, j) => (
+                                  <p key={j} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                                    <span>{d}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              TRAFFIC INSIGHTS WINNERS/LOSERS (ENHANCED)
+              ══════════════════════════════════════════════════ */}
+          {data.trafficInsights && (data.trafficInsights.winners?.length > 0 || data.trafficInsights.losers?.length > 0) && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                  <Activity className="w-5 h-5 text-teal-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Traffic Insights — Winners & Losers</h2>
+                  <p className="text-sm text-muted-foreground">Page-level performance changes with impact indicators</p>
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {/* Winners */}
+                {data.trafficInsights.winners?.length > 0 && (
+                  <div className="bg-emerald-500/5 rounded-xl p-5 border border-emerald-500/20">
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp className="w-5 h-5 text-emerald-400" />
+                      <span className="text-sm font-bold text-emerald-400">Winners</span>
+                      <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] font-bold">{data.trafficInsights.winners.length}</Badge>
+                    </div>
+                    <div className="space-y-3">
+                      {data.trafficInsights.winners.map((w, i) => {
+                        const changeNum = parseInt(w.change?.replace(/[^0-9.-]/g, '') || '0')
+                        return (
+                          <div key={i} className="bg-white/[0.02] rounded-lg p-3 border border-white/5 hover:border-emerald-500/20 transition-colors">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <PillarBadge pillar={w.pillar} />
+                                <span className="text-sm font-medium truncate">{w.page}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-sm font-bold text-emerald-400">{w.change}</span>
+                              </div>
+                            </div>
+                            {/* Change bar */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-white/5 rounded-full h-1.5 overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(Math.abs(changeNum), 100)}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* Losers */}
+                {data.trafficInsights.losers?.length > 0 && (
+                  <div className="bg-rose-500/5 rounded-xl p-5 border border-rose-500/20">
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingDown className="w-5 h-5 text-rose-400" />
+                      <span className="text-sm font-bold text-rose-400">Losers</span>
+                      <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/30 text-[10px] font-bold">{data.trafficInsights.losers.length}</Badge>
+                    </div>
+                    <div className="space-y-3">
+                      {data.trafficInsights.losers.map((l, i) => {
+                        const changeNum = parseInt(l.change?.replace(/[^0-9.-]/g, '') || '0')
+                        return (
+                          <div key={i} className="bg-white/[0.02] rounded-lg p-3 border border-white/5 hover:border-rose-500/20 transition-colors">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <PillarBadge pillar={l.pillar} />
+                                <span className="text-sm font-medium truncate">{l.page}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+                                <span className="text-sm font-bold text-rose-400">{l.change}</span>
+                              </div>
+                            </div>
+                            {/* Change bar */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-white/5 rounded-full h-1.5 overflow-hidden">
+                                <div className="h-full bg-rose-500 rounded-full transition-all" style={{ width: `${Math.min(Math.abs(changeNum), 100)}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* ══════════════════════════════════════════════════
               PHASE 1: AUDIT
@@ -1108,7 +1619,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                     <div key={dim.label} className={`bg-white/[0.02] rounded-xl p-4 border border-white/5`}>
                       <ScoreRing score={dim.score} label={dim.label} color={scoreColor(dim.score)} size={72} />
                       <div className="mt-3 space-y-1">
-                        {dim.findings?.slice(0, 2).map((f, i) => (
+                        {safeArr(dim.findings).slice(0, 2).map((f, i) => (
                           <p key={i} className="text-[11px] text-muted-foreground leading-snug">• {f}</p>
                         ))}
                       </div>
@@ -1154,9 +1665,11 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                       <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full" style={{ width: `${dim.data?.score || 0}%` }} />
                     </div>
                     <div className="space-y-1">
-                      {dim.data?.findings?.map((f, i) => (
-                        <p key={i} className="text-[11px] text-muted-foreground leading-snug">• {f}</p>
-                      ))}
+                      {Array.isArray(dim.data?.findings) ? dim.data.findings.map((f: string, i: number) => (
+                        <p key={i} className="text-[11px] text-muted-foreground leading-snug">• {typeof f === 'string' ? f : JSON.stringify(f)}</p>
+                      )) : dim.data?.findings ? (
+                        <p className="text-[11px] text-muted-foreground leading-snug">• {String(dim.data.findings)}</p>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -1364,7 +1877,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                 <RiskBadge level={data.parasiteRisk.riskLevel} />
               </div>
               <div className={`rounded-xl p-6 border ${data.parasiteRisk.riskLevel === 'low' ? 'bg-emerald-500/5 border-emerald-500/20' : data.parasiteRisk.riskLevel === 'medium' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
-                {data.parasiteRisk.findings?.map((f, i) => (
+                {safeArr(data.parasiteRisk.findings).map((f, i) => (
                   <p key={i} className="text-sm text-muted-foreground mb-1">• {f}</p>
                 ))}
                 {data.parasiteRisk.recommendations?.map((r, i) => (
@@ -1393,7 +1906,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                   <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
                     <ScoreRing score={data.localSEO.gbpSignals.score} label="Google Business Profile" color={scoreColor(data.localSEO.gbpSignals.score)} size={72} />
                     <div className="mt-2 space-y-1">
-                      {data.localSEO.gbpSignals.findings?.map((f, i) => (
+                      {safeArr(data.localSEO.gbpSignals.findings).map((f, i) => (
                         <p key={i} className="text-[11px] text-muted-foreground">• {f}</p>
                       ))}
                     </div>
@@ -1401,7 +1914,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                   <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
                     <ScoreRing score={data.localSEO.napConsistency.score} label="NAP Consistency" color={scoreColor(data.localSEO.napConsistency.score)} size={72} />
                     <div className="mt-2 space-y-1">
-                      {data.localSEO.napConsistency.findings?.map((f, i) => (
+                      {safeArr(data.localSEO.napConsistency.findings).map((f, i) => (
                         <p key={i} className="text-[11px] text-muted-foreground">• {f}</p>
                       ))}
                     </div>
@@ -1409,225 +1922,13 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                   <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
                     <ScoreRing score={data.localSEO.reviewSignals.score} label="Review Signals" color={scoreColor(data.localSEO.reviewSignals.score)} size={72} />
                     <div className="mt-2 space-y-1">
-                      {data.localSEO.reviewSignals.findings?.map((f, i) => (
+                      {safeArr(data.localSEO.reviewSignals.findings).map((f, i) => (
                         <p key={i} className="text-[11px] text-muted-foreground">• {f}</p>
                       ))}
                     </div>
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[10px] border-teal-500/30 text-teal-400">Business Type: {data.localSEO.businessType}</Badge>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ══════════════════════════════════════════════════
-              BONUS: ALGORITHM UPDATES TRACKER (ENHANCED)
-              ══════════════════════════════════════════════════ */}
-          {data.algorithmUpdates && data.algorithmUpdates.recentUpdates?.length > 0 && (
-            <motion.div variants={item}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-orange-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">Algorithm Updates Tracker</h2>
-                  <p className="text-sm text-muted-foreground">Recent Google algorithm changes that may affect your site</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {data.algorithmUpdates.recentUpdates.map((update, i) => (
-                  <div key={i} className="bg-white/[0.02] rounded-xl border border-white/5 overflow-hidden">
-                    <button
-                      onClick={() => setExpandedUpdate(expandedUpdate === i ? null : i)}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* Severity Indicator */}
-                        <div className={`w-1.5 h-8 rounded-full shrink-0 ${update.impact === 'high' ? 'bg-rose-500' : update.impact === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                        <div className="text-left">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-semibold">{update.name}</span>
-                            <Badge variant="outline" className={`text-[10px] ${update.impact === 'high' ? 'border-rose-500/30 text-rose-400 bg-rose-500/5' : update.impact === 'medium' ? 'border-amber-500/30 text-amber-400 bg-amber-500/5' : 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5'}`}>
-                              {update.impact} impact
-                            </Badge>
-                            <PillarBadge pillar={update.affectedPillar} />
-                          </div>
-                          <span className="text-xs text-muted-foreground">{update.date}</span>
-                        </div>
-                      </div>
-                      {expandedUpdate === i ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
-                    </button>
-                    {expandedUpdate === i && (
-                      <div className="px-4 pb-4 border-t border-white/5 pt-3">
-                        <p className="text-sm text-muted-foreground mb-3">{update.description}</p>
-                        <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Info className="w-4 h-4 text-amber-400" />
-                            <span className="text-xs font-bold text-amber-400">What This Means For You</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{getUpdateInsight(update)}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* ══════════════════════════════════════════════════
-              BONUS: 12-MONTH ROADMAP (ENHANCED)
-              ══════════════════════════════════════════════════ */}
-          {data.roadmap && data.roadmap.quarters?.length > 0 && (
-            <motion.div variants={item}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
-                  <Milestone className="w-5 h-5 text-violet-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">12-Month Roadmap</h2>
-                  <p className="text-sm text-muted-foreground">Quarterly milestones with target scores and deliverables</p>
-                </div>
-              </div>
-              {/* Timeline Visualization */}
-              <div className="relative">
-                {/* Vertical Timeline Line */}
-                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-emerald-500/50 via-cyan-500/50 to-amber-500/50 hidden sm:block" />
-                <div className="space-y-6">
-                  {data.roadmap.quarters.map((q, i) => {
-                    const quarterColors = [
-                      { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-                      { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/20' },
-                      { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/20' },
-                      { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/20' },
-                    ]
-                    const qc = quarterColors[i % 4]
-                    // Derive deliverables from weekly actions that fall in this quarter
-                    const quarterWeeks = data.measure.weeklyActions?.slice(i * 4, (i + 1) * 4) || []
-                    const deliverables = quarterWeeks.flatMap(w => w.tasks?.filter(t => t.priority === 'high').map(t => t.task) || []).slice(0, 3)
-
-                    return (
-                      <div key={i} className="relative sm:pl-14">
-                        {/* Timeline Dot */}
-                        <div className={`absolute left-3 top-3 w-5 h-5 rounded-full ${qc.bg} border-2 ${qc.border} hidden sm:flex items-center justify-center`}>
-                          <div className={`w-2 h-2 rounded-full ${qc.text}`} style={{ backgroundColor: i === 0 ? '#10b981' : i === 1 ? '#06b6d4' : i === 2 ? '#f59e0b' : '#8b5cf6' }} />
-                        </div>
-                        <div className={`bg-white/[0.02] rounded-xl p-5 border border-white/5`}>
-                          <div className="flex items-center gap-2 mb-4">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${qc.bg}`}>
-                              <span className={`text-xs font-bold ${qc.text}`}>Q{i + 1}</span>
-                            </div>
-                            <span className="text-sm font-semibold">{q.label}</span>
-                          </div>
-                          {/* Goal Cards */}
-                          <div className="grid sm:grid-cols-3 gap-3 mb-4">
-                            <div className="bg-emerald-500/5 rounded-lg p-3 border border-emerald-500/10">
-                              <p className="text-[10px] text-emerald-400 font-bold mb-1">SEO Goal</p>
-                              <p className="text-xs text-muted-foreground">{q.seoGoal}</p>
-                            </div>
-                            <div className="bg-cyan-500/5 rounded-lg p-3 border border-cyan-500/10">
-                              <p className="text-[10px] text-cyan-400 font-bold mb-1">AEO Goal</p>
-                              <p className="text-xs text-muted-foreground">{q.aeoGoal}</p>
-                            </div>
-                            <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
-                              <p className="text-[10px] text-amber-400 font-bold mb-1">GEO Goal</p>
-                              <p className="text-xs text-muted-foreground">{q.geoGoal}</p>
-                            </div>
-                          </div>
-                          {/* Target Score Progress Bars */}
-                          <div className="space-y-2 mb-4">
-                            {[
-                              { label: 'SEO Target', score: q.targetScores.seo, current: i === 0 ? data.overallScores.seo : data.overallScores.seo + Math.round((q.targetScores.seo - data.overallScores.seo) * (i / (data.roadmap.quarters.length || 1))), color: 'bg-emerald-500' },
-                              { label: 'AEO Target', score: q.targetScores.aeo, current: i === 0 ? data.overallScores.aeo : data.overallScores.aeo + Math.round((q.targetScores.aeo - data.overallScores.aeo) * (i / (data.roadmap.quarters.length || 1))), color: 'bg-cyan-500' },
-                              { label: 'GEO Target', score: q.targetScores.geo, current: i === 0 ? data.overallScores.geo : data.overallScores.geo + Math.round((q.targetScores.geo - data.overallScores.geo) * (i / (data.roadmap.quarters.length || 1))), color: 'bg-amber-500' },
-                            ].map((target, j) => (
-                              <div key={j} className="flex items-center gap-3">
-                                <span className="text-[10px] text-muted-foreground w-20 shrink-0">{target.label}</span>
-                                <div className="flex-1 bg-white/5 rounded-full h-2.5 overflow-hidden relative">
-                                  <div className={`h-full ${target.color} rounded-full transition-all`} style={{ width: `${target.score}%` }} />
-                                </div>
-                                <span className="text-xs font-mono w-8 text-right shrink-0" style={{ color: target.score >= 70 ? '#10b981' : target.score >= 40 ? '#f59e0b' : '#ef4444' }}>{target.score}</span>
-                              </div>
-                            ))}
-                          </div>
-                          {/* Deliverables */}
-                          {deliverables.length > 0 && (
-                            <div className="bg-white/[0.02] rounded-lg p-3 border border-white/5">
-                              <p className="text-[10px] text-muted-foreground font-bold mb-1.5">KEY DELIVERABLES</p>
-                              <div className="space-y-1">
-                                {deliverables.map((d, j) => (
-                                  <p key={j} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
-                                    <span>{d}</span>
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ══════════════════════════════════════════════════
-              BONUS: TRAFFIC INSIGHTS
-              ══════════════════════════════════════════════════ */}
-          {data.trafficInsights && (data.trafficInsights.winners?.length > 0 || data.trafficInsights.losers?.length > 0) && (
-            <motion.div variants={item}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-teal-400" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">Traffic Insights</h2>
-                  <p className="text-sm text-muted-foreground">Winners & losers analysis across your pages</p>
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {/* Winners */}
-                {data.trafficInsights.winners?.length > 0 && (
-                  <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-emerald-400" />
-                      <span className="text-sm font-semibold text-emerald-400">Winners</span>
-                    </div>
-                    <div className="space-y-2">
-                      {data.trafficInsights.winners.map((w, i) => (
-                        <div key={i} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3 border border-white/5">
-                          <div className="flex items-center gap-2">
-                            <PillarBadge pillar={w.pillar} />
-                            <span className="text-sm text-muted-foreground truncate max-w-[140px]">{w.page}</span>
-                          </div>
-                          <span className="text-sm font-mono text-emerald-400">{w.change}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Losers */}
-                {data.trafficInsights.losers?.length > 0 && (
-                  <div className="bg-rose-500/5 rounded-xl p-4 border border-rose-500/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingDown className="w-4 h-4 text-rose-400" />
-                      <span className="text-sm font-semibold text-rose-400">Losers</span>
-                    </div>
-                    <div className="space-y-2">
-                      {data.trafficInsights.losers.map((l, i) => (
-                        <div key={i} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3 border border-white/5">
-                          <div className="flex items-center gap-2">
-                            <PillarBadge pillar={l.pillar} />
-                            <span className="text-sm text-muted-foreground truncate max-w-[140px]">{l.page}</span>
-                          </div>
-                          <span className="text-sm font-mono text-rose-400">{l.change}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </motion.div>
           )}
