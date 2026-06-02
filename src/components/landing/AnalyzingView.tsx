@@ -3,13 +3,16 @@
 import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore, SEOAnalysis } from '@/lib/store'
-import { Globe, Loader2, AlertTriangle, ArrowLeft } from 'lucide-react'
+import { Globe, Loader2, AlertTriangle, ArrowLeft, MapPin } from 'lucide-react'
 
 const phases = [
-  { label: 'Auditing your site', icon: '🔍', phase: 'Phase 1' },
+  { label: 'Scanning your website', icon: '🔍', phase: 'Phase 1' },
   { label: 'Technical SEO & AEO readiness', icon: '⚙️', phase: 'Phase 1' },
   { label: 'GEO visibility & AI citation landscape', icon: '🤖', phase: 'Phase 1' },
-  { label: 'Structuring your strategy', icon: '📐', phase: 'Phase 2' },
+  { label: 'E-E-A-T & content quality analysis', icon: '📋', phase: 'Phase 2' },
+  { label: 'AI crawler & brand mention signals', icon: '🛡️', phase: 'Phase 2' },
+  { label: 'Local SEO & SXO analysis', icon: '📍', phase: 'Phase 2' },
+  { label: 'Structuring your strategy', icon: '📐', phase: 'Phase 3' },
   { label: 'Creating content briefs & answer blocks', icon: '✍️', phase: 'Phase 3' },
   { label: 'Building measurement framework', icon: '📊', phase: 'Phase 4' },
   { label: 'Parsing analysis results', icon: '🔧', phase: '' },
@@ -19,6 +22,7 @@ const phases = [
 export default function AnalyzingView() {
   const {
     targetUrl,
+    targetMarket,
     analysisProgress,
     analysisStep,
     analysisError,
@@ -46,7 +50,7 @@ export default function AnalyzingView() {
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: targetUrl }),
+          body: JSON.stringify({ url: targetUrl, market: targetMarket }),
           signal,
         })
 
@@ -114,7 +118,7 @@ export default function AnalyzingView() {
       abortController.abort()
       analyzedUrlRef.current = null
     }
-  }, [targetUrl, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError])
+  }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError])
 
   const currentStepIndex = phases.findIndex((s) =>
     analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
@@ -172,13 +176,25 @@ export default function AnalyzingView() {
         </motion.h2>
 
         <motion.p
-          className="text-emerald-400 font-mono text-sm mb-8"
+          className="text-emerald-400 font-mono text-sm mb-1"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
           {targetUrl}
         </motion.p>
+
+        {targetMarket && targetMarket !== 'Global' && (
+          <motion.p
+            className="text-amber-400 font-mono text-sm mb-6 flex items-center justify-center gap-1.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <MapPin className="w-4 h-4" />
+            Market: {targetMarket}
+          </motion.p>
+        )}
 
         {/* Progress Bar */}
         <div className="w-full bg-white/5 rounded-full h-3 mb-4 overflow-hidden border border-white/10">
@@ -196,14 +212,14 @@ export default function AnalyzingView() {
         </div>
 
         {/* Phase Steps */}
-        <div className="space-y-2">
+        <div className="space-y-1.5 max-h-80 overflow-y-auto custom-scrollbar">
           {phases.map((step, i) => {
             const isActive = i === currentStepIndex
-            const isDone = (i < currentStepIndex && currentStepIndex !== -1) || analysisProgress >= (i + 1) * 12
+            const isDone = (i < currentStepIndex && currentStepIndex !== -1) || analysisProgress >= (i + 1) * 9
             return (
               <motion.div
                 key={step.label}
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 ${
+                className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-300 ${
                   isActive
                     ? 'bg-emerald-500/10 border border-emerald-500/30'
                     : isDone
@@ -212,7 +228,7 @@ export default function AnalyzingView() {
                 }`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.08 }}
+                transition={{ delay: i * 0.06 }}
               >
                 <span className="text-lg">{step.icon}</span>
                 <div className="flex-1 text-left">

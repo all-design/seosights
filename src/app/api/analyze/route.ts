@@ -24,7 +24,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { url } = body
+    const { url, market } = body
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 })
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     const encoder = new TextEncoder()
+    const targetMarket = market || 'Global'
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
           const zai = await ZAI.create()
 
           // ── Phase 1: Audit ──────────────────────────────────────────────
-          enqueue(sendProgress(10, 'Phase 1: Auditing your site...'))
+          enqueue(sendProgress(8, 'Phase 1: Scanning your website...'))
 
           let siteData: { title?: string; html?: string; url?: string; text?: string }
           try {
@@ -82,11 +83,12 @@ export async function POST(request: NextRequest) {
             siteData = { title: url, url, text: '' }
           }
 
-          enqueue(sendProgress(25, 'Analyzing technical SEO & AEO readiness...'))
+          enqueue(sendProgress(20, 'Analyzing technical SEO & AEO readiness...'))
 
           // Step 2: Search for competitor & niche info
           let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
           let aiSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+          let localSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
           try {
             const domain = new URL(url).hostname.replace('www.', '')
             const nicheQuery = `best ${siteData.title || domain} alternatives competitors`
@@ -97,7 +99,7 @@ export async function POST(request: NextRequest) {
             )
             searchResults = Array.isArray(results) ? results : []
 
-            enqueue(sendProgress(35, 'Checking GEO visibility & AI citation landscape...'))
+            enqueue(sendProgress(30, 'Checking GEO visibility & AI citation landscape...'))
 
             const aiResults = await withTimeout(
               zai.functions.invoke('web_search', {
@@ -108,14 +110,28 @@ export async function POST(request: NextRequest) {
               []
             )
             aiSearchResults = Array.isArray(aiResults) ? aiResults : []
+
+            enqueue(sendProgress(38, `Analyzing local SEO signals for ${targetMarket}...`))
+
+            if (targetMarket !== 'Global') {
+              const localResults = await withTimeout(
+                zai.functions.invoke('web_search', {
+                  query: `${domain} ${targetMarket} local SEO business listings`,
+                  num: 5,
+                }),
+                10000,
+                []
+              )
+              localSearchResults = Array.isArray(localResults) ? localResults : []
+            }
           } catch {
             // Continue without search data
           }
 
           // ── Phase 2: Structure ──────────────────────────────────────────
-          enqueue(sendProgress(50, 'Phase 2: Structuring your strategy...'))
+          enqueue(sendProgress(45, 'Phase 2: Running E-E-A-T & content quality analysis...'))
 
-          // Step 3: LLM — Comprehensive SEO / AEO / GEO Analysis
+          // Step 3: LLM — Comprehensive SEO / AEO / GEO + Bonus Analysis
           const siteContent = siteData.text?.slice(0, 5000) || 'No content available'
           const competitorInfo = searchResults
             .slice(0, 5)
@@ -125,30 +141,90 @@ export async function POST(request: NextRequest) {
             .slice(0, 3)
             .map((r) => `${r.name}: ${r.snippet}`)
             .join('\n')
+          const localInfo = localSearchResults
+            .slice(0, 3)
+            .map((r) => `${r.name}: ${r.snippet}`)
+            .join('\n')
 
           const systemPrompt =
-            'You are an elite SEO/AEO/GEO strategist specializing in SEO (Google rankings), AEO (featured snippets, voice answers), and GEO (AI citation by ChatGPT, Claude, Perplexity). ALWAYS respond with ONLY valid JSON. No markdown. No code fences. Be concise - keep all string values under 15 words.'
+            'You are an elite SEO/AEO/GEO strategist with deep expertise in: SEO (Google rankings), AEO (featured snippets, voice answers), GEO (AI citation by ChatGPT, Claude, Perplexity), E-E-A-T analysis, AI crawler optimization, brand mention signals, content quality/humanization, parasite SEO risk, local SEO, and Search Experience Optimization (SXO). ALWAYS respond with ONLY valid JSON. No markdown. No code fences. Be concise - keep all string values under 20 words.'
 
-          const userPrompt = `Analyze ${url} across SEO, AEO, GEO pillars. Title: ${siteData.title}. Content: ${siteContent.slice(0, 2000)}. Competitors: ${competitorInfo.slice(0, 500) || 'None'}. AI context: ${aiInfo.slice(0, 300) || 'None'}.
+          const userPrompt = `Analyze ${url} for market: ${targetMarket}. Title: ${siteData.title}. Content: ${siteContent.slice(0, 2000)}. Competitors: ${competitorInfo.slice(0, 500) || 'None'}. AI context: ${aiInfo.slice(0, 300) || 'None'}. Local context: ${localInfo.slice(0, 300) || 'None'}.
 
-Return JSON with EXACTLY this structure. Keep values SHORT (max 15 words per string). Generate FEWER items to stay within output limits:
+Return JSON with EXACTLY this structure. Keep values SHORT (max 20 words per string). Generate FEWER items to stay within output limits:
 
 {
   "siteName": "name",
+  "market": "${targetMarket}",
   "overallScores": { "seo": 1-100, "aeo": 1-100, "geo": 1-100, "combined": 1-100 },
   "audit": {
     "technicalSEO": { "score": 1-100, "issues": [{ "issue": "short", "severity": "critical|warning|info", "fix": "short fix" }] },
     "crawlability": { "score": 1-100, "issues": [{ "issue": "short", "impact": "short" }] },
-    "pageSpeed": { "score": 1-100, "coreVitals": [{ "metric": "LCP|FID|CLS", "value": "est. value", "status": "good|needs-improvement|poor" }] },
+    "pageSpeed": { "score": 1-100, "coreVitals": [{ "metric": "LCP|INP|CLS", "value": "est. value", "status": "good|needs-improvement|poor" }] },
     "indexation": { "score": 1-100, "indexedPages": 0, "orphanPages": 0, "issues": ["short"] },
     "aeoReadiness": { "score": 1-100, "hasFAQ": false, "hasSchema": false, "hasStructuredData": false, "answerFormatScore": 1-100, "issues": ["short"] },
     "geoVisibility": { "score": 1-100, "citedByAI": ["ChatGPT"], "entityRecognition": 1-100, "knowledgeGraphPresence": false, "issues": ["short"] }
+  },
+  "eeat": {
+    "overallScore": 1-100,
+    "experience": { "score": 1-100, "findings": ["short finding"] },
+    "expertise": { "score": 1-100, "findings": ["short finding"] },
+    "authoritativeness": { "score": 1-100, "findings": ["short finding"] },
+    "trustworthiness": { "score": 1-100, "findings": ["short finding"] },
+    "whoHowWhyTest": { "who": "who made this", "how": "how it was made", "why": "why it exists" }
+  },
+  "geoCitability": {
+    "overallScore": 1-100,
+    "citabilityScore": { "score": 1-100, "weight": 25, "findings": ["short"] },
+    "structuralReadability": { "score": 1-100, "weight": 20, "findings": ["short"] },
+    "multiModalContent": { "score": 1-100, "weight": 15, "findings": ["short"] },
+    "authorityBrandSignals": { "score": 1-100, "weight": 20, "findings": ["short"] },
+    "technicalAccessibility": { "score": 1-100, "weight": 20, "findings": ["short"] }
+  },
+  "aiCrawler": {
+    "aiCrawlerAccess": [{ "bot": "GPTBot", "allowed": true, "recommendation": "short" }],
+    "robotsTxtAnalysis": ["short finding"],
+    "llmsTxtPresence": false,
+    "jsRenderingDependency": "high|medium|low",
+    "ssrVsCsr": "short description"
+  },
+  "brandMentions": {
+    "brandMentionScore": 1-100,
+    "backlinkCorrelation": "short explanation",
+    "platformPresence": [{ "platform": "Wikipedia", "detected": false, "strength": "none|weak|moderate|strong" }],
+    "citationSources": [{ "engine": "ChatGPT", "topSource": "Wikipedia", "percentage": 48 }]
+  },
+  "contentQuality": {
+    "overallScore": 1-100,
+    "contentDepth": 1-100,
+    "aiPatternRisk": "low|medium|high",
+    "humanizationTips": ["short tip"],
+    "fillerDetected": ["short filler item"],
+    "originalityIndicators": ["short indicator"]
+  },
+  "parasiteRisk": {
+    "riskLevel": "low|medium|high",
+    "findings": ["short finding"],
+    "recommendations": ["short rec"]
+  },
+  "localSEO": {
+    "applicable": false,
+    "gbpSignals": { "score": 1-100, "findings": ["short"] },
+    "napConsistency": { "score": 1-100, "findings": ["short"] },
+    "reviewSignals": { "score": 1-100, "findings": ["short"] },
+    "businessType": "type or N/A"
+  },
+  "sxo": {
+    "pageTypeMatch": "short description",
+    "serpIntentMatch": "informational|transactional|navigational|mixed",
+    "userPersonaScores": [{ "persona": "name", "score": 1-100 }],
+    "recommendations": ["short rec"]
   },
   "structure": {
     "topicClusters": [{ "cluster": "name", "pillarKeyword": "kw", "supportingKeywords": ["kw1","kw2"], "seoOpportunity": "short", "aeoOpportunity": "short", "geoOpportunity": "short" }],
     "keywordGaps": [{ "keyword": "kw", "volume": "High|Med|Low", "difficulty": "Hard|Med|Easy", "type": "seo|aeo|geo", "opportunity": "short" }],
     "contentArchitecture": { "recommended": [{ "section": "name", "purpose": "short", "pillar": "seo|aeo|geo|all" }], "internalLinkMap": [{ "from": "page", "to": "page", "anchor": "text" }] },
-    "schemaRecommendations": [{ "schemaType": "type", "purpose": "short", "pillar": "seo|aeo|geo", "implementation": "short" }]
+    "schemaRecommendations": [{ "schemaType": "type", "purpose": "short", "pillar": "seo|aeo|geo", "implementation": "short", "status": "active|restricted|deprecated" }]
   },
   "creative": {
     "contentBriefs": [{ "title": "title", "type": "blog|guide|faq|tool|comparison", "targetKeyword": "kw", "pillar": "seo|aeo|geo|all", "brief": "short brief", "estimatedImpact": "short", "wordCount": "1000-2000", "structure": ["H2","H2"] }],
@@ -168,14 +244,14 @@ Return JSON with EXACTLY this structure. Keep values SHORT (max 15 words per str
   "executiveActions": ["action1", "action2", "action3", "action4", "action5"]
 }
 
-QUANTITY RULES: 3 technicalSEO issues, 2 crawlability issues, 3 coreVitals, 2 indexation issues, 2 aeoReadiness issues, 2 geoVisibility issues, 3 topicClusters (2 supportingKeywords each), 4 keywordGaps, 3 contentArchitecture recommended, 2 internalLinks, 2 schemaRecommendations, 3 contentBriefs (2 structure headings each), 2 onPageOptimizations (1 aeoTweak + 1 geoTweak each), 3 answerBlocks, 2 KPIs per pillar, 2 competitorBenchmarks, 3 weeks of weeklyActions (3 tasks each), 5 executiveActions.
+QUANTITY RULES: 3 technicalSEO issues, 2 crawlability issues, 3 coreVitals, 2 indexation issues, 2 aeoReadiness issues, 2 geoVisibility issues, 2 eeat findings per dimension, 2 geoCitability findings per dimension, 3 aiCrawlerAccess entries, 1 robotsTxtAnalysis, 3 platformPresence, 2 citationSources, 2 humanizationTips, 1 fillerDetected, 2 originalityIndicators, 1 parasiteRisk finding, 1 parasiteRisk recommendation, 1 gbpSignals finding, 1 napConsistency finding, 1 reviewSignals finding, 2 sxo userPersonaScores, 2 sxo recommendations, 3 topicClusters (2 supportingKeywords each), 4 keywordGaps, 3 contentArchitecture recommended, 2 internalLinks, 2 schemaRecommendations, 3 contentBriefs (2 structure headings each), 2 onPageOptimizations (1 aeoTweak + 1 geoTweak each), 3 answerBlocks, 2 KPIs per pillar, 2 competitorBenchmarks, 3 weeks of weeklyActions (3 tasks each), 5 executiveActions.
 
-SCORE RULES: Realistic scores. Average site: 30-50. Combined = 40% SEO + 30% AEO + 30% GEO.
+SCORE RULES: Realistic scores. Average site: 30-50. Combined = 40% SEO + 30% AEO + 30% GEO. Trustworthiness is most heavily weighted in E-E-A-T. localSEO.applicable should be true if the site is a local business.
 
 IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Keep all strings concise.`
 
           // ── Phase 3: Creative ───────────────────────────────────────────
-          enqueue(sendProgress(65, 'Phase 3: Creating content briefs & answer blocks...'))
+          enqueue(sendProgress(55, 'Phase 3: Creating content briefs & answer blocks...'))
 
           const completion = await zai.chat.completions.create({
             messages: [
@@ -185,7 +261,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Keep all strings
           })
 
           // ── Phase 4: Measure ────────────────────────────────────────────
-          enqueue(sendProgress(80, 'Phase 4: Building measurement framework...'))
+          enqueue(sendProgress(75, 'Phase 4: Building measurement framework...'))
 
           let analysisResult: Record<string, unknown>
           const rawResponse = completion.choices[0]?.message?.content || ''
@@ -195,7 +271,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Keep all strings
           let jsonStr = rawResponse
 
           // Strategy 1: Remove code fences
-          const jsonMatch = rawResponse.match(/```(?:json)?\s*([\s\S]*?)```/)
+          const jsonMatch = rawResponse.match(/\`\`\`(?:json)?\s*([\s\S]*?)\`\`\`/)
           if (jsonMatch) {
             jsonStr = jsonMatch[1].trim()
           }
@@ -226,7 +302,6 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Keep all strings
                   const openBraces = (fixed.match(/{/g) || []).length
                   const closeBraces = (fixed.match(/}/g) || []).length
                   if (openBraces > closeBraces) {
-                    // Add missing closing braces
                     fixed += '}'.repeat(openBraces - closeBraces)
                   }
                   const openBrackets = (fixed.match(/\[/g) || []).length
@@ -248,6 +323,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Keep all strings
           }
 
           analysisResult.url = url
+          analysisResult.market = targetMarket
 
           enqueue(sendProgress(90, 'Parsing analysis results...'))
           await new Promise((resolve) => setTimeout(resolve, 200))

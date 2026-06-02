@@ -6,7 +6,7 @@ import HeroSection from '@/components/landing/HeroSection'
 import StatsSection from '@/components/landing/StatsSection'
 import AgentOSSection from '@/components/landing/AgentOSSection'
 import BacklinksSection from '@/components/landing/BacklinksSection'
-import JuneStackSection from '@/components/landing/JuneStackSection'
+import CompleteSolutionSection from '@/components/landing/CompleteSolutionSection'
 import CTASection from '@/components/landing/CTASection'
 import Footer from '@/components/landing/Footer'
 import URLInputModal from '@/components/landing/URLInputModal'
@@ -45,7 +45,7 @@ export default function Home() {
       <StatsSection />
       <AgentOSSection />
       <BacklinksSection />
-      <JuneStackSection />
+      <CompleteSolutionSection />
       <CTASection onStartFree={() => setIsModalOpen(true)} />
       <Footer />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />

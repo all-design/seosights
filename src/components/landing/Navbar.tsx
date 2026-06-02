@@ -8,7 +8,7 @@ import { Menu, X, Zap } from 'lucide-react'
 const navLinks = [
   { label: 'Agent OS', href: '#agent-os' },
   { label: 'Backlinks', href: '#backlinks' },
-  { label: 'June Stack', href: '#june-stack' },
+  { label: 'Complete Solution', href: '#complete-solution' },
   { label: 'Get Started', href: '#cta' },
 ]
 

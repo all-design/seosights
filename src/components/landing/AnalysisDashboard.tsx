@@ -28,6 +28,16 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  Bot,
+  Globe,
+  Eye,
+  MapPin,
+  Award,
+  Scale,
+  Link2,
+  ShieldAlert,
+  UserCheck,
+  ShoppingBag,
 } from 'lucide-react'
 
 const container = {
@@ -55,22 +65,33 @@ function PillarBadge({ pillar }: { pillar: string }) {
   )
 }
 
+// ── Schema Status Badge ──────────────────────────────────────
+function SchemaStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    active: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5',
+    restricted: 'border-amber-500/30 text-amber-400 bg-amber-500/5',
+    deprecated: 'border-rose-500/30 text-rose-400 bg-rose-500/5',
+  }
+  return <Badge variant="outline" className={`text-[10px] uppercase font-bold ${styles[status] || styles.deprecated}`}>{status}</Badge>
+}
+
 // ── Score Ring ────────────────────────────────────────────────
-function ScoreRing({ score, label, color }: { score: number; label: string; color: string }) {
-  const circumference = 2 * Math.PI * 40
+function ScoreRing({ score, label, color, size = 96 }: { score: number; label: string; color: string; size?: number }) {
+  const r = (size / 2) - 8
+  const circumference = 2 * Math.PI * r
   const offset = circumference - (score / 100) * circumference
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="relative w-24 h-24">
-        <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
-          <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="6" fill="none" className="text-white/5" />
-          <circle cx="48" cy="48" r="40" stroke={color} strokeWidth="6" fill="none" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" />
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg className="w-full h-full -rotate-90" viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={size/2} cy={size/2} r={r} stroke="currentColor" strokeWidth="6" fill="none" className="text-white/5" />
+          <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth="6" fill="none" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xl font-bold">{score}</span>
+          <span className={`font-bold ${size < 80 ? 'text-base' : 'text-xl'}`}>{score}</span>
         </div>
       </div>
-      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-xs text-muted-foreground text-center">{label}</span>
     </div>
   )
 }
@@ -85,14 +106,31 @@ function SeverityBadge({ severity }: { severity: string }) {
   return <Badge variant="outline" className={`text-[10px] uppercase font-bold ${styles[severity] || styles.info}`}>{severity}</Badge>
 }
 
+// ── Risk Badge ────────────────────────────────────────────────
+function RiskBadge({ level }: { level: string }) {
+  const styles: Record<string, string> = {
+    low: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5',
+    medium: 'border-amber-500/30 text-amber-400 bg-amber-500/5',
+    high: 'border-rose-500/30 text-rose-400 bg-rose-500/5',
+  }
+  return <Badge variant="outline" className={`text-[10px] uppercase font-bold ${styles[level] || styles.medium}`}>{level} risk</Badge>
+}
+
 // ── Collapsible Section ───────────────────────────────────────
-function Collapsible({ title, icon: Icon, children, defaultOpen = false, badge }: { title: string; icon: React.ElementType; children: React.ReactNode; defaultOpen?: boolean; badge?: React.ReactNode }) {
+function Collapsible({ title, icon: Icon, children, defaultOpen = false, badge, accentColor = 'emerald' }: { title: string; icon: React.ElementType; children: React.ReactNode; defaultOpen?: boolean; badge?: React.ReactNode; accentColor?: string }) {
   const [open, setOpen] = useState(defaultOpen)
+  const colorMap: Record<string, string> = {
+    emerald: 'text-emerald-400',
+    cyan: 'text-cyan-400',
+    amber: 'text-amber-400',
+    rose: 'text-rose-400',
+    purple: 'text-purple-400',
+  }
   return (
     <div className="bg-white/[0.02] rounded-xl border border-white/5 overflow-hidden">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors">
         <div className="flex items-center gap-3">
-          <Icon className="w-5 h-5 text-emerald-400" />
+          <Icon className={`w-5 h-5 ${colorMap[accentColor] || colorMap.emerald}`} />
           <span className="font-semibold text-sm">{title}</span>
           {badge}
         </div>
@@ -128,6 +166,14 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
             </span>
             <Separator />
             <span className="text-sm text-muted-foreground hidden sm:block">{data.siteName || data.url}</span>
+            {data.market && data.market !== 'Global' && (
+              <>
+                <Separator />
+                <span className="text-xs text-amber-400 hidden sm:flex items-center gap-1">
+                  <MapPin className="w-3 h-3" /> {data.market}
+                </span>
+              </>
+            )}
           </div>
           <button
             onClick={reset}
@@ -152,8 +198,13 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                   </div>
                   <div className="flex-1 min-w-0">
                     <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-                      SEO · AEO · GEO Analysis: <span className="text-emerald-400">{data.siteName}</span>
+                      SEO · AEO · GEO: <span className="text-emerald-400">{data.siteName}</span>
                     </h1>
+                    {data.market && data.market !== 'Global' && (
+                      <p className="text-amber-400 text-sm mb-2 flex items-center gap-1">
+                        <MapPin className="w-4 h-4" /> Target Market: {data.market}
+                      </p>
+                    )}
                     <p className="text-muted-foreground leading-relaxed text-lg">{data.summary}</p>
                   </div>
                 </div>
@@ -223,7 +274,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
             </div>
             <div className="space-y-3">
               {/* Technical SEO */}
-              <Collapsible title="Technical SEO Issues" icon={Wrench} badge={<Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{data.audit.technicalSEO.score}/100</Badge>} defaultOpen>
+              <Collapsible title="Technical SEO Issues" icon={Wrench} badge={<Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{data.audit.technicalSEO.score}/100</Badge>} defaultOpen accentColor="emerald">
                 <div className="space-y-3">
                   {data.audit.technicalSEO.issues?.map((issue, i) => (
                     <div key={i} className="bg-white/[0.02] rounded-lg p-3 border border-white/5">
@@ -238,7 +289,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* Crawlability */}
-              <Collapsible title="Crawlability" icon={Database} badge={<Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{data.audit.crawlability.score}/100</Badge>}>
+              <Collapsible title="Crawlability" icon={Database} badge={<Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{data.audit.crawlability.score}/100</Badge>} accentColor="emerald">
                 <div className="space-y-2">
                   {data.audit.crawlability.issues?.map((issue, i) => (
                     <div key={i} className="flex items-start gap-2">
@@ -253,7 +304,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* Page Speed */}
-              <Collapsible title="Core Web Vitals" icon={Zap} badge={<Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{data.audit.pageSpeed.score}/100</Badge>}>
+              <Collapsible title="Core Web Vitals" icon={Zap} badge={<Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">{data.audit.pageSpeed.score}/100</Badge>} accentColor="emerald">
                 <div className="grid sm:grid-cols-3 gap-3">
                   {data.audit.pageSpeed.coreVitals?.map((vital, i) => (
                     <div key={i} className={`rounded-xl p-4 text-center border ${vital.status === 'good' ? 'bg-emerald-500/5 border-emerald-500/20' : vital.status === 'poor' ? 'bg-rose-500/5 border-rose-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
@@ -266,7 +317,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* AEO Readiness */}
-              <Collapsible title="AEO Readiness" icon={MessageSquare} badge={<PillarBadge pillar="aeo" />}>
+              <Collapsible title="AEO Readiness" icon={MessageSquare} badge={<PillarBadge pillar="aeo" />} accentColor="cyan">
                 <div className="space-y-3">
                   <div className="grid grid-cols-3 gap-3">
                     <div className={`rounded-lg p-3 text-center border ${data.audit.aeoReadiness.hasFAQ ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
@@ -301,7 +352,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* GEO Visibility */}
-              <Collapsible title="GEO Visibility" icon={Brain} badge={<PillarBadge pillar="geo" />}>
+              <Collapsible title="GEO Visibility" icon={Brain} badge={<PillarBadge pillar="geo" />} accentColor="amber">
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">AI Engines That May Cite You</p>
@@ -336,6 +387,418 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
           </motion.div>
 
           {/* ══════════════════════════════════════════════════
+              BONUS: E-E-A-T ANALYSIS
+              ══════════════════════════════════════════════════ */}
+          {data.eeat && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                  <Award className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">E-E-A-T Analysis</h2>
+                  <p className="text-sm text-muted-foreground">Experience · Expertise · Authoritativeness · Trustworthiness</p>
+                </div>
+                <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400">{data.eeat.overallScore}/100</Badge>
+              </div>
+              <div className="space-y-3">
+                {/* Who / How / Why Test */}
+                <Collapsible title="Who / How / Why Test" icon={UserCheck} accentColor="amber">
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="bg-emerald-500/5 rounded-lg p-3 border border-emerald-500/10">
+                      <p className="text-[10px] text-emerald-400 font-bold mb-1">WHO created it?</p>
+                      <p className="text-xs text-muted-foreground">{data.eeat.whoHowWhyTest?.who || 'N/A'}</p>
+                    </div>
+                    <div className="bg-cyan-500/5 rounded-lg p-3 border border-cyan-500/10">
+                      <p className="text-[10px] text-cyan-400 font-bold mb-1">HOW was it created?</p>
+                      <p className="text-xs text-muted-foreground">{data.eeat.whoHowWhyTest?.how || 'N/A'}</p>
+                    </div>
+                    <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
+                      <p className="text-[10px] text-amber-400 font-bold mb-1">WHY does it exist?</p>
+                      <p className="text-xs text-muted-foreground">{data.eeat.whoHowWhyTest?.why || 'N/A'}</p>
+                    </div>
+                  </div>
+                </Collapsible>
+
+                {/* E-E-A-T Scores */}
+                <div className="grid sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Experience', score: data.eeat.experience.score, findings: data.eeat.experience.findings, color: 'emerald' },
+                    { label: 'Expertise', score: data.eeat.expertise.score, findings: data.eeat.expertise.findings, color: 'cyan' },
+                    { label: 'Authoritativeness', score: data.eeat.authoritativeness.score, findings: data.eeat.authoritativeness.findings, color: 'amber' },
+                    { label: 'Trustworthiness', score: data.eeat.trustworthiness.score, findings: data.eeat.trustworthiness.findings, color: 'rose' },
+                  ].map((dim) => (
+                    <div key={dim.label} className={`bg-white/[0.02] rounded-xl p-4 border border-white/5`}>
+                      <ScoreRing score={dim.score} label={dim.label} color={scoreColor(dim.score)} size={72} />
+                      <div className="mt-3 space-y-1">
+                        {dim.findings?.slice(0, 2).map((f, i) => (
+                          <p key={i} className="text-[11px] text-muted-foreground leading-snug">• {f}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: GEO CITABILITY SCORING
+              ══════════════════════════════════════════════════ */}
+          {data.geoCitability && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">GEO Citability Scoring</h2>
+                  <p className="text-sm text-muted-foreground">How likely AI is to cite your content (5 weighted dimensions)</p>
+                </div>
+                <Badge variant="outline" className="text-[10px] border-purple-500/30 text-purple-400">{data.geoCitability.overallScore}/100</Badge>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: 'Citability Score', data: data.geoCitability.citabilityScore, color: 'emerald' },
+                  { label: 'Structural Readability', data: data.geoCitability.structuralReadability, color: 'cyan' },
+                  { label: 'Multi-Modal Content', data: data.geoCitability.multiModalContent, color: 'amber' },
+                  { label: 'Authority & Brand Signals', data: data.geoCitability.authorityBrandSignals, color: 'purple' },
+                  { label: 'Technical Accessibility', data: data.geoCitability.technicalAccessibility, color: 'rose' },
+                ].map((dim) => (
+                  <div key={dim.label} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{dim.label}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] border-white/20 text-muted-foreground">{dim.data?.weight}% weight</Badge>
+                        <span className="text-sm font-mono text-emerald-400">{dim.data?.score}/100</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden mb-2">
+                      <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full" style={{ width: `${dim.data?.score || 0}%` }} />
+                    </div>
+                    <div className="space-y-1">
+                      {dim.data?.findings?.map((f, i) => (
+                        <p key={i} className="text-[11px] text-muted-foreground leading-snug">• {f}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: AI CRAWLER & BOT ANALYSIS
+              ══════════════════════════════════════════════════ */}
+          {data.aiCrawler && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">AI Crawler & Bot Analysis</h2>
+                  <p className="text-sm text-muted-foreground">Ensure AI engines can read and cite your content</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {/* AI Crawler Access Table */}
+                <Collapsible title="AI Crawler Access" icon={Bot} defaultOpen accentColor="cyan">
+                  <div className="space-y-2">
+                    {data.aiCrawler.aiCrawlerAccess?.map((bot, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${bot.allowed ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                          <span className="text-sm font-medium">{bot.bot}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={`text-[10px] ${bot.allowed ? 'border-emerald-500/30 text-emerald-400' : 'border-rose-500/30 text-rose-400'}`}>
+                            {bot.allowed ? 'Allowed' : 'Blocked'}
+                          </Badge>
+                          <span className="text-[11px] text-muted-foreground max-w-[200px] truncate">{bot.recommendation}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Collapsible>
+
+                {/* robots.txt & Technical */}
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className={`rounded-xl p-4 border ${data.aiCrawler.llmsTxtPresence ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                    <p className="text-xs text-muted-foreground">llms.txt</p>
+                    <p className="text-lg font-bold">{data.aiCrawler.llmsTxtPresence ? '✓ Present' : '✗ Missing'}</p>
+                  </div>
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground">JS Dependency</p>
+                    <p className="text-lg font-bold capitalize">{data.aiCrawler.jsRenderingDependency}</p>
+                  </div>
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground">SSR vs CSR</p>
+                    <p className="text-sm font-bold">{data.aiCrawler.ssrVsCsr || 'Unknown'}</p>
+                  </div>
+                </div>
+
+                {data.aiCrawler.robotsTxtAnalysis?.length > 0 && (
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground mb-2">robots.txt Analysis</p>
+                    {data.aiCrawler.robotsTxtAnalysis.map((f, i) => (
+                      <p key={i} className="text-sm text-muted-foreground">• {f}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: BRAND MENTION SIGNALS
+              ══════════════════════════════════════════════════ */}
+          {data.brandMentions && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                  <Link2 className="w-5 h-5 text-rose-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Brand Mention Signals</h2>
+                  <p className="text-sm text-muted-foreground">Brand mentions correlate 3x more with AI visibility than backlinks</p>
+                </div>
+                <Badge variant="outline" className="text-[10px] border-rose-500/30 text-rose-400">{data.brandMentions.brandMentionScore}/100</Badge>
+              </div>
+              <div className="space-y-3">
+                {/* Platform Presence */}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {data.brandMentions.platformPresence?.map((p, i) => (
+                    <div key={i} className={`rounded-xl p-4 border ${p.strength === 'strong' ? 'bg-emerald-500/5 border-emerald-500/20' : p.strength === 'moderate' ? 'bg-amber-500/5 border-amber-500/20' : p.strength === 'weak' ? 'bg-orange-500/5 border-orange-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                      <p className="text-sm font-medium mb-1">{p.platform}</p>
+                      <Badge variant="outline" className={`text-[10px] ${p.detected ? 'border-emerald-500/30 text-emerald-400' : 'border-rose-500/30 text-rose-400'}`}>
+                        {p.detected ? 'Detected' : 'Not Found'}
+                      </Badge>
+                      <p className="text-[10px] text-muted-foreground mt-1 capitalize">Strength: {p.strength}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Citation Sources */}
+                {data.brandMentions.citationSources?.length > 0 && (
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground mb-3">AI Citation Source Breakdown</p>
+                    <div className="space-y-2">
+                      {data.brandMentions.citationSources.map((cs, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="text-sm font-medium w-24">{cs.engine}</span>
+                          <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-amber-500 to-rose-500 rounded-full" style={{ width: `${cs.percentage}%` }} />
+                          </div>
+                          <span className="text-xs font-mono text-amber-400 w-16 text-right">{cs.topSource} ({cs.percentage}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {data.brandMentions.backlinkCorrelation && (
+                  <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
+                    <p className="text-xs text-emerald-400 font-bold mb-1">Backlink vs Brand Mention Insight</p>
+                    <p className="text-sm text-muted-foreground">{data.brandMentions.backlinkCorrelation}</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: CONTENT QUALITY & HUMANIZATION
+              ══════════════════════════════════════════════════ */}
+          {data.contentQuality && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Content Quality & Humanization</h2>
+                  <p className="text-sm text-muted-foreground">AI pattern detection and humanization aligned with Google QRG</p>
+                </div>
+                <Badge variant="outline" className="text-[10px] border-green-500/30 text-green-400">{data.contentQuality.overallScore}/100</Badge>
+              </div>
+              <div className="space-y-3">
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5 text-center">
+                    <p className="text-xs text-muted-foreground">Content Depth</p>
+                    <p className="text-2xl font-bold text-emerald-400">{data.contentQuality.contentDepth}/100</p>
+                  </div>
+                  <div className={`rounded-xl p-4 border text-center ${data.contentQuality.aiPatternRisk === 'low' ? 'bg-emerald-500/5 border-emerald-500/20' : data.contentQuality.aiPatternRisk === 'medium' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                    <p className="text-xs text-muted-foreground">AI Pattern Risk</p>
+                    <p className="text-2xl font-bold capitalize">{data.contentQuality.aiPatternRisk}</p>
+                  </div>
+                  <ScoreRing score={data.contentQuality.overallScore} label="Quality Score" color={scoreColor(data.contentQuality.overallScore)} size={80} />
+                </div>
+
+                {data.contentQuality.humanizationTips?.length > 0 && (
+                  <Collapsible title="Humanization Tips" icon={Lightbulb} accentColor="green">
+                    <div className="space-y-2">
+                      {data.contentQuality.humanizationTips.map((tip, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <p className="text-sm text-muted-foreground">{tip}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </Collapsible>
+                )}
+
+                {data.contentQuality.fillerDetected?.length > 0 && (
+                  <Collapsible title="Filler Detected" icon={AlertTriangle} accentColor="amber">
+                    <div className="space-y-1">
+                      {data.contentQuality.fillerDetected.map((f, i) => (
+                        <p key={i} className="text-sm text-amber-400/70">• {f}</p>
+                      ))}
+                    </div>
+                  </Collapsible>
+                )}
+
+                {data.contentQuality.originalityIndicators?.length > 0 && (
+                  <Collapsible title="Originality Indicators" icon={Sparkles} accentColor="emerald">
+                    <div className="space-y-1">
+                      {data.contentQuality.originalityIndicators.map((ind, i) => (
+                        <p key={i} className="text-sm text-muted-foreground">✓ {ind}</p>
+                      ))}
+                    </div>
+                  </Collapsible>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: PARASITE SEO RISK
+              ══════════════════════════════════════════════════ */}
+          {data.parasiteRisk && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                  <ShieldAlert className="w-5 h-5 text-rose-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Parasite SEO Risk</h2>
+                  <p className="text-sm text-muted-foreground">Google Nov 2024 site reputation abuse policy check</p>
+                </div>
+                <RiskBadge level={data.parasiteRisk.riskLevel} />
+              </div>
+              <div className={`rounded-xl p-6 border ${data.parasiteRisk.riskLevel === 'low' ? 'bg-emerald-500/5 border-emerald-500/20' : data.parasiteRisk.riskLevel === 'medium' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                {data.parasiteRisk.findings?.map((f, i) => (
+                  <p key={i} className="text-sm text-muted-foreground mb-1">• {f}</p>
+                ))}
+                {data.parasiteRisk.recommendations?.map((r, i) => (
+                  <p key={i} className="text-sm text-emerald-400 mt-2">→ {r}</p>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: LOCAL SEO
+              ══════════════════════════════════════════════════ */}
+          {data.localSEO && data.localSEO.applicable && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-teal-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Local SEO Intelligence</h2>
+                  <p className="text-sm text-muted-foreground">GBP · NAP · Reviews for {data.market || 'your market'}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <ScoreRing score={data.localSEO.gbpSignals.score} label="Google Business Profile" color={scoreColor(data.localSEO.gbpSignals.score)} size={72} />
+                    <div className="mt-2 space-y-1">
+                      {data.localSEO.gbpSignals.findings?.map((f, i) => (
+                        <p key={i} className="text-[11px] text-muted-foreground">• {f}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <ScoreRing score={data.localSEO.napConsistency.score} label="NAP Consistency" color={scoreColor(data.localSEO.napConsistency.score)} size={72} />
+                    <div className="mt-2 space-y-1">
+                      {data.localSEO.napConsistency.findings?.map((f, i) => (
+                        <p key={i} className="text-[11px] text-muted-foreground">• {f}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <ScoreRing score={data.localSEO.reviewSignals.score} label="Review Signals" color={scoreColor(data.localSEO.reviewSignals.score)} size={72} />
+                    <div className="mt-2 space-y-1">
+                      {data.localSEO.reviewSignals.findings?.map((f, i) => (
+                        <p key={i} className="text-[11px] text-muted-foreground">• {f}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-[10px] border-teal-500/30 text-teal-400">Business Type: {data.localSEO.businessType}</Badge>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: SXO
+              ══════════════════════════════════════════════════ */}
+          {data.sxo && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                  <Eye className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Search Experience Optimization</h2>
+                  <p className="text-sm text-muted-foreground">SERP backward analysis & page-type matching</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground mb-1">Page Type Match</p>
+                    <p className="text-sm font-medium">{data.sxo.pageTypeMatch}</p>
+                  </div>
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground mb-1">SERP Intent</p>
+                    <Badge variant="outline" className="text-[10px] border-indigo-500/30 text-indigo-400 capitalize">{data.sxo.serpIntentMatch}</Badge>
+                  </div>
+                </div>
+
+                {data.sxo.userPersonaScores?.length > 0 && (
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground mb-3">Persona Scores</p>
+                    <div className="space-y-2">
+                      {data.sxo.userPersonaScores.map((p, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="text-sm w-32">{p.persona}</span>
+                          <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
+                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${p.score}%` }} />
+                          </div>
+                          <span className="text-xs font-mono text-indigo-400">{p.score}/100</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {data.sxo.recommendations?.length > 0 && (
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <p className="text-xs text-muted-foreground mb-2">SXO Recommendations</p>
+                    {data.sxo.recommendations.map((r, i) => (
+                      <p key={i} className="text-sm text-muted-foreground mb-1">• {r}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
               PHASE 2: STRUCTURE
               ══════════════════════════════════════════════════ */}
           <motion.div variants={item}>
@@ -350,7 +813,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
             </div>
             <div className="space-y-3">
               {/* Topic Clusters */}
-              <Collapsible title="Topic Clusters" icon={Target} defaultOpen>
+              <Collapsible title="Topic Clusters" icon={Target} defaultOpen accentColor="cyan">
                 <div className="space-y-4">
                   {data.structure.topicClusters?.map((cluster, i) => (
                     <div key={i} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
@@ -383,7 +846,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* Keyword Gaps */}
-              <Collapsible title="Keyword Gaps" icon={Search}>
+              <Collapsible title="Keyword Gaps" icon={Search} accentColor="cyan">
                 <div className="space-y-2">
                   {data.structure.keywordGaps?.map((kw, i) => (
                     <div key={i} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3 border border-white/5">
@@ -401,13 +864,14 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* Schema Recommendations */}
-              <Collapsible title="Schema Recommendations" icon={Database}>
+              <Collapsible title="Schema Recommendations" icon={Database} accentColor="cyan">
                 <div className="space-y-2">
                   {data.structure.schemaRecommendations?.map((schema, i) => (
                     <div key={i} className="bg-white/[0.02] rounded-lg p-3 border border-white/5">
                       <div className="flex items-center gap-2 mb-1">
                         <PillarBadge pillar={schema.pillar} />
                         <span className="text-sm font-bold">{schema.schemaType}</span>
+                        <SchemaStatusBadge status={schema.status || 'active'} />
                       </div>
                       <p className="text-xs text-muted-foreground mb-1">{schema.purpose}</p>
                       <p className="text-xs text-emerald-400">→ {schema.implementation}</p>
@@ -433,7 +897,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
             </div>
             <div className="space-y-3">
               {/* Content Briefs */}
-              <Collapsible title="Content Briefs" icon={FileText} defaultOpen>
+              <Collapsible title="Content Briefs" icon={FileText} defaultOpen accentColor="amber">
                 <div className="space-y-3">
                   {data.creative.contentBriefs?.map((brief, i) => (
                     <div key={i} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
@@ -464,7 +928,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* Answer Blocks */}
-              <Collapsible title="Answer Blocks for AI Citation" icon={MessageSquare} badge={<PillarBadge pillar="geo" />}>
+              <Collapsible title="Answer Blocks for AI Citation" icon={MessageSquare} badge={<PillarBadge pillar="geo" />} accentColor="amber">
                 <div className="space-y-3">
                   {data.creative.answerBlocks?.map((block, i) => (
                     <div key={i} className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/10">
@@ -480,7 +944,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* On-Page Optimizations */}
-              <Collapsible title="On-Page Optimizations" icon={Wrench}>
+              <Collapsible title="On-Page Optimizations" icon={Wrench} accentColor="amber">
                 <div className="space-y-3">
                   {data.creative.onPageOptimizations?.map((opt, i) => (
                     <div key={i} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
@@ -526,7 +990,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
             </div>
             <div className="space-y-3">
               {/* KPI Tracking */}
-              <Collapsible title="KPI Tracking" icon={Target} defaultOpen>
+              <Collapsible title="KPI Tracking" icon={Target} defaultOpen accentColor="rose">
                 <div className="grid sm:grid-cols-3 gap-4">
                   {(['seo', 'aeo', 'geo'] as const).map((pillar) => (
                     <div key={pillar}>
@@ -553,7 +1017,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* Competitor Benchmarks */}
-              <Collapsible title="Competitor Benchmarks" icon={Users}>
+              <Collapsible title="Competitor Benchmarks" icon={Users} accentColor="rose">
                 <div className="space-y-3">
                   {data.measure.competitorBenchmarks?.map((comp, i) => (
                     <div key={i} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
@@ -593,7 +1057,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </Collapsible>
 
               {/* Weekly Actions */}
-              <Collapsible title="4-Week Action Plan" icon={Calendar} defaultOpen>
+              <Collapsible title="4-Week Action Plan" icon={Calendar} defaultOpen accentColor="rose">
                 <div className="space-y-4">
                   {data.measure.weeklyActions?.map((week, i) => (
                     <div key={i}>

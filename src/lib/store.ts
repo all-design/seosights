@@ -39,11 +39,82 @@ export interface AuditData {
   }
   geoVisibility: {
     score: number
-    citedByAI: string[]  // e.g. ['ChatGPT', 'Claude', 'Perplexity']
-    entityRecognition: number  // 1-100
+    citedByAI: string[]
+    entityRecognition: number
     knowledgeGraphPresence: boolean
     issues: string[]
   }
+}
+
+// Bonus: E-E-A-T Analysis (from claude-seo)
+export interface EEATData {
+  overallScore: number
+  experience: { score: number; findings: string[] }
+  expertise: { score: number; findings: string[] }
+  authoritativeness: { score: number; findings: string[] }
+  trustworthiness: { score: number; findings: string[] }
+  whoHowWhyTest: { who: string; how: string; why: string }
+}
+
+// Bonus: GEO Citability Scoring (5 dimensions from claude-seo)
+export interface GEOCitabilityData {
+  overallScore: number
+  citabilityScore: { score: number; weight: number; findings: string[] }
+  structuralReadability: { score: number; weight: number; findings: string[] }
+  multiModalContent: { score: number; weight: number; findings: string[] }
+  authorityBrandSignals: { score: number; weight: number; findings: string[] }
+  technicalAccessibility: { score: number; weight: number; findings: string[] }
+}
+
+// Bonus: AI Crawler & Bot Analysis (from claude-seo)
+export interface AICrawlerData {
+  aiCrawlerAccess: { bot: string; allowed: boolean; recommendation: string }[]
+  robotsTxtAnalysis: string[]
+  llmsTxtPresence: boolean
+  jsRenderingDependency: 'high' | 'medium' | 'low'
+  ssrVsCsr: string
+}
+
+// Bonus: Brand Mentions & AI Citation Signals (from claude-seo)
+export interface BrandMentionsData {
+  brandMentionScore: number
+  backlinkCorrelation: string
+  platformPresence: { platform: string; detected: boolean; strength: 'strong' | 'moderate' | 'weak' | 'none' }[]
+  citationSources: { engine: string; topSource: string; percentage: number }[]
+}
+
+// Bonus: Content Quality & Humanization (from claude-seo)
+export interface ContentQualityData {
+  overallScore: number
+  contentDepth: number
+  aiPatternRisk: 'low' | 'medium' | 'high'
+  humanizationTips: string[]
+  fillerDetected: string[]
+  originalityIndicators: string[]
+}
+
+// Bonus: Parasite SEO Risk (from claude-seo)
+export interface ParasiteSEORisk {
+  riskLevel: 'low' | 'medium' | 'high'
+  findings: string[]
+  recommendations: string[]
+}
+
+// Bonus: Local SEO Signals (from claude-seo)
+export interface LocalSEOData {
+  applicable: boolean
+  gbpSignals: { score: number; findings: string[] }
+  napConsistency: { score: number; findings: string[] }
+  reviewSignals: { score: number; findings: string[] }
+  businessType: string
+}
+
+// Bonus: SXO (Search Experience Optimization) (from claude-seo)
+export interface SXOData {
+  pageTypeMatch: string
+  serpIntentMatch: 'informational' | 'transactional' | 'navigational' | 'mixed'
+  userPersonaScores: { persona: string; score: number }[]
+  recommendations: string[]
 }
 
 // Structure Phase
@@ -53,8 +124,8 @@ export interface StructureData {
     pillarKeyword: string
     supportingKeywords: string[]
     seoOpportunity: string
-    aeoOpportunity: string  // How to structure for answer engines
-    geoOpportunity: string  // How to get cited by AI
+    aeoOpportunity: string
+    geoOpportunity: string
   }[]
   keywordGaps: {
     keyword: string
@@ -72,6 +143,7 @@ export interface StructureData {
     purpose: string
     pillar: 'seo' | 'aeo' | 'geo'
     implementation: string
+    status: 'active' | 'restricted' | 'deprecated'
   }[]
 }
 
@@ -85,21 +157,21 @@ export interface CreativeData {
     brief: string
     estimatedImpact: string
     wordCount: string
-    structure: string[]  // H2/H3 outline
+    structure: string[]
   }[]
   onPageOptimizations: {
     page: string
     currentTitle: string
     suggestedTitle: string
     suggestedDescription: string
-    aeoTweaks: string[]  // Tweaks for answer engine optimization
-    geoTweaks: string[]  // Tweaks for generative engine optimization
+    aeoTweaks: string[]
+    geoTweaks: string[]
   }[]
   answerBlocks: {
     question: string
     suggestedAnswer: string
     format: 'faq' | 'featured-snippet' | 'people-also-ask' | 'knowledge-panel'
-    targetEngine: string  // e.g. "Google", "ChatGPT", "Perplexity"
+    targetEngine: string
   }[]
 }
 
@@ -128,6 +200,7 @@ export interface MeasureData {
 export interface SEOAnalysis {
   url: string
   siteName: string
+  market: string
   overallScores: {
     seo: number
     aeo: number
@@ -135,45 +208,57 @@ export interface SEOAnalysis {
     combined: number
   }
   audit: AuditData
+  eeat: EEATData
+  geoCitability: GEOCitabilityData
+  aiCrawler: AICrawlerData
+  brandMentions: BrandMentionsData
+  contentQuality: ContentQualityData
+  parasiteRisk: ParasiteSEORisk
+  localSEO: LocalSEOData
+  sxo: SXOData
   structure: StructureData
   creative: CreativeData
   measure: MeasureData
   summary: string
-  executiveActions: string[]  // Top 5 actions to take immediately
+  executiveActions: string[]
 }
 
 interface AppState {
   view: AppView
   targetUrl: string
+  targetMarket: string
   analysis: SEOAnalysis | null
   analysisProgress: number
   analysisStep: string
   analysisError: string
   setView: (view: AppView) => void
   setTargetUrl: (url: string) => void
+  setTargetMarket: (market: string) => void
   setAnalysis: (analysis: SEOAnalysis | null) => void
   setAnalysisProgress: (progress: number) => void
   setAnalysisStep: (step: string) => void
   setAnalysisError: (error: string) => void
   reset: () => void
-  startAnalysis: (url: string) => void
+  startAnalysis: (url: string, market?: string) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   view: 'landing',
   targetUrl: '',
+  targetMarket: 'Global',
   analysis: null,
   analysisProgress: 0,
   analysisStep: '',
   analysisError: '',
   setView: (view) => set({ view }),
   setTargetUrl: (url) => set({ targetUrl: url }),
+  setTargetMarket: (market) => set({ targetMarket: market }),
   setAnalysis: (analysis) => set({ analysis }),
   setAnalysisProgress: (progress) => set({ analysisProgress: progress }),
   setAnalysisStep: (step) => set({ analysisStep: step }),
   setAnalysisError: (error) => set({ analysisError: error }),
-  reset: () => set({ view: 'landing', targetUrl: '', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '' }),
-  startAnalysis: (url: string) => {
-    set({ targetUrl: url, view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null })
+  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '' }),
+  startAnalysis: (url: string, market?: string) => {
+    set({ targetUrl: url, targetMarket: market || 'Global', view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null })
   },
 }))

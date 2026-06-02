@@ -4,8 +4,52 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { X, Globe, ArrowRight } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { X, Globe, ArrowRight, MapPin } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+
+const markets = [
+  { value: 'Global', label: '🌍 Global' },
+  { value: 'United States', label: '🇺🇸 United States' },
+  { value: 'United Kingdom', label: '🇬🇧 United Kingdom' },
+  { value: 'Germany', label: '🇩🇪 Germany' },
+  { value: 'France', label: '🇫🇷 France' },
+  { value: 'Spain', label: '🇪🇸 Spain' },
+  { value: 'Italy', label: '🇮🇹 Italy' },
+  { value: 'Netherlands', label: '🇳🇱 Netherlands' },
+  { value: 'Australia', label: '🇦🇺 Australia' },
+  { value: 'Canada', label: '🇨🇦 Canada' },
+  { value: 'Brazil', label: '🇧🇷 Brazil' },
+  { value: 'Japan', label: '🇯🇵 Japan' },
+  { value: 'India', label: '🇮🇳 India' },
+  { value: 'Serbia', label: '🇷🇸 Serbia' },
+  { value: 'Croatia', label: '🇭🇷 Croatia' },
+  { value: 'Bosnia', label: '🇧🇦 Bosnia & Herzegovina' },
+  { value: 'Montenegro', label: '🇲🇪 Montenegro' },
+  { value: 'Austria', label: '🇦🇹 Austria' },
+  { value: 'Switzerland', label: '🇨🇭 Switzerland' },
+  { value: 'Sweden', label: '🇸🇪 Sweden' },
+  { value: 'Norway', label: '🇳🇴 Norway' },
+  { value: 'Denmark', label: '🇩🇰 Denmark' },
+  { value: 'Finland', label: '🇫🇮 Finland' },
+  { value: 'Poland', label: '🇵🇱 Poland' },
+  { value: 'Czech Republic', label: '🇨🇿 Czech Republic' },
+  { value: 'Romania', label: '🇷🇴 Romania' },
+  { value: 'Belgium', label: '🇧🇪 Belgium' },
+  { value: 'Portugal', label: '🇵🇹 Portugal' },
+  { value: 'Ireland', label: '🇮🇪 Ireland' },
+  { value: 'Mexico', label: '🇲🇽 Mexico' },
+  { value: 'South Korea', label: '🇰🇷 South Korea' },
+  { value: 'UAE', label: '🇦🇪 UAE' },
+  { value: 'Singapore', label: '🇸🇬 Singapore' },
+  { value: 'South Africa', label: '🇿🇦 South Africa' },
+]
 
 interface URLInputModalProps {
   isOpen: boolean
@@ -14,6 +58,7 @@ interface URLInputModalProps {
 
 export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
   const [url, setUrl] = useState('')
+  const [market, setMarket] = useState('Global')
   const [error, setError] = useState('')
   const { startAnalysis } = useAppStore()
 
@@ -36,9 +81,8 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
     }
 
     setError('')
-    // This sets the URL and switches to 'analyzing' view
-    // The AnalyzingView component will handle the actual API call
-    startAnalysis(cleanUrl)
+    startAnalysis(cleanUrl, market)
+    onClose()
   }
 
   return (
@@ -84,14 +128,15 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
 
               {/* Title */}
               <h3 className="text-2xl font-bold text-center mb-2">
-                Enter Your Website URL
+                Analyze Your Website
               </h3>
               <p className="text-muted-foreground text-center mb-8">
-                We&apos;ll analyze your site and generate a complete AI SEO strategy with backlink insights.
+                Full SEO · AEO · GEO analysis with E-E-A-T, AI crawler, and brand signals.
               </p>
 
-              {/* URL Input */}
+              {/* Input Fields */}
               <div className="space-y-4">
+                {/* URL Input */}
                 <div className="relative">
                   <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/50" />
                   <Input
@@ -107,6 +152,23 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
                     className="pl-12 h-14 bg-white/5 border-white/10 focus:border-emerald-500/50 focus:ring-emerald-500/30 text-lg placeholder:text-muted-foreground/40"
                     autoFocus
                   />
+                </div>
+
+                {/* Market Selector */}
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/50 z-10" />
+                  <Select value={market} onValueChange={setMarket}>
+                    <SelectTrigger className="pl-12 h-14 bg-white/5 border-white/10 focus:border-emerald-500/50 text-lg">
+                      <SelectValue placeholder="Select target market" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10 max-h-64">
+                      {markets.map((m) => (
+                        <SelectItem key={m.value} value={m.value} className="text-base">
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {error && (

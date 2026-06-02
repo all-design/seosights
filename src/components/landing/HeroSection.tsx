@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowRight, Sparkles, TrendingUp, Zap, Bot, Brain, Search } from 'lucide-react'
+import { ArrowRight, Sparkles, TrendingUp, Zap, Bot, Brain, Search, Shield, Eye } from 'lucide-react'
 
 interface HeroSectionProps {
   onStartFree?: () => void
@@ -41,7 +41,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
             className="inline-flex items-center gap-2 px-4 py-2 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-8"
           >
             <Sparkles className="w-4 h-4" />
-            SEO · AEO · GEO — One System
+            Complete SEO · AEO · GEO Solution
           </Badge>
         </motion.div>
 
@@ -71,6 +71,16 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           <span className="text-amber-400 font-semibold">(GEO)</span>
         </motion.p>
 
+        {/* Sub-subheadline - New features */}
+        <motion.p
+          className="text-base sm:text-lg text-muted-foreground/70 max-w-3xl mx-auto mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.25 }}
+        >
+          Plus E-E-A-T scoring, AI crawler optimization, brand mention signals, content humanization, and local SEO intelligence.
+        </motion.p>
+
         {/* AI Platform Badges */}
         <motion.div
           className="flex flex-wrap items-center justify-center gap-3 mb-10"
@@ -90,6 +100,10 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
             <Search className="w-4 h-4 text-cyan-400" />
             <span className="text-sm font-medium text-foreground/80">Perplexity</span>
+          </div>
+          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
+            <Eye className="w-4 h-4 text-rose-400" />
+            <span className="text-sm font-medium text-foreground/80">AI Overviews</span>
           </div>
         </motion.div>
 
@@ -112,9 +126,9 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
             variant="outline"
             size="lg"
             className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50 font-semibold text-lg px-8 py-6 transition-all duration-300"
-            onClick={() => scrollToSection('june-stack')}
+            onClick={() => scrollToSection('complete-solution')}
           >
-            See the June Stack
+            See the Complete Solution
           </Button>
         </motion.div>
 
@@ -136,9 +150,9 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
             <span className="text-muted-foreground text-sm">AEO featured snippets</span>
           </div>
           <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm border border-amber-500/20 rounded-xl px-6 py-4">
-            <TrendingUp className="w-5 h-5 text-amber-400" />
-            <span className="text-amber-400 font-bold text-xl">9X</span>
-            <span className="text-muted-foreground text-sm">GEO AI citations</span>
+            <Shield className="w-5 h-5 text-amber-400" />
+            <span className="text-amber-400 font-bold text-xl">3X</span>
+            <span className="text-muted-foreground text-sm">Brand mentions → AI</span>
           </div>
         </motion.div>
       </div>
