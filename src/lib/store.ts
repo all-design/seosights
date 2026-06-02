@@ -196,6 +196,22 @@ export interface MeasureData {
   }[]
 }
 
+// Algorithm Updates Tracker
+export interface AlgorithmUpdatesData {
+  recentUpdates: { name: string; date: string; impact: 'high' | 'medium' | 'low'; description: string; affectedPillar: 'seo' | 'aeo' | 'geo' | 'all' }[]
+}
+
+// 12-Month Roadmap
+export interface RoadmapData {
+  quarters: { label: string; seoGoal: string; aeoGoal: string; geoGoal: string; targetScores: { seo: number; aeo: number; geo: number } }[]
+}
+
+// Traffic Insights (Winners/Losers)
+export interface TrafficInsightsData {
+  winners: { page: string; change: string; pillar: string }[]
+  losers: { page: string; change: string; pillar: string }[]
+}
+
 // Full Analysis Result
 export interface SEOAnalysis {
   url: string
@@ -215,6 +231,9 @@ export interface SEOAnalysis {
   contentQuality: ContentQualityData
   parasiteRisk: ParasiteSEORisk
   localSEO: LocalSEOData
+  algorithmUpdates?: AlgorithmUpdatesData
+  roadmap?: RoadmapData
+  trafficInsights?: TrafficInsightsData
   sxo: SXOData
   structure: StructureData
   creative: CreativeData

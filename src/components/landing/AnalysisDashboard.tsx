@@ -23,8 +23,10 @@ import {
   Lightbulb,
   MessageSquare,
   TrendingUp,
+  TrendingDown,
   Users,
   Calendar,
+  CalendarDays,
   ArrowRight,
   ChevronDown,
   ChevronUp,
@@ -38,6 +40,9 @@ import {
   ShieldAlert,
   UserCheck,
   ShoppingBag,
+  Download,
+  Loader2,
+  Bell,
 } from 'lucide-react'
 
 const container = {
@@ -147,10 +152,36 @@ function Collapsible({ title, icon: Icon, children, defaultOpen = false, badge, 
 export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () => void }) {
   const { analysis, reset } = useAppStore()
   const data = analysis as SEOAnalysis | null
+  const [exporting, setExporting] = useState(false)
 
   if (!data) return null
 
   const scoreColor = (s: number) => (s >= 70 ? '#10b981' : s >= 40 ? '#f59e0b' : '#ef4444')
+
+  const handleExportPDF = async () => {
+    setExporting(true)
+    try {
+      const response = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!response.ok) throw new Error('Export failed')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${(data.siteName || 'site').replace(/[^a-zA-Z0-9]/g, '-')}-SEO-AEO-GEO-Report.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('PDF export failed:', err)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -175,13 +206,23 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </>
             )}
           </div>
-          <button
-            onClick={reset}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            New Analysis
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportPDF}
+              disabled={exporting}
+              className="flex items-center gap-2 text-sm bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-2 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {exporting ? 'Exporting...' : 'Export PDF'}
+            </button>
+            <button
+              onClick={reset}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              New Analysis
+            </button>
+          </div>
         </div>
       </header>
 
@@ -739,6 +780,156 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[10px] border-teal-500/30 text-teal-400">Business Type: {data.localSEO.businessType}</Badge>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: ALGORITHM UPDATES TRACKER
+              ══════════════════════════════════════════════════ */}
+          {data.algorithmUpdates && data.algorithmUpdates.recentUpdates?.length > 0 && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-orange-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Algorithm Updates Tracker</h2>
+                  <p className="text-sm text-muted-foreground">Recent Google algorithm changes that may affect your site</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {data.algorithmUpdates.recentUpdates.map((update, i) => (
+                  <div key={i} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{update.name}</span>
+                        <Badge variant="outline" className={`text-[10px] ${update.impact === 'high' ? 'border-rose-500/30 text-rose-400 bg-rose-500/5' : update.impact === 'medium' ? 'border-amber-500/30 text-amber-400 bg-amber-500/5' : 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5'}`}>
+                          {update.impact} impact
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{update.date}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-1">{update.description}</p>
+                    <PillarBadge pillar={update.affectedPillar} />
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: 12-MONTH ROADMAP
+              ══════════════════════════════════════════════════ */}
+          {data.roadmap && data.roadmap.quarters?.length > 0 && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                  <CalendarDays className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">12-Month Roadmap</h2>
+                  <p className="text-sm text-muted-foreground">Quarterly milestones based on your weekly action plan</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {data.roadmap.quarters.map((q, i) => (
+                  <div key={i} className="bg-white/[0.02] rounded-xl p-4 border border-white/5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${i === 0 ? 'bg-emerald-500/20' : i === 1 ? 'bg-amber-500/20' : i === 2 ? 'bg-cyan-500/20' : 'bg-violet-500/20'}`}>
+                        <span className={`text-xs font-bold ${i === 0 ? 'text-emerald-400' : i === 1 ? 'text-amber-400' : i === 2 ? 'text-cyan-400' : 'text-violet-400'}`}>Q{i + 1}</span>
+                      </div>
+                      <span className="text-sm font-semibold">{q.label}</span>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-3 mb-3">
+                      <div className="bg-emerald-500/5 rounded-lg p-3 border border-emerald-500/10">
+                        <p className="text-[10px] text-emerald-400 font-bold mb-1">SEO Goal</p>
+                        <p className="text-xs text-muted-foreground">{q.seoGoal}</p>
+                      </div>
+                      <div className="bg-cyan-500/5 rounded-lg p-3 border border-cyan-500/10">
+                        <p className="text-[10px] text-cyan-400 font-bold mb-1">AEO Goal</p>
+                        <p className="text-xs text-muted-foreground">{q.aeoGoal}</p>
+                      </div>
+                      <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/10">
+                        <p className="text-[10px] text-amber-400 font-bold mb-1">GEO Goal</p>
+                        <p className="text-xs text-muted-foreground">{q.geoGoal}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-muted-foreground">Target SEO: <span className="text-emerald-400 font-mono">{q.targetScores.seo}</span></span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <div className="w-2 h-2 rounded-full bg-cyan-500" />
+                        <span className="text-muted-foreground">Target AEO: <span className="text-cyan-400 font-mono">{q.targetScores.aeo}</span></span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                        <span className="text-muted-foreground">Target GEO: <span className="text-amber-400 font-mono">{q.targetScores.geo}</span></span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              BONUS: TRAFFIC INSIGHTS
+              ══════════════════════════════════════════════════ */}
+          {data.trafficInsights && (data.trafficInsights.winners?.length > 0 || data.trafficInsights.losers?.length > 0) && (
+            <motion.div variants={item}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-teal-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Traffic Insights</h2>
+                  <p className="text-sm text-muted-foreground">Winners & losers analysis across your pages</p>
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {/* Winners */}
+                {data.trafficInsights.winners?.length > 0 && (
+                  <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm font-semibold text-emerald-400">Winners</span>
+                    </div>
+                    <div className="space-y-2">
+                      {data.trafficInsights.winners.map((w, i) => (
+                        <div key={i} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                          <div className="flex items-center gap-2">
+                            <PillarBadge pillar={w.pillar} />
+                            <span className="text-sm text-muted-foreground truncate max-w-[140px]">{w.page}</span>
+                          </div>
+                          <span className="text-sm font-mono text-emerald-400">{w.change}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Losers */}
+                {data.trafficInsights.losers?.length > 0 && (
+                  <div className="bg-rose-500/5 rounded-xl p-4 border border-rose-500/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingDown className="w-4 h-4 text-rose-400" />
+                      <span className="text-sm font-semibold text-rose-400">Losers</span>
+                    </div>
+                    <div className="space-y-2">
+                      {data.trafficInsights.losers.map((l, i) => (
+                        <div key={i} className="flex items-center justify-between bg-white/[0.02] rounded-lg p-3 border border-white/5">
+                          <div className="flex items-center gap-2">
+                            <PillarBadge pillar={l.pillar} />
+                            <span className="text-sm text-muted-foreground truncate max-w-[140px]">{l.page}</span>
+                          </div>
+                          <span className="text-sm font-mono text-rose-400">{l.change}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

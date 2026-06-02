@@ -337,11 +337,14 @@ Return JSON with this EXACT structure. All strings max 15 words:
     "competitorBenchmarks": [{ "competitor": "name", "url": "url", "seoScore": 1-100, "aeoScore": 1-100, "geoScore": 1-100, "citedBy": ["AI"] }],
     "weeklyActions": [{ "week": "Week 1", "tasks": [{ "task": "short", "pillar": "seo|aeo|geo", "priority": "high|medium|low" }] }]
   },
+  "algorithmUpdates": { "recentUpdates": [{ "name": "update name", "date": "2025-XX", "impact": "high|medium|low", "description": "short", "affectedPillar": "seo|aeo|geo|all" }] },
+  "roadmap": { "quarters": [{ "label": "Q1: Foundation", "seoGoal": "short goal", "aeoGoal": "short goal", "geoGoal": "short goal", "targetScores": { "seo": 50, "aeo": 40, "geo": 35 } }] },
+  "trafficInsights": { "winners": [{ "page": "page url", "change": "+X%", "pillar": "seo|aeo|geo" }], "losers": [{ "page": "page url", "change": "-X%", "pillar": "seo|aeo|geo" }] },
   "summary": "2-3 sentence summary",
   "executiveActions": ["action1", "action2", "action3", "action4", "action5"]
 }
 
-QUANTITY: 2 topicClusters (1 supportingKeyword each), 3 keywordGaps, 2 contentArchitecture recommended, 1 internalLink, 1 schemaRecommendation, 2 contentBriefs (1 structure heading each), 1 onPageOptimization (1 aeoTweak + 1 geoTweak), 2 answerBlocks, 1 KPI per pillar, 1 competitorBenchmark, 3 weeks of weeklyActions (2 tasks each), 5 executiveActions.
+QUANTITY: 2 topicClusters (1 supportingKeyword each), 3 keywordGaps, 2 contentArchitecture recommended, 1 internalLink, 1 schemaRecommendation, 2 contentBriefs (1 structure heading each), 1 onPageOptimization (1 aeoTweak + 1 geoTweak), 2 answerBlocks, 1 KPI per pillar, 1 competitorBenchmark, 3 weeks of weeklyActions (2 tasks each), 5 executiveActions, 2 algorithmUpdates, 4 roadmap quarters, 2 trafficInsights winners, 2 trafficInsights losers.
 
 IMPORTANT: Return ONLY raw JSON. No code fences. No extra text.`
 
@@ -456,6 +459,30 @@ IMPORTANT: Return ONLY raw JSON. No code fences. No extra text.`
               'Build high-quality backlinks from authoritative sources',
               'Implement AI crawler access in robots.txt and add llms.txt',
             ],
+            algorithmUpdates: {
+              recentUpdates: [
+                { name: 'Google Core Update March 2025', date: '2025-03', impact: 'high', description: 'Content quality and E-E-A-T signals prioritized', affectedPillar: 'all' },
+                { name: 'AI Overview Expansion', date: '2025-02', impact: 'medium', description: 'AI Overviews shown for more query types', affectedPillar: 'aeo' },
+              ],
+            },
+            roadmap: {
+              quarters: [
+                { label: 'Q1: Foundation', seoGoal: 'Fix critical issues, optimize meta tags', aeoGoal: 'Add FAQ schema, structured data', geoGoal: 'Create cite-worthy content, add llms.txt', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 15 || 45), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 12 || 35), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 10 || 30) } },
+                { label: 'Q2: Growth', seoGoal: 'Build backlinks, expand topic clusters', aeoGoal: 'Optimize answer blocks, target snippets', geoGoal: 'Increase AI citation presence', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 25 || 55), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 22 || 45), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 20 || 40) } },
+                { label: 'Q3: Authority', seoGoal: 'Dominate niche keywords', aeoGoal: 'Voice search optimization', geoGoal: 'Multi-platform AI visibility', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 35 || 65), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 32 || 55), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 30 || 50) } },
+                { label: 'Q4: Scale', seoGoal: 'Scale content production', aeoGoal: 'Cross-platform AEO coverage', geoGoal: 'AI-first content strategy', targetScores: { seo: Math.min(100, (auditData.overallScores as Record<string, number>)?.seo + 45 || 75), aeo: Math.min(100, (auditData.overallScores as Record<string, number>)?.aeo + 40 || 65), geo: Math.min(100, (auditData.overallScores as Record<string, number>)?.geo + 38 || 60) } },
+              ],
+            },
+            trafficInsights: {
+              winners: [
+                { page: '/blog/guide', change: '+25%', pillar: 'seo' },
+                { page: '/faq', change: '+18%', pillar: 'aeo' },
+              ],
+              losers: [
+                { page: '/old-page', change: '-12%', pillar: 'seo' },
+                { page: '/about', change: '-8%', pillar: 'geo' },
+              ],
+            },
           }
         }
 

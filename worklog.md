@@ -97,3 +97,89 @@ Stage Summary:
 - Caddyfile updated with flush_interval -1 for SSE support (may not take effect as Caddy is system-managed)
 - API route has better error handling for LLM failures and empty responses
 - Full flow verified working: landing → analyzing → dashboard → back to landing
+
+---
+Task ID: 2-a
+Agent: main
+Task: Create PDF Report Generation API Endpoint
+
+Work Log:
+- Read worklog.md and store.ts to understand SEOAnalysis data structure and all nested types
+- Read /api/analyze/route.ts to understand existing API patterns and data flow
+- Verified pdfkit (^0.18.0) is already installed in package.json
+- Created /src/app/api/report/route.ts with complete PDF generation endpoint
+- Built PDFBuilder class with comprehensive formatting capabilities:
+  - Cover page with emerald background band, Agent OS branding, site info, 4 score cards (SEO/AEO/GEO/Combined)
+  - Executive Summary section with summary text and Top 5 Actions
+  - Phase 1: Audit section with Technical SEO, Crawlability, Core Web Vitals, Indexation, AEO Readiness, GEO Visibility
+  - E-E-A-T Analysis with 4 dimension scores + Who/How/Why test
+  - GEO Citability with 5 dimensions in table format (score + weight + findings)
+  - AI Crawler & Bot Analysis with access table, llms.txt, JS dependency
+  - Brand Mentions with platform presence table, citation sources table
+  - Content Quality with depth, AI pattern risk, humanization tips, filler, originality
+  - Parasite SEO Risk with color-coded risk level
+  - Local SEO (conditional on applicable=true) with GBP/NAP/Review scores
+  - SXO section with persona scores and recommendations
+  - Phase 2: Structure with topic clusters, keyword gaps, content architecture, schema recommendations
+  - Phase 3: Creative with content briefs, on-page optimizations, answer blocks
+  - Phase 4: Measure with KPI tracking (3 pillars), competitor benchmarks, weekly action plan
+  - 12-Month Roadmap with 4 quarterly milestones derived from weekly actions
+  - Page numbers on all pages except cover
+- Color scheme: emerald/gold/cyan matching app theme
+- Score color coding: >=70 green, >=40 amber, <40 red (with matching background tints)
+- Tables with colored headers, alternating row backgrounds, and ellipsis truncation
+- Proper A4 page size, 72pt margins, automatic page breaks with ensureSpace()
+- Graceful error handling: JSON parse errors, missing fields, PDF generation failures
+- Returns PDF as downloadable attachment with sanitized filename
+- Uses `export const dynamic = 'force-dynamic'`
+- Inline ReportData interface (avoids client-side store.ts imports)
+- Lint passes cleanly
+- Dev log shows no errors
+
+Stage Summary:
+- Complete PDF report generation API endpoint at /api/report/route.ts
+- POST endpoint accepts full SEOAnalysis object, returns downloadable PDF
+- Professional multi-page PDF with 16+ sections covering all analysis data
+- Emerald/gold/cyan branding with color-coded scores throughout
+- Robust error handling at every level
+
+---
+Task ID: 2-b
+Agent: main
+Task: Add PDF Export Button + Enhance Dashboard with New Sections
+
+Work Log:
+- Read worklog.md and all relevant files (store.ts, AnalysisDashboard.tsx, analyze/route.ts, report/route.ts)
+- Updated store.ts with 3 new optional interfaces:
+  - AlgorithmUpdatesData: tracks recent Google algorithm updates with name, date, impact, description, affectedPillar
+  - RoadmapData: 12-month quarterly roadmap with SEO/AEO/GEO goals and target scores
+  - TrafficInsightsData: winners/losers page analysis with change percentages
+- Added optional fields (algorithmUpdates?, roadmap?, trafficInsights?) to SEOAnalysis interface
+- Updated AnalysisDashboard.tsx:
+  - Added new icon imports: TrendingDown, CalendarDays, Download, Loader2, Bell
+  - Added `exporting` state and `handleExportPDF` async function that POSTs to /api/report
+  - Added Export PDF button to sticky header (emerald-500 bg, Download icon, Loader2 spinner when exporting)
+  - Added Algorithm Updates Tracker section (Bell icon, orange accent, impact badges, PillarBadges)
+  - Added 12-Month Roadmap section (CalendarDays icon, violet accent, quarterly cards with goal grids)
+  - Added Traffic Insights section (TrendingUp/TrendingDown icons, winners in emerald, losers in rose)
+  - All 3 new sections placed BEFORE the SXO section, use conditional rendering
+- Updated analyze API route (strategy LLM prompt):
+  - Added algorithmUpdates, roadmap, trafficInsights to the requested JSON schema
+  - Updated QUANTITY line: 2 algorithmUpdates, 4 roadmap quarters, 2 winners, 2 losers
+  - Added comprehensive fallback data in catch block for strategyData
+- Updated report API route:
+  - Added algorithmUpdates?, roadmap?, trafficInsights? to ReportData interface
+  - Added algorithmUpdatesSection() method (table with name/date/impact/description/pillar)
+  - Added roadmapSection() method (quarterly cards with colored headers, goals, target scores)
+  - Added trafficInsightsSection() method (winners table in green, losers table in red)
+  - Updated build() to call new section methods (before SXO, before existing roadmap method)
+- Lint passes cleanly
+- Dev server shows no errors
+
+Stage Summary:
+- Export PDF button added to dashboard header with loading state
+- 3 new dashboard sections: Algorithm Updates, 12-Month Roadmap, Traffic Insights
+- All sections use optional rendering (won't break if data is missing)
+- API prompt updated to request new data; fallback data provided
+- PDF report includes all 3 new sections with proper formatting
+- All changes consistent across store, dashboard, analyze API, and report API
