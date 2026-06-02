@@ -9,9 +9,12 @@ export default function Footer() {
       <div className="bg-background/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Agent OS. All rights reserved.
-            </p>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="seosight" className="h-6 w-auto" />
+              <span className="text-sm text-muted-foreground">
+                © {new Date().getFullYear()} seosight. All rights reserved.
+              </span>
+            </div>
             <div className="flex items-center gap-6">
               <a
                 href="#"
@@ -26,7 +29,7 @@ export default function Footer() {
                 Terms of Service
               </a>
               <span className="text-sm text-muted-foreground/50 flex items-center gap-1.5">
-                Built with <span className="text-emerald-400 font-medium">Agent OS</span>
+                Built with <span className="text-emerald-400 font-medium">seosight</span>
               </span>
             </div>
           </div>

@@ -4,9 +4,9 @@ import { useState } from 'react'
 import Navbar from '@/components/landing/Navbar'
 import HeroSection from '@/components/landing/HeroSection'
 import StatsSection from '@/components/landing/StatsSection'
-import AgentOSSection from '@/components/landing/AgentOSSection'
-import BacklinksSection from '@/components/landing/BacklinksSection'
-import CompleteSolutionSection from '@/components/landing/CompleteSolutionSection'
+import FeaturesSection from '@/components/landing/FeaturesSection'
+import HowItWorksSection from '@/components/landing/HowItWorksSection'
+import PricingSection from '@/components/landing/PricingSection'
 import CTASection from '@/components/landing/CTASection'
 import Footer from '@/components/landing/Footer'
 import URLInputModal from '@/components/landing/URLInputModal'
@@ -43,9 +43,9 @@ export default function Home() {
       <Navbar onStartFree={() => setIsModalOpen(true)} />
       <HeroSection onStartFree={() => setIsModalOpen(true)} />
       <StatsSection />
-      <AgentOSSection />
-      <BacklinksSection />
-      <CompleteSolutionSection />
+      <FeaturesSection />
+      <HowItWorksSection />
+      <PricingSection onStartFree={() => setIsModalOpen(true)} />
       <CTASection onStartFree={() => setIsModalOpen(true)} />
       <Footer />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />

@@ -695,7 +695,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               <Zap className="w-5 h-5 text-emerald-400" />
             </div>
             <span className="font-bold text-lg tracking-tight">
-              Agent <span className="text-emerald-400">OS</span>
+              seosight
             </span>
             <Separator />
             <span className="text-sm text-muted-foreground hidden sm:block">{data.siteName || data.url}</span>
@@ -2422,14 +2422,14 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               <CardContent className="p-8 text-center">
                 <h2 className="text-2xl font-bold mb-3">Ready to Execute This Strategy?</h2>
                 <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
-                  Get the Agent OS installed free — Hermes, OpenClaw, or Claude — and start building the backlinks that make AI cite you across SEO, AEO, and GEO.
+                  Start your free trial and begin building the authority signals that make AI cite you across SEO, AEO, and GEO.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <button
                     onClick={onStartFree}
                     className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg px-8 py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
                   >
-                    Get Free Agent OS Setup
+                    Start Free Trial
                   </button>
                   <button
                     onClick={reset}

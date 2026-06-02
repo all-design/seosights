@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Menu, X, Zap } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 
 const navLinks = [
-  { label: 'Agent OS', href: '#agent-os' },
-  { label: 'Backlinks', href: '#backlinks' },
-  { label: 'Complete Solution', href: '#complete-solution' },
+  { label: 'Features', href: '#features' },
+  { label: 'Pricing', href: '#pricing' },
+  { label: 'How It Works', href: '#how-it-works' },
   { label: 'Get Started', href: '#cta' },
 ]
 
@@ -48,13 +48,20 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-emerald-400" />
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+              <img
+                src="/logo.png"
+                alt="seosight"
+                className="h-8 w-auto"
+              />
+              <div className="flex flex-col">
+                <span className="font-bold text-lg tracking-tight leading-none">
+                  seosight
+                </span>
+                <span className="text-[9px] tracking-[0.2em] text-emerald-400/70 uppercase leading-none mt-0.5">
+                  Vision · Analytics · Rank
+                </span>
               </div>
-              <span className="font-bold text-lg tracking-tight">
-                Agent <span className="text-emerald-400">OS</span>
-              </span>
             </div>
 
             {/* Desktop Navigation */}
@@ -131,6 +138,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                 <div className="pt-2">
                   <Button
                     onClick={onStartFree}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold"
                   >
                     Analyze Site
                   </Button>

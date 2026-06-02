@@ -15,36 +15,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Agent OS — AI SEO Backlinks That Rank & Get Cited",
+  title: "seosight — Vision. Analytics. Rank. | SEO · AEO · GEO",
   description:
-    "AI-powered SEO backlinks that rank you on Google AND get cited by ChatGPT, Claude, and Perplexity. One lever. Both worlds.",
+    "AI-powered SEO, AEO & GEO platform that ranks you on Google AND gets cited by ChatGPT, Claude, and Perplexity. Vision. Analytics. Rank.",
   keywords: [
     "AI SEO",
+    "AEO",
+    "GEO",
     "backlinks",
     "AI citations",
     "ChatGPT SEO",
     "Perplexity citations",
-    "Agent OS",
+    "seosight",
     "SEO strategy",
     "AI search optimization",
+    "E-E-A-T",
+    "AI crawler",
   ],
-  authors: [{ name: "Agent OS" }],
+  authors: [{ name: "seosight" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.png",
   },
   openGraph: {
-    title: "Agent OS — AI SEO Backlinks That Rank & Get Cited",
+    title: "seosight — Vision. Analytics. Rank.",
     description:
-      "AI-powered SEO backlinks that rank you on Google AND get cited by ChatGPT, Claude, and Perplexity.",
-    url: "https://agentos.ai",
-    siteName: "Agent OS",
+      "AI-powered SEO, AEO & GEO platform that ranks you on Google AND gets cited by ChatGPT, Claude, and Perplexity.",
+    url: "https://seosight.ai",
+    siteName: "seosight",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Agent OS — AI SEO Backlinks That Rank & Get Cited",
+    title: "seosight — Vision. Analytics. Rank.",
     description:
-      "AI-powered SEO backlinks that rank you on Google AND get cited by ChatGPT, Claude, and Perplexity.",
+      "AI-powered SEO, AEO & GEO platform that ranks you on Google AND gets cited by ChatGPT, Claude, and Perplexity.",
   },
 };
 

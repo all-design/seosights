@@ -1,26 +1,29 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Fix HTTP 502 analysis failure, enhance dashboard, verify end-to-end
+Task: Rebrand from "Agent OS" to "seosight", add logo, update landing page, add pricing and features sections
 
 Work Log:
-- Diagnosed root cause: 429 rate limiting from z-ai-web-dev-sdk APIs causing analysis to fail
-- Rewrote /src/app/api/analyze/route.ts with retry logic (exponential backoff, 3 retries)
-- Changed API calls from parallel to sequential with delays between calls (1.5-3s)
-- Added retryWithBackoff wrapper function for all API calls
-- Removed broken pdfkit dependency (was causing ENOENT errors)
-- jsPDF-based PDF generation verified working (POST /api/report 200 in 91ms)
-- Fixed runtime TypeError in AnalysisDashboard.tsx: `dim.data?.findings?.map is not a function`
-- Added safeArr() helper function to handle non-array findings from LLM responses
-- Applied safeArr to all findings.map, issues.map calls in dashboard
-- Verified full analysis flow: Landing → Modal → Analyzing (SSE progress) → Dashboard
-- Analysis completing successfully in ~97-107 seconds with retry logic
-- Dashboard rendering all 24+ sections correctly including new features
-- PDF export verified working
+- Analyzed uploaded logo using VLM — identified brand name "seosight" with tagline "VISION. ANALYTICS. RANK."
+- Copied logo to /public/logo.png
+- Updated layout.tsx: metadata title/description/keywords/icons/openGraph/twitter to seosight branding
+- Created new Navbar.tsx with seosight logo image, tagline, updated nav links (Features, Pricing, How It Works, Get Started)
+- Created new HeroSection.tsx with seosight branding, logo display, grid pattern background, "Vision. Analytics. Rank." headline, 4 stat badges
+- Created PricingSection.tsx with 3 pricing tiers:
+  - Starter: $5/month with 1 month free trial (AEO/GEO tracking, E-E-A-T audit, AI Crawler Status, SEO Check, 1 Domain)
+  - Pro Agency: $79/month "Most Popular" (White-Label Reports, 20 Domains, Entity/Brand Mentions, PDF/CSV Export, B2B Outreach)
+  - Managed: Contact Us (Complete Project Takeover, Technical Perfection, Authority Building, Strategic Interlinking, Content Humanization, Dedicated Account Manager)
+- Created FeaturesSection.tsx with Three Pillars (SEO, AEO, GEO) each with 5 feature cards, plus 6 additional features
+- Created HowItWorksSection.tsx with 4 steps (Enter URL → AI Scans → Get Strategy → Track & Dominate)
+- Updated CTASection.tsx with prominent "Analyze My Site — Free" button, contact form for Managed service, trust signals
+- Updated Footer.tsx with seosight logo and branding
+- Updated page.tsx to use new section order: Hero → Stats → Features → How It Works → Pricing → CTA → Footer
+- Updated AnalysisDashboard.tsx branding (header logo, CTA text)
+- Verified with agent-browser: Landing page renders correctly, all sections visible, pricing cards show correct prices, modal works, no console errors
 
 Stage Summary:
-- Analysis API now resilient to 429 rate limits with retry logic
-- PDF generation working (jsPDF, pdfkit removed)
-- Dashboard enhanced with: Pillar Correlation Matrix, Deep Strategy section, 12-Month Roadmap Timeline, Traffic Insights Winners/Losers, Algorithm Updates Tracker, Copy-to-clipboard for code snippets
-- All runtime errors fixed with safeArr helper
-- End-to-end flow verified with agent browser
+- Complete rebrand from "Agent OS" to "seosight" with logo, tagline "Vision. Analytics. Rank."
+- Three pricing tiers implemented as requested ($5 Starter, $79 Pro Agency, Contact Us Managed)
+- Features section with SEO/AEO/GEO pillars plus additional capabilities
+- How It Works section with 4-step process
+- All sections verified via browser QA with no errors
