@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const maxDuration = 120
+export const dynamic = 'force-dynamic'
 
 function sendProgress(progress: number, step: string): string {
   return `data: ${JSON.stringify({ type: 'progress', progress, step })}\n\n`
@@ -14,6 +15,9 @@ function sendError(message: string): string {
   return `data: ${JSON.stringify({ type: 'error', message })}\n\n`
 }
 
+// Yield to event loop — critical for SSE flushing in Next.js
+const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
     promise,
@@ -23,7 +27,6 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
 
 /**
  * Robust JSON repair for truncated LLM responses.
- * Handles: truncated strings, missing closing braces/brackets, trailing commas, etc.
  */
 function repairAndParseJSON(raw: string): Record<string, unknown> {
   // Strategy 1: Remove code fences
@@ -50,101 +53,53 @@ function repairAndParseJSON(raw: string): Record<string, unknown> {
     // Continue to repair
   }
 
-  // Strategy 5: Advanced repair - fix truncated strings and close structures
+  // Strategy 5: Advanced repair
   let fixed = jsonStr
     .replace(/\\n/g, ' ')
     .replace(/\\t/g, ' ')
     .replace(/[\x00-\x1f]/g, (ch) => (ch === '\n' || ch === '\r' || ch === '\t' ? ' ' : ''))
 
-  // Fix truncated strings: find unclosed string values and close them
-  // Walk character by character to track string state
   let inString = false
   let escape = false
-  let lastStringStart = -1
   for (let i = 0; i < fixed.length; i++) {
     const ch = fixed[i]
-    if (escape) {
-      escape = false
-      continue
-    }
-    if (ch === '\\') {
-      escape = true
-      continue
-    }
-    if (ch === '"') {
-      if (inString) {
-        inString = false
-      } else {
-        inString = true
-        lastStringStart = i
-      }
-    }
+    if (escape) { escape = false; continue }
+    if (ch === '\\') { escape = true; continue }
+    if (ch === '"') { inString = !inString }
   }
+  if (inString) fixed = fixed + '"'
 
-  // If we're still in a string at the end, it was truncated - close it
-  if (inString) {
-    fixed = fixed + '"'
-  }
-
-  // Remove any trailing partial content after the last complete key-value pair
-  // Find the last complete value (number, boolean, null, or closed string/array/object)
-  // Simple approach: remove trailing incomplete content
-
-  // Count and close unclosed brackets and braces
   const openBraces = (fixed.match(/{/g) || []).length
   const closeBraces = (fixed.match(/}/g) || []).length
   const openBrackets = (fixed.match(/\[/g) || []).length
   const closeBrackets = (fixed.match(/]/g) || []).length
 
-  // Close arrays first, then objects
   fixed += ']'.repeat(Math.max(0, openBrackets - closeBrackets))
   fixed += '}'.repeat(Math.max(0, openBraces - closeBraces))
-
-  // Fix trailing commas again after closures
   fixed = fixed.replace(/,\s*([}\]])/g, '$1')
 
   try {
     return JSON.parse(fixed)
   } catch {
-    // Last resort: try to find the last complete object boundary
-    // Walk backwards from the end to find a safe truncation point
     const safeEndPatterns = [
-      /\]\s*\}\s*$/,
-      /\}\s*\}\s*$/,
-      /\]\s*$/,
-      /\}\s*$/,
-      /"\s*\}\s*$/,
-      /\d+\s*\}\s*$/,
-      /true\s*\}\s*$/,
-      /false\s*\}\s*$/,
-      /null\s*\}\s*$/,
+      /\]\s*\}\s*$/, /\}\s*\}\s*$/, /\]\s*$/, /\}\s*$/,
+      /"\s*\}\s*$/, /\d+\s*\}\s*$/, /true\s*\}\s*$/,
+      /false\s*\}\s*$/, /null\s*\}\s*$/,
     ]
-
     for (const pattern of safeEndPatterns) {
       const match = fixed.match(pattern)
       if (match && match.index && match.index > fixed.length * 0.5) {
-        // Found a safe ending point - try parsing up to there
-        // But we need to make sure we close all open structures
         let truncated = fixed.slice(0, match.index + match[0].length)
-
-        // Re-count and close
         const tOpenB = (truncated.match(/{/g) || []).length
         const tCloseB = (truncated.match(/}/g) || []).length
         const tOpenBr = (truncated.match(/\[/g) || []).length
         const tCloseBr = (truncated.match(/]/g) || []).length
-
         truncated += ']'.repeat(Math.max(0, tOpenBr - tCloseBr))
         truncated += '}'.repeat(Math.max(0, tOpenB - tCloseB))
         truncated = truncated.replace(/,\s*([}\]])/g, '$1')
-
-        try {
-          return JSON.parse(truncated)
-        } catch {
-          continue
-        }
+        try { return JSON.parse(truncated) } catch { continue }
       }
     }
-
     throw new Error('Failed to parse AI response as JSON after repair attempts')
   }
 }
@@ -167,115 +122,116 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder()
     const targetMarket = market || 'Global'
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const enqueue = (data: string) => {
-          controller.enqueue(encoder.encode(data))
-        }
+    // Use async generator for reliable SSE streaming
+    async function* generateEvents(): AsyncGenerator<string> {
+      try {
+        const ZAI = (await import('z-ai-web-dev-sdk')).default
+        const zai = await ZAI.create()
 
+        // ── Phase 1: Gather Data ──────────────────────────────────────
+        yield sendProgress(8, 'Phase 1: Scanning your website...')
+        await flush()
+
+        let siteData: { title?: string; html?: string; url?: string; text?: string }
         try {
-          const ZAI = (await import('z-ai-web-dev-sdk')).default
-          const zai = await ZAI.create()
+          const pageResult = await withTimeout(
+            zai.functions.invoke('page_reader', { url }),
+            15000,
+            null
+          )
+          if (pageResult) {
+            const rawData = pageResult.data || pageResult
+            const htmlContent = rawData.html || ''
+            const plainText = htmlContent
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]*>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 6000)
 
-          // ── Phase 1: Gather Data ──────────────────────────────────────
-          enqueue(sendProgress(8, 'Phase 1: Scanning your website...'))
-
-          let siteData: { title?: string; html?: string; url?: string; text?: string }
-          try {
-            const pageResult = await withTimeout(
-              zai.functions.invoke('page_reader', { url }),
-              15000,
-              null
-            )
-            if (pageResult) {
-              const rawData = pageResult.data || pageResult
-              const htmlContent = rawData.html || ''
-              const plainText = htmlContent
-                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-                .replace(/<[^>]*>/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim()
-                .slice(0, 6000)
-
-              siteData = {
-                title: rawData.title || url,
-                html: htmlContent.slice(0, 2000),
-                url: rawData.url || url,
-                text: plainText,
-              }
-            } else {
-              siteData = { title: url, url, text: '' }
+            siteData = {
+              title: rawData.title || url,
+              html: htmlContent.slice(0, 2000),
+              url: rawData.url || url,
+              text: plainText,
             }
-          } catch {
+          } else {
             siteData = { title: url, url, text: '' }
           }
+        } catch {
+          siteData = { title: url, url, text: '' }
+        }
 
-          enqueue(sendProgress(20, 'Analyzing technical SEO & AEO readiness...'))
+        yield sendProgress(20, 'Analyzing technical SEO & AEO readiness...')
+        await flush()
 
-          // Step 2: Search for competitor & niche info
-          let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
-          let aiSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
-          let localSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
-          try {
-            const domain = new URL(url).hostname.replace('www.', '')
-            const nicheQuery = `best ${siteData.title || domain} alternatives competitors`
-            const results = await withTimeout(
-              zai.functions.invoke('web_search', { query: nicheQuery, num: 5 }),
-              10000,
-              []
-            )
-            searchResults = Array.isArray(results) ? results : []
+        // Step 2: Search for competitor & niche info
+        let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+        let aiSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+        let localSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+        try {
+          const domain = new URL(url).hostname.replace('www.', '')
+          const nicheQuery = `best ${siteData.title || domain} alternatives competitors`
+          const results = await withTimeout(
+            zai.functions.invoke('web_search', { query: nicheQuery, num: 5 }),
+            10000,
+            []
+          )
+          searchResults = Array.isArray(results) ? results : []
 
-            enqueue(sendProgress(30, 'Checking GEO visibility & AI citation landscape...'))
+          yield sendProgress(30, 'Checking GEO visibility & AI citation landscape...')
+          await flush()
 
-            const aiResults = await withTimeout(
+          const aiResults = await withTimeout(
+            zai.functions.invoke('web_search', {
+              query: `${domain} AI citation authority ChatGPT Perplexity`,
+              num: 3,
+            }),
+            10000,
+            []
+          )
+          aiSearchResults = Array.isArray(aiResults) ? aiResults : []
+
+          if (targetMarket !== 'Global') {
+            yield sendProgress(38, `Analyzing local SEO for ${targetMarket}...`)
+            await flush()
+            const localResults = await withTimeout(
               zai.functions.invoke('web_search', {
-                query: `${domain} AI citation authority ChatGPT Perplexity`,
+                query: `${domain} ${targetMarket} local SEO business`,
                 num: 3,
               }),
               10000,
               []
             )
-            aiSearchResults = Array.isArray(aiResults) ? aiResults : []
-
-            if (targetMarket !== 'Global') {
-              enqueue(sendProgress(38, `Analyzing local SEO for ${targetMarket}...`))
-              const localResults = await withTimeout(
-                zai.functions.invoke('web_search', {
-                  query: `${domain} ${targetMarket} local SEO business`,
-                  num: 3,
-                }),
-                10000,
-                []
-              )
-              localSearchResults = Array.isArray(localResults) ? localResults : []
-            }
-          } catch {
-            // Continue without search data
+            localSearchResults = Array.isArray(localResults) ? localResults : []
           }
+        } catch {
+          // Continue without search data
+        }
 
-          // ── Phase 2: LLM Analysis (2 calls for reliability) ──────────────────
-          enqueue(sendProgress(45, 'Phase 2: Running comprehensive analysis...'))
+        // ── Phase 2: LLM Analysis (2 calls for reliability) ──────────────────
+        yield sendProgress(45, 'Phase 2: Running comprehensive analysis...')
+        await flush()
 
-          const siteContent = siteData.text?.slice(0, 3000) || 'No content available'
-          const competitorInfo = searchResults
-            .slice(0, 3)
-            .map((r) => `${r.name} (${r.host_name}): ${(r.snippet || '').slice(0, 80)}`)
-            .join(' | ')
-          const aiInfo = aiSearchResults
-            .slice(0, 2)
-            .map((r) => `${r.name}: ${(r.snippet || '').slice(0, 60)}`)
-            .join(' | ')
-          const localInfo = localSearchResults
-            .slice(0, 2)
-            .map((r) => `${r.name}: ${(r.snippet || '').slice(0, 60)}`)
-            .join(' | ')
+        const siteContent = siteData.text?.slice(0, 3000) || 'No content available'
+        const competitorInfo = searchResults
+          .slice(0, 3)
+          .map((r) => `${r.name} (${r.host_name}): ${(r.snippet || '').slice(0, 80)}`)
+          .join(' | ')
+        const aiInfo = aiSearchResults
+          .slice(0, 2)
+          .map((r) => `${r.name}: ${(r.snippet || '').slice(0, 60)}`)
+          .join(' | ')
+        const localInfo = localSearchResults
+          .slice(0, 2)
+          .map((r) => `${r.name}: ${(r.snippet || '').slice(0, 60)}`)
+          .join(' | ')
 
-          // ── Call 1: Audit + Bonus Scores ──────────────────────────
-          const auditSystemPrompt = 'You are an elite SEO/AEO/GEO strategist. Respond with ONLY valid JSON. No markdown. No code fences. Be extremely concise - all string values under 12 words. This is critical to avoid truncation.'
+        // ── Call 1: Audit + Bonus Scores ──────────────────────────
+        const auditSystemPrompt = 'You are an elite SEO/AEO/GEO strategist. Respond with ONLY valid JSON. No markdown. No code fences. Be extremely concise - all string values under 12 words. This is critical to avoid truncation.'
 
-          const auditUserPrompt = `Analyze ${url} for market: ${targetMarket}. Title: ${siteData.title}. Content: ${siteContent.slice(0, 1500)}. Competitors: ${competitorInfo.slice(0, 300) || 'None'}. AI: ${aiInfo.slice(0, 200) || 'None'}. Local: ${localInfo.slice(0, 200) || 'None'}.
+        const auditUserPrompt = `Analyze ${url} for market: ${targetMarket}. Title: ${siteData.title}. Content: ${siteContent.slice(0, 1500)}. Competitors: ${competitorInfo.slice(0, 300) || 'None'}. AI: ${aiInfo.slice(0, 200) || 'None'}. Local: ${localInfo.slice(0, 200) || 'None'}.
 
 Return JSON with this EXACT structure. All strings max 12 words. Minimize items:
 
@@ -354,10 +310,10 @@ SCORES: Realistic. Average site: 30-50. Combined = 40%SEO+30%AEO+30%GEO. localSE
 
 IMPORTANT: Return ONLY raw JSON. No code fences. No extra text.`
 
-          // ── Call 2: Strategy + Creative + Measure ──────────────────
-          const strategySystemPrompt = 'You are an elite SEO/AEO/GEO content strategist. Respond with ONLY valid JSON. No markdown. No code fences. Be extremely concise - all string values under 15 words. This is critical to avoid truncation.'
+        // ── Call 2: Strategy + Creative + Measure ──────────────────
+        const strategySystemPrompt = 'You are an elite SEO/AEO/GEO content strategist. Respond with ONLY valid JSON. No markdown. No code fences. Be extremely concise - all string values under 15 words. This is critical to avoid truncation.'
 
-          const strategyUserPrompt = `Create strategy for ${url} (${siteData.title}). Market: ${targetMarket}. Competitors: ${competitorInfo.slice(0, 200) || 'None'}.
+        const strategyUserPrompt = `Create strategy for ${url} (${siteData.title}). Market: ${targetMarket}. Competitors: ${competitorInfo.slice(0, 200) || 'None'}.
 
 Return JSON with this EXACT structure. All strings max 15 words:
 
@@ -390,131 +346,154 @@ QUANTITY: 2 topicClusters (1 supportingKeyword each), 3 keywordGaps, 2 contentAr
 
 IMPORTANT: Return ONLY raw JSON. No code fences. No extra text.`
 
-          // Run both LLM calls in parallel
-          enqueue(sendProgress(50, 'Running AI analysis engine...'))
+        // Run both LLM calls in parallel
+        yield sendProgress(50, 'Running AI analysis engine...')
+        await flush()
 
-          const [auditResult, strategyResult] = await Promise.all([
-            zai.chat.completions.create({
-              messages: [
-                { role: 'system', content: auditSystemPrompt },
-                { role: 'user', content: auditUserPrompt },
-              ],
-            }),
-            zai.chat.completions.create({
-              messages: [
-                { role: 'system', content: strategySystemPrompt },
-                { role: 'user', content: strategyUserPrompt },
-              ],
-            }),
-          ])
+        const [auditResult, strategyResult] = await Promise.all([
+          zai.chat.completions.create({
+            messages: [
+              { role: 'system', content: auditSystemPrompt },
+              { role: 'user', content: auditUserPrompt },
+            ],
+          }),
+          zai.chat.completions.create({
+            messages: [
+              { role: 'system', content: strategySystemPrompt },
+              { role: 'user', content: strategyUserPrompt },
+            ],
+          }),
+        ])
 
-          // ── Phase 3: Parse & Merge ──────────────────────────────────
-          enqueue(sendProgress(75, 'Phase 3: Building your strategy...'))
+        // ── Phase 3: Parse & Merge ──────────────────────────────────
+        yield sendProgress(75, 'Phase 3: Building your strategy...')
+        await flush()
 
-          const auditRaw = auditResult.choices[0]?.message?.content || ''
-          const strategyRaw = strategyResult.choices[0]?.message?.content || ''
+        const auditRaw = auditResult.choices[0]?.message?.content || ''
+        const strategyRaw = strategyResult.choices[0]?.message?.content || ''
 
-          console.log('[analyze] Audit response length:', auditRaw.length)
-          console.log('[analyze] Strategy response length:', strategyRaw.length)
+        console.log('[analyze] Audit response length:', auditRaw.length)
+        console.log('[analyze] Strategy response length:', strategyRaw.length)
 
-          let auditData: Record<string, unknown>
-          let strategyData: Record<string, unknown>
+        let auditData: Record<string, unknown>
+        let strategyData: Record<string, unknown>
 
-          try {
-            auditData = repairAndParseJSON(auditRaw)
-          } catch (e) {
-            console.error('[analyze] Audit JSON parse failed:', e instanceof Error ? e.message : 'Unknown error')
-            // Provide minimal fallback audit data
-            auditData = {
-              siteName: siteData.title || url,
-              market: targetMarket,
-              overallScores: { seo: 35, aeo: 25, geo: 20, combined: 27 },
-              audit: {
-                technicalSEO: { score: 35, issues: [{ issue: 'Analysis incomplete', severity: 'warning', fix: 'Try again later' }] },
-                crawlability: { score: 40, issues: [{ issue: 'Could not fully analyze', impact: 'Medium' }] },
-                pageSpeed: { score: 50, coreVitals: [{ metric: 'LCP', value: 'Unknown', status: 'needs-improvement' }] },
-                indexation: { score: 40, indexedPages: 0, orphanPages: 0, issues: ['Could not determine'] },
-                aeoReadiness: { score: 25, hasFAQ: false, hasSchema: false, hasStructuredData: false, answerFormatScore: 20, issues: ['Could not fully analyze'] },
-                geoVisibility: { score: 20, citedByAI: [], entityRecognition: 15, knowledgeGraphPresence: false, issues: ['Could not fully analyze'] },
-              },
-              eeat: { overallScore: 30, experience: { score: 30, findings: ['Partial analysis'] }, expertise: { score: 25, findings: ['Partial analysis'] }, authoritativeness: { score: 20, findings: ['Partial analysis'] }, trustworthiness: { score: 35, findings: ['Partial analysis'] }, whoHowWhyTest: { who: 'N/A', how: 'N/A', why: 'N/A' } },
-              geoCitability: { overallScore: 25, citabilityScore: { score: 25, weight: 25, findings: ['Partial'] }, structuralReadability: { score: 30, weight: 20, findings: ['Partial'] }, multiModalContent: { score: 20, weight: 15, findings: ['Partial'] }, authorityBrandSignals: { score: 20, weight: 20, findings: ['Partial'] }, technicalAccessibility: { score: 30, weight: 20, findings: ['Partial'] } },
-              aiCrawler: { aiCrawlerAccess: [{ bot: 'GPTBot', allowed: true, recommendation: 'Unknown' }, { bot: 'ClaudeBot', allowed: true, recommendation: 'Unknown' }], robotsTxtAnalysis: ['Could not analyze'], llmsTxtPresence: false, jsRenderingDependency: 'medium', ssrVsCsr: 'Unknown' },
-              brandMentions: { brandMentionScore: 20, backlinkCorrelation: 'Could not determine', platformPresence: [{ platform: 'Wikipedia', detected: false, strength: 'none' }, { platform: 'Reddit', detected: false, strength: 'none' }], citationSources: [{ engine: 'ChatGPT', topSource: 'Unknown', percentage: 0 }] },
-              contentQuality: { overallScore: 35, contentDepth: 30, aiPatternRisk: 'medium', humanizationTips: ['Add original insights'], fillerDetected: ['Analysis incomplete'], originalityIndicators: ['Partial analysis'] },
-              parasiteRisk: { riskLevel: 'low', findings: ['Could not fully analyze'], recommendations: ['Monitor for changes'] },
-              localSEO: { applicable: targetMarket !== 'Global', gbpSignals: { score: 20, findings: ['Not analyzed'] }, napConsistency: { score: 20, findings: ['Not analyzed'] }, reviewSignals: { score: 20, findings: ['Not analyzed'] }, businessType: 'N/A' },
-              sxo: { pageTypeMatch: 'Unknown', serpIntentMatch: 'mixed', userPersonaScores: [{ persona: 'General', score: 40 }], recommendations: ['Full analysis recommended'] },
-            }
-          }
-
-          try {
-            strategyData = repairAndParseJSON(strategyRaw)
-          } catch (e) {
-            console.error('[analyze] Strategy JSON parse failed:', e instanceof Error ? e.message : 'Unknown error')
-            strategyData = {
-              structure: {
-                topicClusters: [{ cluster: 'Core Topic', pillarKeyword: 'primary keyword', supportingKeywords: ['secondary'], seoOpportunity: 'Optimize existing pages', aeoOpportunity: 'Add FAQ section', geoOpportunity: 'Create cite-worthy content' }],
-                keywordGaps: [{ keyword: 'target keyword', volume: 'Med', difficulty: 'Med', type: 'seo', opportunity: 'Create content' }],
-                contentArchitecture: { recommended: [{ section: 'Main Content', purpose: 'Core topic coverage', pillar: 'all' }], internalLinkMap: [{ from: 'Home', to: 'Blog', anchor: 'Learn more' }] },
-                schemaRecommendations: [{ schemaType: 'Organization', purpose: 'Brand identity', pillar: 'geo', implementation: 'Add to homepage', status: 'active' }],
-              },
-              creative: {
-                contentBriefs: [{ title: 'Comprehensive Guide', type: 'guide', targetKeyword: 'main keyword', pillar: 'all', brief: 'Cover topic thoroughly', estimatedImpact: 'High', wordCount: '2000-3000', structure: ['Introduction', 'Main Content'] }],
-                onPageOptimizations: [{ page: '/', currentTitle: 'Current', suggestedTitle: 'Optimized Title', suggestedDescription: 'Optimized description', aeoTweaks: ['Add FAQ'], geoTweaks: ['Add structured data'] }],
-                answerBlocks: [{ question: 'What is...?', suggestedAnswer: 'A clear concise answer that AI can cite.', format: 'faq', targetEngine: 'Google' }],
-              },
-              measure: {
-                kpiTracking: {
-                  seo: [{ metric: 'Organic Traffic', current: '0', target: '+50%', timeline: '3mo' }],
-                  aeo: [{ metric: 'Featured Snippets', current: '0', target: '+3', timeline: '3mo' }],
-                  geo: [{ metric: 'AI Citations', current: '0', target: '+2', timeline: '3mo' }],
-                },
-                competitorBenchmarks: [{ competitor: 'Top Competitor', url: 'https://example.com', seoScore: 70, aeoScore: 60, geoScore: 50, citedBy: ['ChatGPT'] }],
-                weeklyActions: [
-                  { week: 'Week 1', tasks: [{ task: 'Fix critical SEO issues', pillar: 'seo', priority: 'high' }, { task: 'Add FAQ schema', pillar: 'aeo', priority: 'high' }] },
-                  { week: 'Week 2', tasks: [{ task: 'Create pillar content', pillar: 'seo', priority: 'high' }, { task: 'Optimize for AI citation', pillar: 'geo', priority: 'medium' }] },
-                  { week: 'Week 3', tasks: [{ task: 'Build backlinks', pillar: 'seo', priority: 'medium' }, { task: 'Add answer blocks', pillar: 'aeo', priority: 'medium' }] },
-                ],
-              },
-              summary: `Analysis of ${siteData.title || url} shows significant opportunities for improvement across SEO, AEO, and GEO pillars. Focus on building authority and creating cite-worthy content.`,
-              executiveActions: [
-                'Fix critical technical SEO issues identified in the audit',
-                'Add FAQ schema and structured data for AEO optimization',
-                'Create comprehensive, cite-worthy content for GEO visibility',
-                'Build high-quality backlinks from authoritative sources',
-                'Implement AI crawler access in robots.txt and add llms.txt',
-              ],
-            }
-          }
-
-          // Merge both results into a single analysis
-          const analysisResult = {
-            ...auditData,
-            ...strategyData,
-            // Ensure critical fields from audit take precedence
-            siteName: auditData.siteName || strategyData.siteName || siteData.title || url,
+        try {
+          auditData = repairAndParseJSON(auditRaw)
+        } catch (e) {
+          console.error('[analyze] Audit JSON parse failed:', e instanceof Error ? e.message : 'Unknown error')
+          auditData = {
+            siteName: siteData.title || url,
             market: targetMarket,
-            overallScores: auditData.overallScores || strategyData.overallScores,
-            audit: auditData.audit || strategyData.audit,
-            url,
+            overallScores: { seo: 35, aeo: 25, geo: 20, combined: 27 },
+            audit: {
+              technicalSEO: { score: 35, issues: [{ issue: 'Analysis incomplete', severity: 'warning', fix: 'Try again later' }] },
+              crawlability: { score: 40, issues: [{ issue: 'Could not fully analyze', impact: 'Medium' }] },
+              pageSpeed: { score: 50, coreVitals: [{ metric: 'LCP', value: 'Unknown', status: 'needs-improvement' }] },
+              indexation: { score: 40, indexedPages: 0, orphanPages: 0, issues: ['Could not determine'] },
+              aeoReadiness: { score: 25, hasFAQ: false, hasSchema: false, hasStructuredData: false, answerFormatScore: 20, issues: ['Could not fully analyze'] },
+              geoVisibility: { score: 20, citedByAI: [], entityRecognition: 15, knowledgeGraphPresence: false, issues: ['Could not fully analyze'] },
+            },
+            eeat: { overallScore: 30, experience: { score: 30, findings: ['Partial analysis'] }, expertise: { score: 25, findings: ['Partial analysis'] }, authoritativeness: { score: 20, findings: ['Partial analysis'] }, trustworthiness: { score: 35, findings: ['Partial analysis'] }, whoHowWhyTest: { who: 'N/A', how: 'N/A', why: 'N/A' } },
+            geoCitability: { overallScore: 25, citabilityScore: { score: 25, weight: 25, findings: ['Partial'] }, structuralReadability: { score: 30, weight: 20, findings: ['Partial'] }, multiModalContent: { score: 20, weight: 15, findings: ['Partial'] }, authorityBrandSignals: { score: 20, weight: 20, findings: ['Partial'] }, technicalAccessibility: { score: 30, weight: 20, findings: ['Partial'] } },
+            aiCrawler: { aiCrawlerAccess: [{ bot: 'GPTBot', allowed: true, recommendation: 'Unknown' }, { bot: 'ClaudeBot', allowed: true, recommendation: 'Unknown' }], robotsTxtAnalysis: ['Could not analyze'], llmsTxtPresence: false, jsRenderingDependency: 'medium', ssrVsCsr: 'Unknown' },
+            brandMentions: { brandMentionScore: 20, backlinkCorrelation: 'Could not determine', platformPresence: [{ platform: 'Wikipedia', detected: false, strength: 'none' }, { platform: 'Reddit', detected: false, strength: 'none' }], citationSources: [{ engine: 'ChatGPT', topSource: 'Unknown', percentage: 0 }] },
+            contentQuality: { overallScore: 35, contentDepth: 30, aiPatternRisk: 'medium', humanizationTips: ['Add original insights'], fillerDetected: ['Analysis incomplete'], originalityIndicators: ['Partial analysis'] },
+            parasiteRisk: { riskLevel: 'low', findings: ['Could not fully analyze'], recommendations: ['Monitor for changes'] },
+            localSEO: { applicable: targetMarket !== 'Global', gbpSignals: { score: 20, findings: ['Not analyzed'] }, napConsistency: { score: 20, findings: ['Not analyzed'] }, reviewSignals: { score: 20, findings: ['Not analyzed'] }, businessType: 'N/A' },
+            sxo: { pageTypeMatch: 'Unknown', serpIntentMatch: 'mixed', userPersonaScores: [{ persona: 'General', score: 40 }], recommendations: ['Full analysis recommended'] },
           }
+        }
 
-          enqueue(sendProgress(90, 'Parsing analysis results...'))
-          await new Promise((resolve) => setTimeout(resolve, 200))
+        try {
+          strategyData = repairAndParseJSON(strategyRaw)
+        } catch (e) {
+          console.error('[analyze] Strategy JSON parse failed:', e instanceof Error ? e.message : 'Unknown error')
+          strategyData = {
+            structure: {
+              topicClusters: [{ cluster: 'Core Topic', pillarKeyword: 'primary keyword', supportingKeywords: ['secondary'], seoOpportunity: 'Optimize existing pages', aeoOpportunity: 'Add FAQ section', geoOpportunity: 'Create cite-worthy content' }],
+              keywordGaps: [{ keyword: 'target keyword', volume: 'Med', difficulty: 'Med', type: 'seo', opportunity: 'Create content' }],
+              contentArchitecture: { recommended: [{ section: 'Main Content', purpose: 'Core topic coverage', pillar: 'all' }], internalLinkMap: [{ from: 'Home', to: 'Blog', anchor: 'Learn more' }] },
+              schemaRecommendations: [{ schemaType: 'Organization', purpose: 'Brand identity', pillar: 'geo', implementation: 'Add to homepage', status: 'active' }],
+            },
+            creative: {
+              contentBriefs: [{ title: 'Comprehensive Guide', type: 'guide', targetKeyword: 'main keyword', pillar: 'all', brief: 'Cover topic thoroughly', estimatedImpact: 'High', wordCount: '2000-3000', structure: ['Introduction', 'Main Content'] }],
+              onPageOptimizations: [{ page: '/', currentTitle: 'Current', suggestedTitle: 'Optimized Title', suggestedDescription: 'Optimized description', aeoTweaks: ['Add FAQ'], geoTweaks: ['Add structured data'] }],
+              answerBlocks: [{ question: 'What is...?', suggestedAnswer: 'A clear concise answer that AI can cite.', format: 'faq', targetEngine: 'Google' }],
+            },
+            measure: {
+              kpiTracking: {
+                seo: [{ metric: 'Organic Traffic', current: '0', target: '+50%', timeline: '3mo' }],
+                aeo: [{ metric: 'Featured Snippets', current: '0', target: '+3', timeline: '3mo' }],
+                geo: [{ metric: 'AI Citations', current: '0', target: '+2', timeline: '3mo' }],
+              },
+              competitorBenchmarks: [{ competitor: 'Top Competitor', url: 'https://example.com', seoScore: 70, aeoScore: 60, geoScore: 50, citedBy: ['ChatGPT'] }],
+              weeklyActions: [
+                { week: 'Week 1', tasks: [{ task: 'Fix critical SEO issues', pillar: 'seo', priority: 'high' }, { task: 'Add FAQ schema', pillar: 'aeo', priority: 'high' }] },
+                { week: 'Week 2', tasks: [{ task: 'Create pillar content', pillar: 'seo', priority: 'high' }, { task: 'Optimize for AI citation', pillar: 'geo', priority: 'medium' }] },
+                { week: 'Week 3', tasks: [{ task: 'Build backlinks', pillar: 'seo', priority: 'medium' }, { task: 'Add answer blocks', pillar: 'aeo', priority: 'medium' }] },
+              ],
+            },
+            summary: `Analysis of ${siteData.title || url} shows significant opportunities for improvement across SEO, AEO, and GEO pillars. Focus on building authority and creating cite-worthy content.`,
+            executiveActions: [
+              'Fix critical technical SEO issues identified in the audit',
+              'Add FAQ schema and structured data for AEO optimization',
+              'Create comprehensive, cite-worthy content for GEO visibility',
+              'Build high-quality backlinks from authoritative sources',
+              'Implement AI crawler access in robots.txt and add llms.txt',
+            ],
+          }
+        }
 
-          enqueue(sendProgress(95, 'Finalizing your strategy...'))
-          await new Promise((resolve) => setTimeout(resolve, 300))
+        // Merge both results into a single analysis
+        const analysisResult = {
+          ...auditData,
+          ...strategyData,
+          siteName: auditData.siteName || strategyData.siteName || siteData.title || url,
+          market: targetMarket,
+          overallScores: auditData.overallScores || strategyData.overallScores,
+          audit: auditData.audit || strategyData.audit,
+          url,
+        }
 
-          enqueue(sendProgress(100, 'Analysis complete!'))
-          enqueue(sendComplete(analysisResult))
+        yield sendProgress(90, 'Parsing analysis results...')
+        await flush()
+        await new Promise((resolve) => setTimeout(resolve, 200))
+
+        yield sendProgress(95, 'Finalizing your strategy...')
+        await flush()
+        await new Promise((resolve) => setTimeout(resolve, 300))
+
+        yield sendProgress(100, 'Analysis complete!')
+        yield sendComplete(analysisResult)
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Analysis failed'
+        console.error('[analyze] Error:', msg)
+        yield sendError(msg)
+      }
+    }
+
+    const encoder2 = new TextEncoder()
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of generateEvents()) {
+            controller.enqueue(encoder2.encode(event))
+          }
         } catch (error) {
-          const msg = error instanceof Error ? error.message : 'Analysis failed'
-          console.error('[analyze] Error:', msg)
-          enqueue(sendError(msg))
+          const msg = error instanceof Error ? error.message : 'Stream error'
+          try {
+            controller.enqueue(encoder2.encode(sendError(msg)))
+          } catch {
+            // Controller already closed
+          }
         } finally {
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-          controller.close()
+          try {
+            controller.enqueue(encoder2.encode('data: [DONE]\n\n'))
+            controller.close()
+          } catch {
+            // Controller already closed
+          }
         }
       },
     })

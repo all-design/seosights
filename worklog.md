@@ -53,3 +53,27 @@ Stage Summary:
 - Landing, modal, market selector, analyzing animation, dashboard - all functional
 - API response time: ~27 seconds (down from 50+ seconds with failures)
 - Clean codebase - lint passes, no unused files
+---
+Task ID: 1
+Agent: main
+Task: Fix analysis stuck at 8% - SSE streaming not reaching client in real-time
+
+Work Log:
+- Diagnosed root cause: SSE progress events were being buffered by Next.js and not reaching the client in real-time
+- Rewrote API route (`/api/analyze/route.ts`) using async generator pattern with explicit `flush()` calls between progress events
+- Added `export const dynamic = 'force-dynamic'` to prevent response caching
+- Each progress event now yields to the event loop with `await flush()` (setTimeout(0)) allowing the stream to flush
+- Rewrote `AnalyzingView.tsx` with:
+  - Client-side 3-minute timeout with abort controller
+  - Retry button that properly resets state and re-triggers analysis
+  - "Go Back" button on error screen
+  - Elapsed timer display showing "Usually takes 30-90 seconds"
+  - Better error messages explaining common failure reasons
+- Verified with agent browser: analysis now shows real-time progress (8% → 20% → 30% → 45% → 50% → 75% → 90% → 100%)
+- Full dashboard renders correctly with all sections (SEO/AEO/GEO scores, E-E-A-T, GEO Citability, AI Crawler, Brand Mentions, Content Quality, Parasite Risk, Local SEO, SXO, Structure, Creative, Measure)
+
+Stage Summary:
+- SSE streaming fixed by using async generator with flush() between events
+- Analysis no longer stuck at 8% - progress updates reach client in real-time
+- Added timeout, retry, and better error handling
+- Full end-to-end flow verified: Landing → Modal → Analyzing (with progress) → Dashboard → New Analysis

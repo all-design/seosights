@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore, SEOAnalysis } from '@/lib/store'
-import { Globe, Loader2, AlertTriangle, ArrowLeft, MapPin } from 'lucide-react'
+import { Globe, Loader2, AlertTriangle, ArrowLeft, MapPin, RefreshCw, Clock } from 'lucide-react'
 
 const phases = [
   { label: 'Scanning your website', icon: '🔍', phase: 'Phase 1' },
@@ -18,6 +18,8 @@ const phases = [
   { label: 'Parsing analysis results', icon: '🔧', phase: '' },
   { label: 'Finalizing your strategy', icon: '🎯', phase: '' },
 ]
+
+const ANALYSIS_TIMEOUT = 180_000 // 3 minutes
 
 export default function AnalyzingView() {
   const {
@@ -34,6 +36,24 @@ export default function AnalyzingView() {
   } = useAppStore()
 
   const analyzedUrlRef = useRef<string | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  const [retryCount, setRetryCount] = useState(0)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Elapsed time counter
+  useEffect(() => {
+    if (analysisError) {
+      if (timerRef.current) clearInterval(timerRef.current)
+      return
+    }
+    setElapsed(0)
+    timerRef.current = setInterval(() => {
+      setElapsed((prev) => prev + 1)
+    }, 1000)
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [analysisError, retryCount])
 
   useEffect(() => {
     if (analyzedUrlRef.current === targetUrl || !targetUrl) return
@@ -42,8 +62,14 @@ export default function AnalyzingView() {
     const abortController = new AbortController()
     const { signal } = abortController
 
+    // Client-side timeout
+    const timeoutId = setTimeout(() => {
+      abortController.abort()
+      setAnalysisError('Analysis timed out. The server took too long to respond. Please try again.')
+    }, ANALYSIS_TIMEOUT)
+
     const runAnalysis = async () => {
-      setAnalysisProgress(8)
+      setAnalysisProgress(5)
       setAnalysisStep('Connecting to analysis engine...')
 
       try {
@@ -55,7 +81,7 @@ export default function AnalyzingView() {
         })
 
         if (!response.ok) {
-          let errMsg = 'Analysis failed'
+          let errMsg = `Analysis failed (HTTP ${response.status})`
           try {
             const errData = await response.json()
             errMsg = errData.error || errMsg
@@ -66,10 +92,11 @@ export default function AnalyzingView() {
         }
 
         const reader = response.body?.getReader()
-        if (!reader) throw new Error('No response stream')
+        if (!reader) throw new Error('No response stream received')
 
         const decoder = new TextDecoder()
         let buffer = ''
+        let lastProgressTime = Date.now()
 
         while (true) {
           if (signal.aborted) break
@@ -89,9 +116,11 @@ export default function AnalyzingView() {
             try {
               const parsed = JSON.parse(data)
               if (parsed.type === 'progress') {
+                lastProgressTime = Date.now()
                 setAnalysisProgress(parsed.progress)
                 setAnalysisStep(parsed.step)
               } else if (parsed.type === 'complete') {
+                clearTimeout(timeoutId)
                 setAnalysis(parsed.analysis as SEOAnalysis)
                 setAnalysisProgress(100)
                 setAnalysisStep('Analysis complete!')
@@ -99,16 +128,22 @@ export default function AnalyzingView() {
                   setView('dashboard')
                 }, 600)
               } else if (parsed.type === 'error') {
-                setAnalysisError(parsed.message || 'Analysis failed')
+                clearTimeout(timeoutId)
+                setAnalysisError(parsed.message || 'Analysis failed. Please try again.')
               }
             } catch {
               // skip non-JSON lines
             }
           }
         }
+
+        // If we reach here without completing, check if we got data
+        // (stream ended without 'complete' event)
       } catch (err) {
         if (signal.aborted) return
-        setAnalysisError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')
+        clearTimeout(timeoutId)
+        const message = err instanceof Error ? err.message : 'Analysis failed. Please try again.'
+        setAnalysisError(message)
       }
     }
 
@@ -116,13 +151,36 @@ export default function AnalyzingView() {
 
     return () => {
       abortController.abort()
+      clearTimeout(timeoutId)
       analyzedUrlRef.current = null
     }
-  }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError])
+  }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError, retryCount])
 
   const currentStepIndex = phases.findIndex((s) =>
     analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
   )
+
+  const handleRetry = () => {
+    const url = targetUrl
+    const market = targetMarket
+    analyzedUrlRef.current = null
+    useAppStore.getState().reset()
+    setRetryCount((prev) => prev + 1)
+    // Re-trigger analysis after a short delay
+    setTimeout(() => {
+      useAppStore.getState().startAnalysis(url, market)
+    }, 100)
+  }
+
+  const handleGoBack = () => {
+    useAppStore.getState().reset()
+  }
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
 
   if (analysisError) {
     return (
@@ -133,14 +191,26 @@ export default function AnalyzingView() {
             <AlertTriangle className="w-10 h-10 text-rose-400" />
           </div>
           <h2 className="text-2xl font-bold mb-3">Analysis Failed</h2>
-          <p className="text-muted-foreground mb-6">{analysisError}</p>
-          <button
-            onClick={() => useAppStore.getState().reset()}
-            className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-6 py-3 rounded-xl transition-all duration-300"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Try Again
-          </button>
+          <p className="text-muted-foreground mb-2">{analysisError}</p>
+          <p className="text-xs text-muted-foreground/50 mb-6">
+            This can happen if the website is unreachable, blocks our crawler, or if the AI service is temporarily busy.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={handleRetry}
+              className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-6 py-3 rounded-xl transition-all duration-300"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </button>
+            <button
+              onClick={handleGoBack}
+              className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-foreground font-semibold px-6 py-3 rounded-xl transition-all duration-300"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -186,7 +256,7 @@ export default function AnalyzingView() {
 
         {targetMarket && targetMarket !== 'Global' && (
           <motion.p
-            className="text-amber-400 font-mono text-sm mb-6 flex items-center justify-center gap-1.5"
+            className="text-amber-400 font-mono text-sm mb-4 flex items-center justify-center gap-1.5"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
@@ -195,6 +265,19 @@ export default function AnalyzingView() {
             Market: {targetMarket}
           </motion.p>
         )}
+
+        {/* Elapsed Timer */}
+        <motion.div
+          className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground/60 mb-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Clock className="w-3 h-3" />
+          <span>{formatTime(elapsed)}</span>
+          <span>·</span>
+          <span>Usually takes 30-90 seconds</span>
+        </motion.div>
 
         {/* Progress Bar */}
         <div className="w-full bg-white/5 rounded-full h-3 mb-4 overflow-hidden border border-white/10">
