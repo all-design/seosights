@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
           const ZAI = (await import('z-ai-web-dev-sdk')).default
           const zai = await ZAI.create()
 
-          // Step 1: Scrape the website
-          enqueue(sendProgress(10, 'Scanning your website...'))
+          // ── Phase 1: Audit ──────────────────────────────────────────────
+          enqueue(sendProgress(10, 'Phase 1: Auditing your site...'))
 
           let siteData: { title?: string; html?: string; url?: string; text?: string }
           try {
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
             siteData = { title: url, url, text: '' }
           }
 
-          enqueue(sendProgress(25, 'Analyzing content & structure...'))
+          enqueue(sendProgress(25, 'Analyzing technical SEO & AEO readiness...'))
 
           // Step 2: Search for competitor & niche info
           let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
@@ -97,10 +97,13 @@ export async function POST(request: NextRequest) {
             )
             searchResults = Array.isArray(results) ? results : []
 
-            enqueue(sendProgress(35, 'Checking AI citation landscape...'))
+            enqueue(sendProgress(35, 'Checking GEO visibility & AI citation landscape...'))
 
             const aiResults = await withTimeout(
-              zai.functions.invoke('web_search', { query: `${domain} AI citation SEO authority`, num: 5 }),
+              zai.functions.invoke('web_search', {
+                query: `${domain} AI citation authority ChatGPT Perplexity`,
+                num: 5,
+              }),
               10000,
               []
             )
@@ -109,9 +112,10 @@ export async function POST(request: NextRequest) {
             // Continue without search data
           }
 
-          enqueue(sendProgress(50, 'Running AI-powered SEO analysis...'))
+          // ── Phase 2: Structure ──────────────────────────────────────────
+          enqueue(sendProgress(50, 'Phase 2: Structuring your strategy...'))
 
-          // Step 3: LLM - Full SEO Analysis
+          // Step 3: LLM — Comprehensive SEO / AEO / GEO Analysis
           const siteContent = siteData.text?.slice(0, 5000) || 'No content available'
           const competitorInfo = searchResults
             .slice(0, 5)
@@ -122,84 +126,70 @@ export async function POST(request: NextRequest) {
             .map((r) => `${r.name}: ${r.snippet}`)
             .join('\n')
 
-          const seoPrompt = `You are an elite AI SEO strategist who specializes in helping websites rank on Google AND get cited by ChatGPT, Claude, and Perplexity. You have deep expertise in backlink strategy, AI citation optimization, and content strategy.
+          const systemPrompt =
+            'You are an elite SEO/AEO/GEO strategist specializing in SEO (Google rankings), AEO (featured snippets, voice answers), and GEO (AI citation by ChatGPT, Claude, Perplexity). ALWAYS respond with ONLY valid JSON. No markdown. No code fences. Be concise - keep all string values under 15 words.'
 
-Analyze this website and generate a comprehensive SEO strategy:
+          const userPrompt = `Analyze ${url} across SEO, AEO, GEO pillars. Title: ${siteData.title}. Content: ${siteContent.slice(0, 2000)}. Competitors: ${competitorInfo.slice(0, 500) || 'None'}. AI context: ${aiInfo.slice(0, 300) || 'None'}.
 
-**Website URL:** ${url}
-**Website Title:** ${siteData.title}
-**Website Content (excerpt):**
-${siteContent}
-
-**Competitor/Alternative Search Results:**
-${competitorInfo || 'No competitor data available'}
-
-**AI Citation Context:**
-${aiInfo || 'No AI citation data available'}
-
-Generate a complete analysis as a JSON object with EXACTLY this structure (respond with ONLY valid JSON, no markdown, no code fences):
+Return JSON with EXACTLY this structure. Keep values SHORT (max 15 words per string). Generate FEWER items to stay within output limits:
 
 {
-  "siteName": "string - the website/business name",
-  "scores": {
-    "overall": number 1-100,
-    "aiCitationReadiness": number 1-100,
-    "contentQuality": number 1-100,
-    "backlinkProfile": number 1-100,
-    "technicalSEO": number 1-100,
-    "keywordCoverage": number 1-100
+  "siteName": "name",
+  "overallScores": { "seo": 1-100, "aeo": 1-100, "geo": 1-100, "combined": 1-100 },
+  "audit": {
+    "technicalSEO": { "score": 1-100, "issues": [{ "issue": "short", "severity": "critical|warning|info", "fix": "short fix" }] },
+    "crawlability": { "score": 1-100, "issues": [{ "issue": "short", "impact": "short" }] },
+    "pageSpeed": { "score": 1-100, "coreVitals": [{ "metric": "LCP|FID|CLS", "value": "est. value", "status": "good|needs-improvement|poor" }] },
+    "indexation": { "score": 1-100, "indexedPages": 0, "orphanPages": 0, "issues": ["short"] },
+    "aeoReadiness": { "score": 1-100, "hasFAQ": false, "hasSchema": false, "hasStructuredData": false, "answerFormatScore": 1-100, "issues": ["short"] },
+    "geoVisibility": { "score": 1-100, "citedByAI": ["ChatGPT"], "entityRecognition": 1-100, "knowledgeGraphPresence": false, "issues": ["short"] }
   },
-  "citationGap": {
-    "competitors": [
-      {"name": "string", "url": "string", "citedBy": "which AI cites them"}
-    ],
-    "gapSummary": "string - why competitors are cited instead",
-    "fixes": ["string - specific fix"]
+  "structure": {
+    "topicClusters": [{ "cluster": "name", "pillarKeyword": "kw", "supportingKeywords": ["kw1","kw2"], "seoOpportunity": "short", "aeoOpportunity": "short", "geoOpportunity": "short" }],
+    "keywordGaps": [{ "keyword": "kw", "volume": "High|Med|Low", "difficulty": "Hard|Med|Easy", "type": "seo|aeo|geo", "opportunity": "short" }],
+    "contentArchitecture": { "recommended": [{ "section": "name", "purpose": "short", "pillar": "seo|aeo|geo|all" }], "internalLinkMap": [{ "from": "page", "to": "page", "anchor": "text" }] },
+    "schemaRecommendations": [{ "schemaType": "type", "purpose": "short", "pillar": "seo|aeo|geo", "implementation": "short" }]
   },
-  "keywords": {
-    "primary": [
-      {"keyword": "string", "volume": "High/Medium/Low", "difficulty": "Hard/Medium/Easy", "opportunity": "string brief why"}
-    ],
-    "secondary": [
-      {"keyword": "string", "volume": "High/Medium/Low", "difficulty": "Hard/Medium/Easy", "opportunity": "string brief why"}
-    ]
+  "creative": {
+    "contentBriefs": [{ "title": "title", "type": "blog|guide|faq|tool|comparison", "targetKeyword": "kw", "pillar": "seo|aeo|geo|all", "brief": "short brief", "estimatedImpact": "short", "wordCount": "1000-2000", "structure": ["H2","H2"] }],
+    "onPageOptimizations": [{ "page": "url", "currentTitle": "old", "suggestedTitle": "new", "suggestedDescription": "desc", "aeoTweaks": ["tweak"], "geoTweaks": ["tweak"] }],
+    "answerBlocks": [{ "question": "Q?", "suggestedAnswer": "40-60 word answer", "format": "faq|featured-snippet|people-also-ask|knowledge-panel", "targetEngine": "Google|ChatGPT|Perplexity" }]
   },
-  "backlinkStrategy": {
-    "currentProfile": "string - assessment of current backlink situation",
-    "recommendedActions": [
-      {"title": "string", "description": "string", "impact": "high/medium/low"}
-    ],
-    "linkableAssets": ["string - asset type that could earn backlinks"]
+  "measure": {
+    "kpiTracking": {
+      "seo": [{ "metric": "name", "current": "val", "target": "val", "timeline": "3 months" }],
+      "aeo": [{ "metric": "name", "current": "val", "target": "val", "timeline": "3 months" }],
+      "geo": [{ "metric": "name", "current": "val", "target": "val", "timeline": "3 months" }]
+    },
+    "competitorBenchmarks": [{ "competitor": "name", "url": "url", "seoScore": 1-100, "aeoScore": 1-100, "geoScore": 1-100, "citedBy": ["AI"] }],
+    "weeklyActions": [{ "week": "Week 1", "tasks": [{ "task": "short task", "pillar": "seo|aeo|geo", "priority": "high|medium|low" }] }]
   },
-  "contentStrategy": {
-    "priority": [
-      {"title": "string - article title", "type": "blog/guide/tool/infographic/case-study", "targetKeyword": "string", "estimatedImpact": "string"}
-    ],
-    "contentGaps": ["string - gap description"]
-  },
-  "roadmap": [
-    {
-      "phase": "string - Phase name",
-      "timeframe": "string - e.g. Week 1-2",
-      "tasks": ["string - specific task"]
-    }
-  ],
-  "summary": "string - executive summary of the analysis and top recommendation"
+  "summary": "2-3 sentence summary",
+  "executiveActions": ["action1", "action2", "action3", "action4", "action5"]
 }
 
-Be specific, actionable, and data-driven. Make the scores realistic (not too generous). Generate 4-5 primary keywords, 4-5 secondary keywords, 3-4 competitors, 4-5 backlink actions, 4-5 content priorities, 4-5 linkable assets, 3-4 content gaps, and 3-4 roadmap phases. IMPORTANT: Return ONLY the raw JSON object, no markdown code fences.`
+QUANTITY RULES: 3 technicalSEO issues, 2 crawlability issues, 3 coreVitals, 2 indexation issues, 2 aeoReadiness issues, 2 geoVisibility issues, 3 topicClusters (2 supportingKeywords each), 4 keywordGaps, 3 contentArchitecture recommended, 2 internalLinks, 2 schemaRecommendations, 3 contentBriefs (2 structure headings each), 2 onPageOptimizations (1 aeoTweak + 1 geoTweak each), 3 answerBlocks, 2 KPIs per pillar, 2 competitorBenchmarks, 3 weeks of weeklyActions (3 tasks each), 5 executiveActions.
+
+SCORE RULES: Realistic scores. Average site: 30-50. Combined = 40% SEO + 30% AEO + 30% GEO.
+
+IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Keep all strings concise.`
+
+          // ── Phase 3: Creative ───────────────────────────────────────────
+          enqueue(sendProgress(65, 'Phase 3: Creating content briefs & answer blocks...'))
 
           const completion = await zai.chat.completions.create({
             messages: [
-              { role: 'system', content: 'You are an elite AI SEO strategist who specializes in helping websites rank on Google AND get cited by ChatGPT, Claude, and Perplexity. You have deep expertise in backlink strategy, AI citation optimization, and content strategy. Always respond with valid JSON only, no markdown formatting or code fences.' },
-              { role: 'user', content: seoPrompt },
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
             ],
           })
 
-          enqueue(sendProgress(80, 'Parsing analysis results...'))
+          // ── Phase 4: Measure ────────────────────────────────────────────
+          enqueue(sendProgress(80, 'Phase 4: Building measurement framework...'))
 
-          let analysisResult
+          let analysisResult: Record<string, unknown>
           const rawResponse = completion.choices[0]?.message?.content || ''
+          console.log('[analyze] Raw response length:', rawResponse.length)
 
           // Try multiple JSON extraction strategies
           let jsonStr = rawResponse
@@ -213,7 +203,7 @@ Be specific, actionable, and data-driven. Make the scores realistic (not too gen
           // Strategy 2: Try direct parse
           try {
             analysisResult = JSON.parse(jsonStr)
-          } catch {
+          } catch (e1) {
             // Strategy 3: Find outermost braces
             const braceStart = rawResponse.indexOf('{')
             const braceEnd = rawResponse.lastIndexOf('}')
@@ -221,14 +211,35 @@ Be specific, actionable, and data-driven. Make the scores realistic (not too gen
               jsonStr = rawResponse.slice(braceStart, braceEnd + 1)
               try {
                 analysisResult = JSON.parse(jsonStr)
-              } catch {
-                // Strategy 4: Try to fix common JSON issues
-                // Remove trailing commas before } or ]
-                const fixed = jsonStr.replace(/,\s*([}\]])/g, '$1')
+              } catch (e2) {
+                // Strategy 4: Fix trailing commas
+                let fixed = jsonStr.replace(/,\s*([}\]])/g, '$1')
                 try {
                   analysisResult = JSON.parse(fixed)
-                } catch {
-                  throw new Error('Failed to parse AI response as JSON')
+                } catch (e3) {
+                  // Strategy 5: Fix unescaped quotes in strings and other common issues
+                  fixed = fixed
+                    .replace(/\\n/g, ' ')
+                    .replace(/\\t/g, ' ')
+                    .replace(/[\x00-\x1f]/g, (ch) => ch === '\n' || ch === '\r' || ch === '\t' ? ' ' : '')
+                  // Fix unclosed strings at end (truncation)
+                  const openBraces = (fixed.match(/{/g) || []).length
+                  const closeBraces = (fixed.match(/}/g) || []).length
+                  if (openBraces > closeBraces) {
+                    // Add missing closing braces
+                    fixed += '}'.repeat(openBraces - closeBraces)
+                  }
+                  const openBrackets = (fixed.match(/\[/g) || []).length
+                  const closeBrackets = (fixed.match(/]/g) || []).length
+                  if (openBrackets > closeBrackets) {
+                    fixed += ']'.repeat(openBrackets - closeBrackets)
+                  }
+                  try {
+                    analysisResult = JSON.parse(fixed)
+                  } catch (e4) {
+                    console.error('[analyze] JSON parse failed. Raw length:', rawResponse.length, 'First 200:', rawResponse.slice(0, 200), 'Last 200:', rawResponse.slice(-200))
+                    throw new Error('Failed to parse AI response as JSON')
+                  }
                 }
               }
             } else {
@@ -238,8 +249,12 @@ Be specific, actionable, and data-driven. Make the scores realistic (not too gen
 
           analysisResult.url = url
 
+          enqueue(sendProgress(90, 'Parsing analysis results...'))
+          await new Promise((resolve) => setTimeout(resolve, 200))
+
           enqueue(sendProgress(95, 'Finalizing your strategy...'))
           await new Promise((resolve) => setTimeout(resolve, 300))
+
           enqueue(sendProgress(100, 'Analysis complete!'))
           enqueue(sendComplete(analysisResult))
         } catch (error) {

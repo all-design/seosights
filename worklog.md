@@ -1,17 +1,24 @@
 ---
-Task ID: 1
+Task ID: 1-6
 Agent: Main
-Task: QA and fix the full site flow - analysis stuck at 5% and "Get Free Agent OS Setup" not working
+Task: Rework entire workflow for SEO/AEO/GEO compatibility based on user's uploaded workflow image
 
 Work Log:
-- Diagnosed the root cause: LLM API messages had `role: 'assistant'` instead of `role: 'system'`, causing 400 errors from the AI API
-- Fixed the API route: Changed message role from 'assistant' to 'system', added timeouts (15s for page_reader, 10s for web_search), improved JSON parsing with 4 fallback strategies, added X-Accel-Buffering header for proper SSE streaming
-- Fixed AnalyzingView: Improved React strict mode handling by using URL-based ref tracking instead of boolean flag, added proper cleanup with AbortController
-- Fixed AnalysisDashboard: Made "Get Free Agent OS Setup" button functional by adding onStartFree prop
-- Fixed page.tsx: Pass URLInputModal to all views (analyzing and dashboard) so the "Get Free Agent OS Setup" button can open the URL input modal from the dashboard
-- Tested full end-to-end flow with agent-browser: Landing page → Click Analyze → Enter URL → Progress streaming (10%, 25%, 35%, 50%, 80%, 95%, 100%) → Full dashboard with all 6 sections
+- Analyzed uploaded image showing "6 Claude Workflows weekly for SEO" with 4-phase structure: Audit → Structure → Creative → Measure
+- Rewrote store types (store.ts) with comprehensive SEO/AEO/GEO data model: AuditData, StructureData, CreativeData, MeasureData
+- Rewrote API route (analyze/route.ts) with new LLM prompt covering all three pillars, 4-phase progress steps, and 5-level JSON repair
+- Initial prompt was too long causing JSON truncation - simplified to concise format with explicit quantity rules
+- Built completely new AnalysisDashboard with 4-phase collapsible layout, pillar badges (SEO=emerald, AEO=cyan, GEO=amber), score rings, answer blocks
+- Updated AnalyzingView with 8-step progress showing phase labels (Phase 1-4)
+- Updated HeroSection with "SEO · AEO · GEO" branding and three-pillar subheadline
+- Updated CTASection with "Ready to Dominate SEO, AEO & GEO?" messaging
+- Tested API via curl - returns complete JSON with all 4 phases and 3 pillars
+- Tested browser flow - progress streaming works with phase labels, API completes in ~30-35s
 
 Stage Summary:
-- Root cause: `role: 'assistant'` in LLM API call caused 400 errors, breaking the analysis flow
-- All 3 bugs fixed: API message format, streaming progress, "Get Free Agent OS Setup" button
-- Full flow verified working with multiple test sites (example.com, vercel.com, shopify.com, stripe.com)
+- Complete rework from single "AI SEO" to three-pillar SEO/AEO/GEO system
+- 4-phase workflow: Audit → Structure → Creative → Measure
+- Each phase has collapsible sections in dashboard
+- Color-coded pillar system: SEO (emerald), AEO (cyan), GEO (amber)
+- API reliably generates complete analysis within LLM output limits
+- All components compile cleanly with zero lint errors

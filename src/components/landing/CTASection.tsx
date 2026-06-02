@@ -76,11 +76,13 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
           transition={{ duration: 0.6 }}
         >
           <h2 className="text-4xl sm:text-5xl font-bold mb-6">
-            Ready to Rank #1 and Get Cited by{' '}
-            <span className="text-emerald-400">AI</span>?
+            Ready to Dominate{' '}
+            <span className="text-emerald-400">SEO</span>,{' '}
+            <span className="text-cyan-400">AEO</span> &{' '}
+            <span className="text-amber-400">GEO</span>?
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Rank #1 on Google AND get cited by AI — or we work for free until
+            Rank on Google, win featured snippets, and get cited by AI — or we work for free until
             you do. That&apos;s our guarantee.
           </p>
         </motion.div>

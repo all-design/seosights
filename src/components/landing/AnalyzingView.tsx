@@ -5,13 +5,15 @@ import { motion } from 'framer-motion'
 import { useAppStore, SEOAnalysis } from '@/lib/store'
 import { Globe, Loader2, AlertTriangle, ArrowLeft } from 'lucide-react'
 
-const steps = [
-  { label: 'Scanning your website', icon: '🔍' },
-  { label: 'Analyzing content & structure', icon: '📄' },
-  { label: 'Checking AI citation landscape', icon: '🤖' },
-  { label: 'Running AI-powered SEO analysis', icon: '⚡' },
-  { label: 'Parsing analysis results', icon: '📊' },
-  { label: 'Finalizing your strategy', icon: '🎯' },
+const phases = [
+  { label: 'Auditing your site', icon: '🔍', phase: 'Phase 1' },
+  { label: 'Technical SEO & AEO readiness', icon: '⚙️', phase: 'Phase 1' },
+  { label: 'GEO visibility & AI citation landscape', icon: '🤖', phase: 'Phase 1' },
+  { label: 'Structuring your strategy', icon: '📐', phase: 'Phase 2' },
+  { label: 'Creating content briefs & answer blocks', icon: '✍️', phase: 'Phase 3' },
+  { label: 'Building measurement framework', icon: '📊', phase: 'Phase 4' },
+  { label: 'Parsing analysis results', icon: '🔧', phase: '' },
+  { label: 'Finalizing your strategy', icon: '🎯', phase: '' },
 ]
 
 export default function AnalyzingView() {
@@ -27,13 +29,9 @@ export default function AnalyzingView() {
     setAnalysisError,
   } = useAppStore()
 
-  // Use a ref to track the URL being analyzed, not a boolean flag
-  // This way, when strict mode remounts, it can detect the URL is the same
-  // and skip re-running the analysis
   const analyzedUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
-    // If we've already started analyzing this exact URL, don't restart
     if (analyzedUrlRef.current === targetUrl || !targetUrl) return
     analyzedUrlRef.current = targetUrl
 
@@ -58,7 +56,7 @@ export default function AnalyzingView() {
             const errData = await response.json()
             errMsg = errData.error || errMsg
           } catch {
-            // response might be streaming, just use generic message
+            // response might be streaming
           }
           throw new Error(errMsg)
         }
@@ -93,7 +91,6 @@ export default function AnalyzingView() {
                 setAnalysis(parsed.analysis as SEOAnalysis)
                 setAnalysisProgress(100)
                 setAnalysisStep('Analysis complete!')
-                // Small delay so user sees 100%
                 setTimeout(() => {
                   setView('dashboard')
                 }, 600)
@@ -106,7 +103,7 @@ export default function AnalyzingView() {
           }
         }
       } catch (err) {
-        if (signal.aborted) return // Ignore abort errors
+        if (signal.aborted) return
         setAnalysisError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')
       }
     }
@@ -115,17 +112,14 @@ export default function AnalyzingView() {
 
     return () => {
       abortController.abort()
-      // Reset the ref so if the component remounts with the same URL,
-      // it can restart (this handles strict mode properly)
       analyzedUrlRef.current = null
     }
   }, [targetUrl, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError])
 
-  const currentStepIndex = steps.findIndex((s) =>
+  const currentStepIndex = phases.findIndex((s) =>
     analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
   )
 
-  // Error state
   if (analysisError) {
     return (
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -150,7 +144,6 @@ export default function AnalyzingView() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-background via-emerald-950/10 to-background" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/8 rounded-full blur-[150px]" />
 
@@ -170,16 +163,14 @@ export default function AnalyzingView() {
           <Globe className="w-12 h-12 text-emerald-400" />
         </motion.div>
 
-        {/* Title */}
         <motion.h2
           className="text-3xl font-bold mb-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          Analyzing Your Site
+          SEO · AEO · GEO Analysis
         </motion.h2>
 
-        {/* URL */}
         <motion.p
           className="text-emerald-400 font-mono text-sm mb-8"
           initial={{ opacity: 0 }}
@@ -192,30 +183,27 @@ export default function AnalyzingView() {
         {/* Progress Bar */}
         <div className="w-full bg-white/5 rounded-full h-3 mb-4 overflow-hidden border border-white/10">
           <motion.div
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full"
+            className="h-full bg-gradient-to-r from-emerald-500 via-cyan-500 to-amber-500 rounded-full"
             initial={{ width: '0%' }}
             animate={{ width: `${Math.max(analysisProgress, 2)}%` }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
           />
         </div>
 
-        {/* Progress Percentage & Step */}
         <div className="flex items-center justify-between mb-8">
           <span className="text-sm text-muted-foreground">{analysisStep}</span>
           <span className="text-sm font-mono text-emerald-400">{analysisProgress}%</span>
         </div>
 
-        {/* Step Indicators */}
-        <div className="space-y-3">
-          {steps.map((step, i) => {
+        {/* Phase Steps */}
+        <div className="space-y-2">
+          {phases.map((step, i) => {
             const isActive = i === currentStepIndex
-            const isDone =
-              (i < currentStepIndex && currentStepIndex !== -1) ||
-              analysisProgress >= (i + 1) * 17
+            const isDone = (i < currentStepIndex && currentStepIndex !== -1) || analysisProgress >= (i + 1) * 12
             return (
               <motion.div
                 key={step.label}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 ${
                   isActive
                     ? 'bg-emerald-500/10 border border-emerald-500/30'
                     : isDone
@@ -224,18 +212,23 @@ export default function AnalyzingView() {
                 }`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.08 }}
               >
                 <span className="text-lg">{step.icon}</span>
-                <span
-                  className={`text-sm ${
-                    isActive ? 'text-emerald-400 font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  {step.label}
-                </span>
-                {isActive && <Loader2 className="w-4 h-4 text-emerald-400 animate-spin ml-auto" />}
-                {isDone && !isActive && <span className="ml-auto text-emerald-500">✓</span>}
+                <div className="flex-1 text-left">
+                  <span className={`text-sm ${isActive ? 'text-emerald-400 font-medium' : 'text-muted-foreground'}`}>
+                    {step.label}
+                  </span>
+                </div>
+                {step.phase && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                    isActive ? 'bg-emerald-500/20 text-emerald-400' : isDone ? 'bg-white/5 text-muted-foreground' : 'bg-transparent text-muted-foreground/50'
+                  }`}>
+                    {step.phase}
+                  </span>
+                )}
+                {isActive && <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />}
+                {isDone && !isActive && <span className="text-emerald-500">✓</span>}
               </motion.div>
             )
           })}
