@@ -212,6 +212,46 @@ export interface TrafficInsightsData {
   losers: { page: string; change: string; pillar: string }[]
 }
 
+// Deep Strategy (from third LLM call)
+export interface DeepStrategyData {
+  technicalImplementations: {
+    type: 'schema' | 'robots' | 'meta' | 'headers' | 'sitemap'
+    description: string
+    codeSnippet: string
+    priority: 'critical' | 'high' | 'medium' | 'low'
+    pillar: 'seo' | 'aeo' | 'geo' | 'all'
+  }[]
+  backlinkOutreach: {
+    targetSite: string
+    url: string
+    strategy: string
+    contentAngle: string
+    priority: 'high' | 'medium' | 'low'
+  }[]
+  contentCalendar: {
+    week: string
+    title: string
+    targetKeyword: string
+    contentType: string
+    pillar: 'seo' | 'aeo' | 'geo' | 'all'
+    estimatedWords: number
+    publishDate: string
+  }[]
+  competitorGapAnalysis: {
+    competitor: string
+    gapKeyword: string
+    gapType: 'seo' | 'aeo' | 'geo'
+    difficulty: 'easy' | 'medium' | 'hard'
+    action: string
+  }[]
+  aiCitationStrategy: {
+    technique: string
+    implementation: string
+    targetEngine: string
+    expectedResult: string
+  }[]
+}
+
 // Full Analysis Result
 export interface SEOAnalysis {
   url: string
@@ -234,6 +274,7 @@ export interface SEOAnalysis {
   algorithmUpdates?: AlgorithmUpdatesData
   roadmap?: RoadmapData
   trafficInsights?: TrafficInsightsData
+  deepStrategy?: DeepStrategyData
   sxo: SXOData
   structure: StructureData
   creative: CreativeData

@@ -19,7 +19,7 @@ const phases = [
   { label: 'Finalizing your strategy', icon: '🎯', phase: '' },
 ]
 
-const ANALYSIS_TIMEOUT = 180_000 // 3 minutes
+const ANALYSIS_TIMEOUT = 240_000 // 4 minutes
 
 // Simulated progress steps — used as visual fallback when SSE events lag
 const SIMULATED_STEPS = [
