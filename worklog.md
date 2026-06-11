@@ -536,3 +536,33 @@ Stage Summary:
 - 3 pricing plans with Stripe checkout: Starter ($5), Pro ($79), Managed ($299)
 - All APIs verified working, zero lint errors, dev server running cleanly
 - Browser QA passed: landing page, pricing section, responsive design all verified
+
+---
+Task ID: session-4
+Agent: Main Orchestrator
+Task: Fix LOVE AT FIRST SIGHT placement + Prisma composite indexes + MODEL_COSTS pricing
+
+Work Log:
+- Moved "LOVE AT FIRST SIGHT" from under the seosights logo to the Three Sights section
+- Reverted HeroSection.tsx logo area to original "Multiple pillars, one unified AI engine" tagline
+- Changed threeSights[0].name from "First Sight" to "LOVE AT FIRST SIGHT" in HeroSection.tsx
+- Updated FeaturesSection.tsx sightName from "First Sight" to "LOVE AT FIRST SIGHT"
+- Updated HowItWorksSection.tsx description from "First Sight" to "Love at First Sight"
+- Updated layout.tsx metadata descriptions (3 occurrences) from "First Sight" to "Love at First Sight"
+- Added Prisma composite indexes on TokenUsageLog:
+  - @@index([userId, createdAt]) — idx_logs_user_time for Superadmin dashboard queries
+  - @@index([agentName, modelUsed]) — idx_logs_agent_model for agent performance analysis
+- Updated MODEL_COSTS in token-tracker.ts with exact per-token pricing:
+  - gpt-4o: $5/M input, $15/M output (0.000005 / 0.000015 per token)
+  - claude-3-5-sonnet: $3/M input, $15/M output (0.000003 / 0.000015 per token)
+  - deepseek-v3: $0.14/M input, $0.28/M output (0.00000014 / 0.00000028 per token)
+- Updated calculateCost() to use per-token multiplication instead of per-1K division
+- Ran db:push — schema synced with new composite indexes
+- Ran lint — zero errors
+- Browser QA: all 5 verification checks passed
+
+Stage Summary:
+- "LOVE AT FIRST SIGHT" now appears in Three Sights cards (not under logo)
+- Composite indexes added for enterprise-scale dashboard queries
+- Accurate per-token pricing from provider rate cards
+- All "First Sight" references updated across codebase

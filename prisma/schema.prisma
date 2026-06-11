@@ -236,4 +236,7 @@ model TokenUsageLog {
   @@index([agentName])
   @@index([modelUsed])
   @@index([createdAt])
+  // Composite indexes for enterprise analytics (from SQL spec)
+  @@index([userId, createdAt])       // idx_logs_user_time: per-user time-series for Superadmin dashboard
+  @@index([agentName, modelUsed])    // idx_logs_agent_model: agent performance + cost per model
 }

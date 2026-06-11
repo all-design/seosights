@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "seosights — Three Sights. One Unified AI Engine. | SEO · AEO · GEO",
   description:
-    "seosights gives you Three Sights on modern search: First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents audit, strategize, and auto-execute — all while you sleep.",
+    "seosights gives you Three Sights on modern search: Love at First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents audit, strategize, and auto-execute — all while you sleep.",
   keywords: [
     "AI SEO",
     "AEO",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "seosights — Three Sights. One Unified AI Engine.",
     description:
-      "seosights gives you Three Sights on modern search: First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents work 24/7 — all while you sleep.",
+      "seosights gives you Three Sights on modern search: Love at First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents work 24/7 — all while you sleep.",
     url: "https://seosights.com",
     siteName: "seosights",
     type: "website",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "seosights — Three Sights. One Unified AI Engine.",
     description:
-      "seosights gives you Three Sights on modern search: First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents work 24/7.",
+      "seosights gives you Three Sights on modern search: Love at First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents work 24/7.",
   },
 };
 

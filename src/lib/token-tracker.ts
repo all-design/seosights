@@ -1,12 +1,16 @@
 import { db } from '@/lib/db'
 
-// Cost per 1K tokens (approximate, update as needed)
+// Cost per 1 token (based on per-million-token pricing from providers)
+// gpt-4o:        $5/M input,  $15/M output  → 0.000005 / 0.000015
+// claude-3.5:     $3/M input,  $15/M output  → 0.000003 / 0.000015
+// deepseek-v3:    $0.14/M in,  $0.28/M out   → 0.00000014 / 0.00000028
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
-  'default': { input: 0.002, output: 0.008 },  // GPT-4o-mini approx
-  'gpt-4o': { input: 0.0025, output: 0.01 },
-  'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
-  'claude-3.5-sonnet': { input: 0.003, output: 0.015 },
-  'deepseek-v3': { input: 0.00027, output: 0.0011 },
+  'default':       { input: 0.000005,  output: 0.000015 },     // defaults to gpt-4o pricing
+  'gpt-4o':        { input: 0.000005,  output: 0.000015 },     // $5 / $15 per million
+  'gpt-4o-mini':   { input: 0.00000015, output: 0.0000006 },   // $0.15 / $0.60 per million
+  'claude-3-5-sonnet': { input: 0.000003, output: 0.000015 },  // $3 / $15 per million
+  'claude-3.5-sonnet': { input: 0.000003, output: 0.000015 },  // alt key
+  'deepseek-v3':   { input: 0.00000014, output: 0.00000028 },  // $0.14 / $0.28 per million — extremely cheap
 }
 
 export interface TokenUsageRecord {
@@ -39,11 +43,11 @@ export class TokenTracker {
     return Math.ceil(text.length / 4)
   }
 
-  // Calculate cost for a record
+  // Calculate cost for a record (prices are per-token, matching provider per-million pricing)
   calculateCost(record: TokenUsageRecord): number {
     const costs = MODEL_COSTS[record.model] || MODEL_COSTS['default']
-    const inputCost = (record.inputTokens / 1000) * costs.input
-    const outputCost = (record.outputTokens / 1000) * costs.output
+    const inputCost = record.inputTokens * costs.input
+    const outputCost = record.outputTokens * costs.output
     return inputCost + outputCost
   }
 

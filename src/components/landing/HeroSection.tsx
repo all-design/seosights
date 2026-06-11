@@ -25,7 +25,7 @@ const agentPills = [
 const threeSights = [
   {
     number: '1st',
-    name: 'First Sight',
+    name: 'LOVE AT FIRST SIGHT',
     label: 'SEO',
     description: 'Traditional search',
     color: 'text-emerald-400',
@@ -176,10 +176,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
               seosights
             </span>
           </h2>
-          <p className="text-xs sm:text-sm tracking-[0.35em] text-emerald-400/70 uppercase mt-2 text-center font-semibold">
-            LOVE AT FIRST SIGHT
-          </p>
-          <p className="text-[10px] sm:text-xs tracking-widest text-muted-foreground/50 uppercase mt-1 text-center">
+          <p className="text-xs sm:text-sm tracking-[0.35em] text-emerald-400/60 uppercase mt-2 text-center">
             Multiple pillars, one unified AI engine
           </p>
         </motion.div>

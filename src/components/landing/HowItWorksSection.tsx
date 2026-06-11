@@ -20,7 +20,7 @@ const steps = [
     number: '02',
     icon: Search,
     title: '8 Agents Analyze All Three Sights',
-    description: 'Master Director orchestrates 7 specialist agents — analyzing your First Sight (SEO), Second Sight (AEO), and Third Sight (GEO) in parallel.',
+    description: 'Master Director orchestrates 7 specialist agents — analyzing your Love at First Sight (SEO), Second Sight (AEO), and Third Sight (GEO) in parallel.',
     color: 'text-cyan-400',
     bg: 'bg-cyan-500/20',
     border: 'border-cyan-500/30',
