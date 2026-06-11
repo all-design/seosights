@@ -1,0 +1,12 @@
+{
+  "name": "audit-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun index.ts"
+  },
+  "dependencies": {
+    "bullmq": "^5.78.0",
+    "ioredis": "^5.11.1"
+  }
+}

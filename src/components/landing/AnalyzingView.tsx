@@ -93,12 +93,18 @@ export default function AnalyzingView() {
     analysisError,
     sessionId,
     mode,
+    analysisEngine,
+    jobId,
+    jobStatus,
     setAnalysisProgress,
     setAnalysisStep,
     setAnalysis,
     setView,
     setAnalysisError,
     setSessionId,
+    setJobId,
+    setJobStatus,
+    setCurrentAnalysisId,
   } = useAppStore()
 
   const analyzedUrlRef = useRef<string | null>(null)
@@ -357,6 +363,7 @@ export default function AnalyzingView() {
   }, [clearSimulationTimers, setAnalysisProgress, setAnalysisStep])
 
   useEffect(() => {
+    if (analysisEngine === 'queue') return  // Queue mode uses its own effect below
     if (analyzedUrlRef.current === targetUrl || !targetUrl) return
     analyzedUrlRef.current = targetUrl
     sseProgressRef.current = 0
@@ -477,6 +484,180 @@ export default function AnalyzingView() {
       analyzedUrlRef.current = null
     }
   }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError, setSessionId, retryCount, startSimulatedProgress, clearSimulationTimers, sessionId])
+
+  // ── Queue-based Analysis Flow (BullMQ) ─────────────────────────────
+  // This runs when analysisEngine === 'queue'
+  // 1. Call /api/audit/run → get jobId + sessionId (HTTP 202)
+  // 2. Connect WebSocket for real-time agent events
+  // 3. Poll /api/audit/[jobId] every 5s as fallback
+  // 4. When completed → fetch full analysis from DB
+  useEffect(() => {
+    if (analysisEngine !== 'queue') return
+    if (analyzedUrlRef.current === targetUrl || !targetUrl) return
+    analyzedUrlRef.current = targetUrl
+    sseProgressRef.current = 0
+
+    let cancelled = false
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+
+    const timeoutId = setTimeout(() => {
+      cancelled = true
+      clearSimulationTimers()
+      setAnalysisError('Analysis timed out. The server took too long to respond. Please try again.')
+    }, ANALYSIS_TIMEOUT)
+
+    // Start simulated progress
+    setAnalysisProgress(5)
+    setAnalysisStep('Queuing analysis job...')
+    startSimulatedProgress()
+
+    const runQueueAnalysis = async () => {
+      try {
+        // Step 1: Enqueue the job
+        const enqueueResponse = await fetch('/api/audit/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl, market: targetMarket, execution_mode: mode }),
+        })
+
+        if (!enqueueResponse.ok) {
+          let errMsg = `Failed to queue analysis (HTTP ${enqueueResponse.status})`
+          try {
+            const errData = await enqueueResponse.json()
+            errMsg = errData.error || errMsg
+            // Special handling for rate limit errors
+            if (errData.code === 'RATE_LIMIT_EXCEEDED') {
+              errMsg = errData.error || 'Rate limit exceeded. Please upgrade your plan.'
+            }
+          } catch { /* ignore */ }
+          throw new Error(errMsg)
+        }
+
+        const enqueueData = await enqueueResponse.json()
+
+        if (cancelled) return
+
+        const { jobId: newJobId, analysisId, sessionId: newSessionId } = enqueueData
+
+        // Update store with job info
+        setJobId(newJobId)
+        setJobStatus('queued')
+        setSessionId(newSessionId)
+        setCurrentAnalysisId(analysisId)
+
+        setAnalysisProgress(8)
+        setAnalysisStep('Job queued. Waiting for 8 AI agents...')
+
+        console.log(`[AnalyzingView] Job ${newJobId} queued (analysis: ${analysisId})`)
+
+        // Step 2: Poll for job status every 5 seconds
+        pollInterval = setInterval(async () => {
+          if (cancelled) return
+
+          try {
+            const statusResponse = await fetch(`/api/audit/${newJobId}`)
+            if (!statusResponse.ok) {
+              // Job might have been evicted from in-memory queue
+              // Try fetching analysis directly from DB
+              return
+            }
+
+            const statusData = await statusResponse.json()
+
+            if (cancelled) return
+
+            setJobStatus(statusData.status as 'idle' | 'queued' | 'active' | 'completed' | 'failed' | 'unknown')
+
+            if (statusData.status === 'active' && statusData.progress > 0) {
+              // Worker is processing — update progress
+              sseProgressRef.current = statusData.progress
+              setAnalysisProgress(statusData.progress)
+              setAnalysisStep('Agents are analyzing your site...')
+            }
+
+            if (statusData.status === 'completed') {
+              // Job completed!
+              clearTimeout(timeoutId)
+              if (pollInterval) clearInterval(pollInterval)
+              clearSimulationTimers()
+
+              sseProgressRef.current = 100
+              setAnalysisProgress(100)
+              setAnalysisStep('Analysis complete!')
+              setJobStatus('completed')
+
+              // Fetch the full analysis from the status response or DB
+              if (statusData.analysis) {
+                setAnalysis(statusData.analysis as SEOAnalysis)
+                setTimeout(() => setView('dashboard'), 600)
+              } else if (statusData.data?.analysisId || statusData.analysisId) {
+                // Fetch analysis from DB
+                const fetchAnalysisId = statusData.analysisId || statusData.data?.analysisId
+                try {
+                  const dbResponse = await fetch(`/api/analysis/${fetchAnalysisId}`)
+                  if (dbResponse.ok) {
+                    const dbData = await dbResponse.json()
+                    if (dbData.analysis) {
+                      setAnalysis(dbData.analysis as SEOAnalysis)
+                      setTimeout(() => setView('dashboard'), 600)
+                    }
+                  }
+                } catch (dbErr) {
+                  console.warn('[AnalyzingView] Failed to fetch analysis from DB:', dbErr)
+                }
+              }
+            }
+
+            if (statusData.status === 'failed') {
+              clearTimeout(timeoutId)
+              if (pollInterval) clearInterval(pollInterval)
+              clearSimulationTimers()
+              setJobStatus('failed')
+              setAnalysisError(statusData.failedReason || 'Analysis failed. Please try again.')
+            }
+          } catch (pollErr) {
+            // Polling error — don't break, just log
+            console.warn('[AnalyzingView] Poll error:', pollErr instanceof Error ? pollErr.message : 'Unknown')
+          }
+        }, 5000)
+
+        // Also trigger the first poll immediately after a short delay
+        setTimeout(() => {
+          if (!cancelled && pollInterval) {
+            // Manually trigger first poll
+            fetch(`/api/audit/${newJobId}`)
+              .then(r => r.json())
+              .then(data => {
+                if (cancelled) return
+                if (data.status === 'active') {
+                  setJobStatus('active')
+                  setAnalysisStep('8 AI agents are analyzing your site...')
+                }
+              })
+              .catch(() => { /* ignore */ })
+          }
+        }, 2000)
+
+      } catch (err) {
+        if (cancelled) return
+        clearTimeout(timeoutId)
+        if (pollInterval) clearInterval(pollInterval)
+        clearSimulationTimers()
+        const message = err instanceof Error ? err.message : 'Failed to queue analysis. Please try again.'
+        setAnalysisError(message)
+      }
+    }
+
+    runQueueAnalysis()
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+      if (pollInterval) clearInterval(pollInterval)
+      clearSimulationTimers()
+      analyzedUrlRef.current = null
+    }
+  }, [targetUrl, targetMarket, analysisEngine, mode, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError, setSessionId, setJobId, setJobStatus, setCurrentAnalysisId, retryCount, startSimulatedProgress, clearSimulationTimers])
 
   const currentStepIndex = phases.findIndex((s) =>
     analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
@@ -607,6 +788,24 @@ export default function AnalyzingView() {
           <span>{formatTime(elapsed)}</span>
           <span>·</span>
           <span>Usually takes 30-90 seconds</span>
+          {analysisEngine === 'queue' && (
+            <>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                  jobStatus === 'queued' ? 'bg-amber-400 animate-pulse' :
+                  jobStatus === 'active' ? 'bg-emerald-400 animate-pulse' :
+                  'bg-muted-foreground/40'
+                }`} />
+                <span className="font-mono">
+                  {jobStatus === 'queued' ? 'Queued' :
+                   jobStatus === 'active' ? 'Processing' :
+                   jobStatus === 'completed' ? 'Complete' :
+                   jobStatus === 'failed' ? 'Failed' : 'Idle'}
+                </span>
+              </span>
+            </>
+          )}
         </motion.div>
 
         {/* Progress Bar */}

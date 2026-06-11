@@ -297,6 +297,9 @@ export interface SEOAnalysis {
   executiveActions: string[]
 }
 
+// Queue-based analysis state
+export type AnalysisEngine = 'sse' | 'queue'  // 'sse' = legacy SSE stream, 'queue' = BullMQ background job
+
 interface AppState {
   view: AppView
   targetUrl: string
@@ -310,6 +313,10 @@ interface AppState {
   mode: AnalysisMode
   pendingApprovals: Approval[]
   currentAnalysisId: string | null
+  // Queue-based analysis state
+  analysisEngine: AnalysisEngine
+  jobId: string | null
+  jobStatus: 'idle' | 'queued' | 'active' | 'completed' | 'failed' | 'unknown'
   setView: (view: AppView) => void
   setTargetUrl: (url: string) => void
   setTargetMarket: (market: string) => void
@@ -325,8 +332,11 @@ interface AppState {
   removePendingApproval: (id: string) => void
   updatePendingApproval: (id: string, status: Approval['status']) => void
   setCurrentAnalysisId: (id: string | null) => void
+  setAnalysisEngine: (engine: AnalysisEngine) => void
+  setJobId: (jobId: string | null) => void
+  setJobStatus: (status: AppState['jobStatus']) => void
   reset: () => void
-  startAnalysis: (url: string, market?: string, mode?: AnalysisMode) => void
+  startAnalysis: (url: string, market?: string, mode?: AnalysisMode, engine?: AnalysisEngine) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -342,6 +352,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   mode: 'auto-pilot',
   pendingApprovals: [],
   currentAnalysisId: null,
+  analysisEngine: 'queue',
+  jobId: null,
+  jobStatus: 'idle',
   setView: (view) => set({ view }),
   setTargetUrl: (url) => set({ targetUrl: url }),
   setTargetMarket: (market) => set({ targetMarket: market }),
@@ -361,8 +374,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     ),
   })),
   setCurrentAnalysisId: (id) => set({ currentAnalysisId: id }),
-  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '', activeAgent: null, sessionId: '', mode: 'auto-pilot', pendingApprovals: [], currentAnalysisId: null }),
-  startAnalysis: (url: string, market?: string, mode?: AnalysisMode) => {
-    set({ targetUrl: url, targetMarket: market || 'Global', mode: mode || get().mode, view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null, activeAgent: null, sessionId: '', pendingApprovals: [], currentAnalysisId: null })
+  setAnalysisEngine: (engine) => set({ analysisEngine: engine }),
+  setJobId: (jobId) => set({ jobId }),
+  setJobStatus: (status) => set({ jobStatus: status }),
+  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '', activeAgent: null, sessionId: '', mode: 'auto-pilot', pendingApprovals: [], currentAnalysisId: null, analysisEngine: 'queue', jobId: null, jobStatus: 'idle' }),
+  startAnalysis: (url: string, market?: string, mode?: AnalysisMode, engine?: AnalysisEngine) => {
+    const selectedEngine = engine || get().analysisEngine
+    set({ targetUrl: url, targetMarket: market || 'Global', mode: mode || get().mode, view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null, activeAgent: null, sessionId: '', pendingApprovals: [], currentAnalysisId: null, analysisEngine: selectedEngine, jobId: null, jobStatus: 'idle' })
   },
 }))
