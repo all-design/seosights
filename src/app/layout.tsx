@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "seosight" }],
   icons: {
-    icon: "/logo.png",
+    icon: "/logo-transparent.png",
   },
   openGraph: {
     title: "seosight — Vision. Analytics. Rank.",

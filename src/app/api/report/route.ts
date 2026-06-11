@@ -164,8 +164,8 @@ class PDFBuilder {
   constructor() {
     this.doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     this.doc.setProperties({
-      title: 'Agent OS — SEO/AEO/GEO Analysis Report',
-      author: 'Agent OS',
+      title: 'seosight — SEO/AEO/GEO Analysis Report',
+      author: 'seosight',
       subject: 'Comprehensive Search Intelligence Report',
     })
   }
@@ -404,13 +404,13 @@ class PDFBuilder {
     this.doc.setFontSize(32)
     this.doc.setFont('helvetica', 'bold')
     this.setColor(C.white)
-    this.doc.text('Agent OS', PW / 2, 38, { align: 'center' })
+    this.doc.text('seosight', PW / 2, 38, { align: 'center' })
 
     // Tagline
     this.doc.setFontSize(10)
     this.doc.setFont('helvetica', 'normal')
     this.doc.setTextColor(255, 255, 255)
-    this.doc.text('Search Intelligence Platform', PW / 2, 48, { align: 'center' })
+    this.doc.text('Vision. Analytics. Rank.', PW / 2, 48, { align: 'center' })
 
     // Gold divider line
     this.setDrawColor(C.amber)
@@ -485,7 +485,7 @@ class PDFBuilder {
     this.doc.text('SEO (Search Engine Optimization)  \u00B7  AEO (Answer Engine Optimization)  \u00B7  GEO (Generative Engine Optimization)', PW / 2, PH - 40, { align: 'center', maxWidth: CW })
     this.doc.setFontSize(6)
     this.setColor(C.border)
-    this.doc.text(`\u00A9 ${new Date().getFullYear()} Agent OS \u2014 Confidential`, PW / 2, PH - 30, { align: 'center' })
+    this.doc.text(`\u00A9 ${new Date().getFullYear()} seosight \u2014 Confidential`, PW / 2, PH - 30, { align: 'center' })
 
     // Start content on new page
     this.doc.addPage()

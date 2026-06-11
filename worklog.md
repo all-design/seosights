@@ -32,3 +32,121 @@ Stage Summary:
 - Two-batch parallel execution with rate limit protection
 - All agent results deep-merged into compatible SEOAnalysis format
 - Browser QA passed with zero errors
+
+---
+Task ID: 6
+Agent: Dashboard Auto-Execute Upgrader
+Task: Add agent execution panel + auto-execute strategy to dashboard
+
+Work Log:
+- Read existing worklog and full AnalysisDashboard.tsx (~2448 lines)
+- Added `useEffect` import from React for animation timer
+- Added new state variables: showAutoExecute, showWeeklyReview, executionPhase, executionProgress, isExecuting
+- Added auto-execute animation useEffect hook with interval-based progress simulation (60ms tick, +2% per tick, 3 phases)
+- Added green pulse "8 Agents Active" indicator in header bar (next to Export PDF button)
+- Added AI Agent Team Panel section after Quick Wins with:
+  - 8 agent pills (Master Director, Keyword Researcher, Competitor Analyst, Content Architect, On-Page Auditor, Link Strategist, Tech & Schema, Backlink Prospector)
+  - Each pill has emoji + name + green pulse dot + color-coded border (emerald/cyan/amber/purple)
+  - "Auto-Execute Strategy" emerald CTA button with glow shadow
+  - "Weekly Review" outline button
+- Added Auto-Execute Strategy collapsible section with:
+  - 3-phase execution timeline (Setup/Build/Review Loop)
+  - Animated progress bars per phase using Framer Motion
+  - Agent-task mapping for each phase
+  - Current week's tasks from data.measure.weeklyActions
+  - "Start Execution" button that triggers simulated animation across all 3 phases
+  - Execution state indicator with spinner
+- Added Weekly Review collapsible section with:
+  - Progress scorecard (SEO/AEO/GEO targets for Day 90)
+  - Top wins from quickWins
+  - Priority actions next week from weeklyActions (high priority highlighted)
+  - Risk flags derived from critical issues, parasite risk, AI pattern risk
+  - Master Director decision questions (4 questions)
+- Verified lint passes with no errors
+- Verified dev server compiles successfully
+
+Stage Summary:
+- Agent Team Panel with 8 animated agent pills added below Quick Wins
+- Auto-Execute Strategy section with 3-phase timeline + animated progress bars
+- Weekly Review section with scorecard, wins, actions, risks, and decision questions
+- Green pulse "8 Agents Active" indicator in header
+- All existing dashboard sections preserved intact
+- Client-side simulation only (no new API needed)
+
+---
+Task ID: 4+5
+Agent: Hero & Agent System Upgrader
+Task: Update Hero CTA + Upgrade 8-Agent system with ESSHEO concepts
+
+Work Log:
+- Read worklog.md and all relevant files (HeroSection, agents.ts, HowItWorksSection, AnalyzingView, Navbar, Footer, layout.tsx, route.ts)
+- Rewrote HeroSection.tsx with:
+  - New "Not a Wrapper. A Purpose-Built SEO Engine." amber badge below main badge
+  - Updated sub-subheadline: "Not a ChatGPT wrapper. A proprietary multi-agent engine built for stealth, E-E-A-T compliance, and AI citation dominance. 8 agents. Real-time SERP scraping. 2,000-word stealth strategies that actually stick."
+  - Added "Your 24/7 AI SEO Team" section between AI Platform Badges and CTA buttons
+  - 8 agent pills with emoji icons: Master Director, Keyword Researcher, Competitor Analyst, Content Architect, On-Page Auditor, Link Strategist, Tech & Schema, Backlink Prospector
+  - Alternating emerald/cyan/amber pill color scheme
+  - Updated main CTA from "Start Free Trial" to "Deploy Your AI Team — Free"
+  - Changed "Optimize for" to "Cited by" label above platform badges
+  - Updated logo.png → logo-transparent.png
+- Rewrote agents.ts with ESSHEO-inspired 8-agent system:
+  - Agent 1: Master Director (batch 1) — strategy lead, produces overallScores, summary, executiveActions, roadmap, algorithmUpdates
+  - Agent 2: Keyword Researcher (batch 1) — keyword opportunities, produces structure.keywordGaps, structure.topicClusters
+  - Agent 3: Competitor Analyst (batch 1) — competitor reverse-engineering, produces measure.competitorBenchmarks, deepStrategy.competitorGapAnalysis
+  - Agent 4: Content Architect (batch 1) — content briefs and answer blocks, produces creative.contentBriefs, creative.answerBlocks, creative.onPageOptimizations
+  - Agent 5: On-Page Auditor (batch 2) — technical SEO audit, produces audit.technicalSEO, audit.crawlability, audit.pageSpeed, audit.indexation
+  - Agent 6: Link Strategist (batch 2) — internal linking + backlink strategy, produces structure.contentArchitecture, deepStrategy.backlinkOutreach, deepStrategy.aiCitationStrategy
+  - Agent 7: Tech & Schema Auditor (batch 2) — technical/schema + E-E-A-T + GEO, produces structure.schemaRecommendations, eeat, audit.aeoReadiness, audit.geoVisibility, aiCrawler, brandMentions, geoCitability
+  - Agent 8: Backlink Prospector (batch 2) — backlink outreach + content quality + KPI tracking, produces deepStrategy.technicalImplementations, contentQuality, parasiteRisk, localSEO, sxo, measure.kpiTracking, measure.weeklyActions, trafficInsights
+  - All agent outputs remain compatible with existing SEOAnalysis interface in store.ts
+- Updated HowItWorksSection.tsx: Step 2 description now lists new agent names, Step 3 emphasizes auto-execution of 90-day plan
+- Updated AnalyzingView.tsx: phases and SIMULATED_STEPS now reference new agent names
+- Updated analyze/route.ts: Batch comments updated with new agent names
+- Updated all logo.png → logo-transparent.png references in: HeroSection.tsx, Navbar.tsx, Footer.tsx, layout.tsx
+- Lint check passes with zero errors
+- Dev server compiles and serves pages successfully
+
+Stage Summary:
+- Hero section fully upgraded with "Your 24/7 AI SEO Team" section, new CTA, and Wisewand V2 positioning
+- 8-agent system completely rewritten with ESSHEO-inspired roles and specialized prompts
+- All agent outputs remain compatible with existing SEOAnalysis TypeScript interface
+- All logo references updated from logo.png to logo-transparent.png
+- AnalyzingView progress phases updated to match new agent names
+- Zero lint errors, dev server running cleanly
+---
+Task ID: 1-8
+Agent: Main Orchestrator
+Task: Complete seosight upgrade - Hero CTA, 8-Agent ESSHEO team, auto-execute strategy, logo transparency, PDF fix
+
+Work Log:
+- Read all current project files (Hero, Dashboard, Agents, Store, API route)
+- Fetched 8-Agent SEO Team roles/prompts from Notion page (ESSHEO/Myles Robinson)
+- Extracted all 8 agent definitions: Master Director, Keyword Researcher, Competitor Analyst, Content Architect, On-Page Auditor, Link Strategist, Tech & Schema Auditor, Backlink Prospector
+- Removed white background from logo using Pillow (39.6% white pixels → transparent)
+- Updated hero section with "Your 24/7 AI SEO Team" CTA below "Cited by AI" badges
+- Added "Not a Wrapper. A Purpose-Built SEO Engine." badge
+- Changed CTA button to "Deploy Your AI Team — Free"
+- Updated sub-subheadline with Wisewand V2 positioning
+- Added 8 agent pills (emoji + name) with alternating emerald/cyan/amber colors
+- Upgraded 8-agent system with ESSHEO team roles (batch 1: Master Director, Keyword Researcher, Competitor Analyst, Content Architect; batch 2: On-Page Auditor, Link Strategist, Tech & Schema Auditor, Backlink Prospector)
+- Updated HowItWorksSection with new agent names and 90-day plan emphasis
+- Updated AnalyzingView with new agent phases and simulated progress
+- Added AI Agent Team Panel to dashboard with 8 agent pills
+- Added Auto-Execute Strategy section with 3-phase execution timeline
+- Added Weekly Review section with scorecard, wins, risk flags, decision questions
+- Added "8 Agents Active" indicator with green pulse in dashboard header
+- Updated all logo references from logo.png to logo-transparent.png
+- Updated PDF report branding from "Agent OS" to "seosight"
+- Verified lint passes cleanly
+- Verified dev server compiles and runs
+- Browser QA: Landing page renders correctly with all new features
+- Browser QA: Analysis flow works - all 8 agents run successfully
+- Browser QA: Dashboard displays agent team panel, auto-execute, weekly review
+
+Stage Summary:
+- Hero section fully upgraded with "Your 24/7 AI SEO Team" CTA and agent pills
+- 8-agent system replaced with ESSHEO-inspired team (Master Director → Backlink Prospector)
+- Dashboard now has agent execution panel, auto-execute strategy, weekly review
+- Logo transparency achieved (white background removed)
+- PDF report rebranded to "seosight"
+- All features verified via browser QA

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore, SEOAnalysis } from '@/lib/store'
 import { Card, CardContent } from '@/components/ui/card'
@@ -614,6 +614,30 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
   const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null)
   const [copiedSnippet, setCopiedSnippet] = useState<number | null>(null)
   const [copiedWin, setCopiedWin] = useState<number | null>(null)
+  const [showAutoExecute, setShowAutoExecute] = useState(false)
+  const [showWeeklyReview, setShowWeeklyReview] = useState(false)
+  const [executionPhase, setExecutionPhase] = useState(0)
+  const [executionProgress, setExecutionProgress] = useState(0)
+  const [isExecuting, setIsExecuting] = useState(false)
+
+  // Auto-execute animation effect
+  useEffect(() => {
+    if (!isExecuting) return
+    const interval = setInterval(() => {
+      setExecutionProgress(prev => {
+        if (prev >= 100) {
+          if (executionPhase >= 3) {
+            setIsExecuting(false)
+            return 100
+          }
+          setExecutionPhase(p => p + 1)
+          return 0
+        }
+        return prev + 2
+      })
+    }, 60)
+    return () => clearInterval(interval)
+  }, [isExecuting, executionPhase])
 
   const quickWins = useMemo(() => data ? deriveQuickWins(data) : [], [data])
   const seoStrategy = useMemo(() => data ? deriveSEOStrategy(data) : [], [data])
@@ -709,6 +733,14 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Agent Execution Indicator */}
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-xs font-semibold text-emerald-400">8 Agents Active</span>
+            </div>
             <button
               onClick={handleExportPDF}
               disabled={exporting}
@@ -803,6 +835,393 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                   </div>
                 </CardContent>
               </Card>
+            </motion.div>
+          )}
+
+          {/* ── AI Agent Team Panel ──────────────────────────── */}
+          <motion.div variants={item}>
+            <Card className="bg-gradient-to-r from-emerald-500/10 via-background to-cyan-500/10 border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                    <Bot className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Your AI SEO Team — <span className="text-emerald-400">8 Agents Active</span></h2>
+                    <p className="text-sm text-muted-foreground">Specialized agents working 24/7 on your SEO, AEO &amp; GEO strategy</p>
+                  </div>
+                </div>
+
+                {/* Agent Pills */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {[
+                    { emoji: '🎯', name: 'Master Director', color: 'emerald' },
+                    { emoji: '🔑', name: 'Keyword Researcher', color: 'cyan' },
+                    { emoji: '⚔️', name: 'Competitor Analyst', color: 'amber' },
+                    { emoji: '📄', name: 'Content Architect', color: 'purple' },
+                    { emoji: '🔍', name: 'On-Page Auditor', color: 'emerald' },
+                    { emoji: '🔗', name: 'Link Strategist', color: 'cyan' },
+                    { emoji: '🏗️', name: 'Tech & Schema', color: 'amber' },
+                    { emoji: '📣', name: 'Backlink Prospector', color: 'purple' },
+                  ].map((agent, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.06 }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium ${
+                        agent.color === 'emerald' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' :
+                        agent.color === 'cyan' ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300' :
+                        agent.color === 'amber' ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' :
+                        'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                      }`}
+                    >
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                      </span>
+                      <span>{agent.emoji}</span>
+                      <span>{agent.name}</span>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* CTA Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => { setShowAutoExecute(!showAutoExecute); setShowWeeklyReview(false) }}
+                    className="flex items-center justify-center gap-2 text-sm bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-6 py-3 rounded-xl transition-all duration-300 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]"
+                  >
+                    <Zap className="w-4 h-4" />
+                    Auto-Execute Strategy
+                  </button>
+                  <button
+                    onClick={() => { setShowWeeklyReview(!showWeeklyReview); setShowAutoExecute(false) }}
+                    className="flex items-center justify-center gap-2 text-sm text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 font-semibold px-6 py-3 rounded-xl transition-all duration-300"
+                  >
+                    <CalendarDays className="w-4 h-4" />
+                    Weekly Review
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ── Auto-Execute Strategy ──────────────────────────── */}
+          {showAutoExecute && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              <Collapsible
+                title="Auto-Execute Strategy"
+                icon={Swords}
+                defaultOpen
+                badge={<Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] font-bold">90-Day Plan</Badge>}
+                accentColor="emerald"
+              >
+                <div className="space-y-6">
+                  {/* Phase Timeline */}
+                  {[
+                    {
+                      phase: 1,
+                      title: 'Setup',
+                      period: 'Week 1',
+                      color: 'emerald',
+                      tasks: [
+                        { agent: '🎯 Master Director', task: 'Define 90-day plan with KPIs and milestones' },
+                        { agent: '🔑 Keyword Researcher', task: 'Build target keyword list from gap analysis' },
+                        { agent: '⚔️ Competitor Analyst', task: 'Map competitive battlefield and opportunities' },
+                        { agent: '📄 Content Architect', task: 'Brief first content batch based on keyword gaps' },
+                      ],
+                      progress: isExecuting && executionPhase >= 1 ? Math.min(executionProgress, 100) : 0,
+                    },
+                    {
+                      phase: 2,
+                      title: 'Build',
+                      period: 'Weeks 2-8',
+                      color: 'cyan',
+                      tasks: [
+                        { agent: '🔍 On-Page Auditor', task: 'Review all pages against SEO/AEO/GEO benchmarks' },
+                        { agent: '🔗 Link Strategist', task: 'Update internal linking plan & anchor strategy' },
+                        { agent: '🏗️ Tech & Schema', task: 'Run monthly schema audit & implementation' },
+                        { agent: '📣 Backlink Prospector', task: 'Run weekly outreach to high-priority targets' },
+                      ],
+                      progress: isExecuting && executionPhase >= 2 ? Math.min(executionProgress, 100) : 0,
+                    },
+                    {
+                      phase: 3,
+                      title: 'Review Loop',
+                      period: 'Every Monday',
+                      color: 'amber',
+                      tasks: [
+                        { agent: '🎯 Master Director', task: 'Score progress against 90-day KPIs' },
+                        { agent: '🎯 Master Director', task: 'Flag issues requiring human decision' },
+                        { agent: '🎯 Master Director', task: 'Decide next actions & reprioritize backlog' },
+                      ],
+                      progress: isExecuting && executionPhase >= 3 ? Math.min(executionProgress, 100) : 0,
+                    },
+                  ].map((phase) => (
+                    <div key={phase.phase} className="relative">
+                      {/* Phase Header */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-sm ${
+                          phase.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' :
+                          phase.color === 'cyan' ? 'bg-cyan-500/20 text-cyan-400' :
+                          'bg-amber-500/20 text-amber-400'
+                        }`}>
+                          {phase.phase}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold">{phase.title}</span>
+                            <Badge variant="outline" className="text-[10px] border-white/20 text-muted-foreground">{phase.period}</Badge>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex-1 bg-white/5 rounded-full h-1.5 overflow-hidden">
+                              <motion.div
+                                className={`h-full rounded-full ${
+                                  phase.color === 'emerald' ? 'bg-emerald-500' :
+                                  phase.color === 'cyan' ? 'bg-cyan-500' :
+                                  'bg-amber-500'
+                                }`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${isExecuting && executionPhase >= phase.phase ? executionProgress : 0}%` }}
+                                transition={{ duration: 0.5 }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground w-8 text-right shrink-0">
+                              {isExecuting && executionPhase >= phase.phase ? `${Math.round(executionProgress)}%` : '0%'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Phase Tasks */}
+                      <div className="ml-11 space-y-2">
+                        {phase.tasks.map((t, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.1 * i }}
+                            className="flex items-start gap-2 bg-white/[0.02] rounded-lg p-2.5 border border-white/5"
+                          >
+                            <span className="text-xs shrink-0">{t.agent}</span>
+                            <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+                            <span className="text-xs text-muted-foreground">{t.task}</span>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Current Week Tasks from Analysis Data */}
+                  {data.measure?.weeklyActions && data.measure.weeklyActions.length > 0 && (
+                    <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/15">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Calendar className="w-4 h-4 text-emerald-400" />
+                        <span className="text-sm font-semibold text-emerald-300">This Week&apos;s Tasks (from analysis)</span>
+                      </div>
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(16,185,129,0.3) transparent' }}>
+                        {data.measure.weeklyActions.slice(0, 2).flatMap((week) =>
+                          week.tasks?.map((task, i) => (
+                            <div key={`${week.week}-${i}`} className="flex items-start gap-2">
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${
+                                task.priority === 'high' ? 'bg-rose-400' :
+                                task.priority === 'medium' ? 'bg-amber-400' : 'bg-emerald-400'
+                              }`} />
+                              <span className="text-xs text-muted-foreground">{task.task}</span>
+                              <PillarBadge pillar={task.pillar} />
+                            </div>
+                          )) || []
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Start Execution Button */}
+                  <div className="flex items-center gap-4 pt-2">
+                    <button
+                      onClick={() => {
+                        if (isExecuting) return
+                        setIsExecuting(true)
+                        setExecutionPhase(1)
+                        setExecutionProgress(0)
+                      }}
+                      disabled={isExecuting}
+                      className={`flex items-center gap-2 text-sm font-bold px-6 py-3 rounded-xl transition-all duration-300 ${
+                        isExecuting
+                          ? 'bg-emerald-500/20 text-emerald-400 cursor-not-allowed'
+                          : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]'
+                      }`}
+                    >
+                      {isExecuting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Executing Phase {executionPhase}...
+                        </>
+                      ) : (
+                        <>
+                          <Rocket className="w-4 h-4" />
+                          Start Execution
+                        </>
+                      )}
+                    </button>
+                    {isExecuting && (
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-xs text-emerald-400/70"
+                      >
+                        Simulating 90-day auto-execution plan...
+                      </motion.span>
+                    )}
+                  </div>
+                </div>
+              </Collapsible>
+            </motion.div>
+          )}
+
+          {/* ── Weekly Review ──────────────────────────────────── */}
+          {showWeeklyReview && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              <Collapsible
+                title="Weekly Review"
+                icon={CalendarDays}
+                defaultOpen
+                badge={<Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 text-[10px] font-bold">Progress Scorecard</Badge>}
+                accentColor="cyan"
+              >
+                <div className="space-y-5">
+                  {/* Progress Scorecard */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-emerald-500/5 rounded-lg p-3 border border-emerald-500/15 text-center">
+                      <p className="text-[10px] text-muted-foreground font-bold mb-1">SEO TARGET</p>
+                      <p className="text-xl font-bold text-emerald-400">{Math.min(data.overallScores.seo + 15, 100)}</p>
+                      <p className="text-[10px] text-muted-foreground">by Day 90</p>
+                    </div>
+                    <div className="bg-cyan-500/5 rounded-lg p-3 border border-cyan-500/15 text-center">
+                      <p className="text-[10px] text-muted-foreground font-bold mb-1">AEO TARGET</p>
+                      <p className="text-xl font-bold text-cyan-400">{Math.min(data.overallScores.aeo + 20, 100)}</p>
+                      <p className="text-[10px] text-muted-foreground">by Day 90</p>
+                    </div>
+                    <div className="bg-amber-500/5 rounded-lg p-3 border border-amber-500/15 text-center">
+                      <p className="text-[10px] text-muted-foreground font-bold mb-1">GEO TARGET</p>
+                      <p className="text-xl font-bold text-amber-400">{Math.min(data.overallScores.geo + 25, 100)}</p>
+                      <p className="text-[10px] text-muted-foreground">by Day 90</p>
+                    </div>
+                  </div>
+
+                  {/* Top Wins This Week */}
+                  {quickWins.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        <span className="text-sm font-semibold">Top Wins This Week</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {quickWins.map((win, i) => (
+                          <div key={i} className="flex items-start gap-2 bg-emerald-500/5 rounded-lg p-2 border border-emerald-500/10">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="text-xs font-medium">{win.title}</span>
+                              <span className="text-[10px] text-muted-foreground ml-2">({win.time})</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Priority Actions Next Week */}
+                  {data.measure?.weeklyActions && data.measure.weeklyActions.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <ArrowRight className="w-4 h-4 text-cyan-400" />
+                        <span className="text-sm font-semibold">Priority Actions Next Week</span>
+                      </div>
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(6,182,212,0.3) transparent' }}>
+                        {data.measure.weeklyActions.slice(0, 2).flatMap((week) =>
+                          week.tasks?.filter(t => t.priority === 'high').map((task, i) => (
+                            <div key={`next-${i}`} className="flex items-start gap-2 bg-cyan-500/5 rounded-lg p-2 border border-cyan-500/10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 mt-1.5" />
+                              <span className="text-xs text-muted-foreground">{task.task}</span>
+                              <PillarBadge pillar={task.pillar} />
+                            </div>
+                          )) || []
+                        )}
+                        {data.measure.weeklyActions.slice(0, 2).flatMap((week) =>
+                          week.tasks?.filter(t => t.priority !== 'high').map((task, i) => (
+                            <div key={`next-med-${i}`} className="flex items-start gap-2 bg-white/[0.02] rounded-lg p-2 border border-white/5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+                              <span className="text-xs text-muted-foreground">{task.task}</span>
+                              <PillarBadge pillar={task.pillar} />
+                            </div>
+                          )) || []
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Risk Flags */}
+                  {(() => {
+                    const criticalIssues = data.audit?.technicalSEO?.issues?.filter(i => i.severity === 'critical') || []
+                    const riskFlags = [
+                      ...criticalIssues.slice(0, 2).map(i => ({ text: i.issue, level: 'high' as const })),
+                      ...(data.parasiteRisk?.riskLevel === 'high' ? [{ text: 'High parasite SEO risk detected', level: 'high' as const }] : []),
+                      ...(data.contentQuality?.aiPatternRisk === 'high' ? [{ text: 'Content flagged as AI-generated pattern', level: 'high' as const }] : []),
+                    ]
+                    if (riskFlags.length === 0) return null
+                    return (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-400" />
+                          <span className="text-sm font-semibold">Risk Flags</span>
+                          <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/30 text-[10px] font-bold">{riskFlags.length}</Badge>
+                        </div>
+                        <div className="space-y-1.5">
+                          {riskFlags.map((flag, i) => (
+                            <div key={i} className="flex items-start gap-2 bg-rose-500/5 rounded-lg p-2 border border-rose-500/10">
+                              <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 mt-1.5" />
+                              <span className="text-xs text-muted-foreground">{flag.text}</span>
+                              <RiskBadge level={flag.level} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Decision Questions */}
+                  <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/15">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Brain className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-300">Master Director Decision Questions</span>
+                    </div>
+                    <div className="space-y-2">
+                      {[
+                        'Are the quick wins implemented? If not, what\'s blocking?',
+                        'Which content briefs should be prioritized for next week?',
+                        'Are there any algorithm updates requiring strategy pivot?',
+                        'Is the backlink outreach on track with response rates?',
+                      ].map((question, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-xs text-amber-400 font-bold shrink-0">Q{i + 1}:</span>
+                          <span className="text-xs text-muted-foreground">{question}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </Collapsible>
             </motion.div>
           )}
 

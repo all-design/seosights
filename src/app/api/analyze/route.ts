@@ -426,7 +426,7 @@ export async function POST(request: NextRequest) {
 
         const allAgentResults: Record<string, unknown>[] = []
 
-        // ── Batch 1: Crawler, Schema Architect, Content Analyst, E-E-A-T Auditor ──
+        // ── Batch 1: Master Director, Keyword Researcher, Competitor Analyst, Content Architect ──
         yield sendProgress(38, 'Launching Agent Batch 1: Technical analysis...')
         await flush()
 
@@ -463,7 +463,7 @@ export async function POST(request: NextRequest) {
         // Small delay between batches
         await new Promise(resolve => setTimeout(resolve, 2000))
 
-        // ── Batch 2: GEO Specialist, Link Architect, Local Scout, SXO Strategist ──
+        // ── Batch 2: On-Page Auditor, Link Strategist, Tech & Schema Auditor, Backlink Prospector ──
         yield sendProgress(62, 'Launching Agent Batch 2: Strategy & optimization...')
         await flush()
 

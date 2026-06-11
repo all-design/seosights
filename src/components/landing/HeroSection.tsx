@@ -9,6 +9,17 @@ interface HeroSectionProps {
   onStartFree?: () => void
 }
 
+const agentPills = [
+  { name: 'Master Director', icon: '🎯', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+  { name: 'Keyword Researcher', icon: '🔑', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+  { name: 'Competitor Analyst', icon: '🕵️', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  { name: 'Content Architect', icon: '🏗️', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+  { name: 'On-Page Auditor', icon: '🔍', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+  { name: 'Link Strategist', icon: '🔗', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  { name: 'Tech & Schema', icon: '⚙️', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+  { name: 'Backlink Prospector', icon: '🤝', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+]
+
 export default function HeroSection({ onStartFree }: HeroSectionProps) {
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id)
@@ -39,7 +50,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <img src="/logo.png" alt="seosight" className="h-12 w-auto" />
+          <img src="/logo-transparent.png" alt="seosight" className="h-12 w-auto" />
           <div className="flex flex-col items-start">
             <span className="font-bold text-2xl tracking-tight">seosight</span>
             <span className="text-[10px] tracking-[0.25em] text-emerald-400/70 uppercase">Vision · Analytics · Rank</span>
@@ -54,10 +65,24 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
         >
           <Badge
             variant="outline"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-4"
           >
             <Sparkles className="w-4 h-4" />
             Complete SEO · AEO · GEO Platform
+          </Badge>
+        </motion.div>
+
+        {/* "Not a Wrapper" Badge */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+        >
+          <Badge
+            variant="outline"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm border-amber-500/50 text-amber-400 bg-amber-500/10 backdrop-blur-sm mb-8"
+          >
+            ⚡ Not a Wrapper. A Purpose-Built SEO Engine.
           </Badge>
         </motion.div>
 
@@ -87,24 +112,24 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           <span className="text-amber-400 font-semibold">(GEO)</span>
         </motion.p>
 
-        {/* Sub-subheadline */}
+        {/* Sub-subheadline — Updated powerful positioning */}
         <motion.p
           className="text-base sm:text-lg text-muted-foreground/70 max-w-3xl mx-auto mb-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
-          Powered by 8 specialized AI agents working in parallel — from Crawler Agent to SXO Strategist — delivering 10x more precise analysis than any existing tool.
+          Not a ChatGPT wrapper. A proprietary multi-agent engine built for stealth, E-E-A-T compliance, and AI citation dominance. 8 agents. Real-time SERP scraping. 2,000-word stealth strategies that actually stick.
         </motion.p>
 
         {/* AI Platform Badges */}
         <motion.div
-          className="flex flex-wrap items-center justify-center gap-3 mb-10"
+          className="flex flex-wrap items-center justify-center gap-3 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
-          <span className="text-sm text-muted-foreground/70 mr-1">Optimize for</span>
+          <span className="text-sm text-muted-foreground/70 mr-1">Cited by</span>
           <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
             <Bot className="w-4 h-4 text-emerald-400" />
             <span className="text-sm font-medium text-foreground/80">ChatGPT</span>
@@ -123,19 +148,50 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </div>
         </motion.div>
 
+        {/* ── "Your 24/7 AI SEO Team" Section ── */}
+        <motion.div
+          className="mb-10"
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.45 }}
+        >
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3">
+            <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">
+              Your 24/7 AI SEO Team
+            </span>
+          </h2>
+          <p className="text-muted-foreground/80 text-base sm:text-lg mb-5">
+            8 specialized agents. Auto-executing your strategy while you sleep.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {agentPills.map((agent, idx) => (
+              <motion.div
+                key={agent.name}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium ${agent.color} backdrop-blur-sm`}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.5 + idx * 0.06 }}
+              >
+                <span className="text-sm">{agent.icon}</span>
+                {agent.name}
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
         {/* CTA Buttons */}
         <motion.div
           className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.5 }}
+          transition={{ duration: 0.7, delay: 0.6 }}
         >
           <Button
             size="lg"
             className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg px-8 py-6 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
             onClick={onStartFree}
           >
-            Start Free Trial
+            Deploy Your AI Team — Free
             <ArrowRight className="ml-2 w-5 h-5" />
           </Button>
           <Button
@@ -153,7 +209,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.7 }}
+          transition={{ duration: 0.8, delay: 0.8 }}
         >
           <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm border border-emerald-500/20 rounded-xl px-5 py-3">
             <TrendingUp className="w-5 h-5 text-emerald-400" />

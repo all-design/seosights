@@ -50,7 +50,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
             {/* Logo */}
             <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <img
-                src="/logo.png"
+                src="/logo-transparent.png"
                 alt="seosight"
                 className="h-8 w-auto"
               />
