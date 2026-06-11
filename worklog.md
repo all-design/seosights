@@ -566,3 +566,53 @@ Stage Summary:
 - Composite indexes added for enterprise-scale dashboard queries
 - Accurate per-token pricing from provider rate cards
 - All "First Sight" references updated across codebase
+
+---
+Task ID: session-5
+Agent: Main Orchestrator
+Task: Fix LOVE AT FIRST SIGHT to navbar + Implement detailed 4-step Hub-and-Spoke JSON protocol
+
+Work Log:
+- Fixed "LOVE AT FIRST SIGHT" placement per user correction:
+  - Navbar.tsx: Replaced "1st Sight · 2nd Sight · 3rd Sight" with "LOVE AT FIRST SIGHT" in upper-left corner
+  - HeroSection.tsx: Reverted threeSights[0].name from "LOVE AT FIRST SIGHT" back to "First Sight"
+  - FeaturesSection.tsx: Reverted sightName from "LOVE AT FIRST SIGHT" back to "First Sight"
+  - HowItWorksSection.tsx: Reverted "Love at First Sight" back to "First Sight"
+  - layout.tsx: Reverted all 3 metadata descriptions from "Love at First Sight" back to "First Sight"
+- Rewrote agent-protocol.ts with comprehensive 4-step Hub-and-Spoke JSON protocol:
+  - Step 1: AnalysisInitPayload (project_id, target_url, target_market, timestamp, execution_mode)
+  - Step 2: AgentDispatch + TaskScope (session_id, agent_target, context, task_scope with action, required_engines, checkpoints, output_strict_format)
+  - Step 3: AgentResponse with enhanced AgentAction (action_id, sight: SEO/AEO/GEO, description, estimated_impact: critical/high/medium/low)
+  - Step 4: FinalAssembledReport (project_id, overall_scores, 90_day_roadmap, agent_findings, all_recommended_actions, meta with session stats)
+  - OverallScores, RoadmapTask, NinetyDayRoadmap, CitationGap interfaces
+  - buildAgentDispatch() for Step 2 dispatch message construction
+  - assembleFinalReport() for Step 4 final report assembly with 90-day roadmap builder
+  - Backward-compatible validation: supports both new (findings, action_id/sight) and legacy (critical_findings/data, action/priority) formats
+- Updated agents.ts with enhanced protocol:
+  - Added taskScope field to AgentDefinition (required per agent)
+  - Each agent now defines its TaskScope (action, required_engines/checkpoints, output_strict_format)
+  - Added JSON_ENFORCEMENT_SUFFIX to all system prompts: "Return ONLY a valid JSON object. No markdown, backticks, or extra text."
+  - Updated Master Director prompt with full 4-step protocol description and STRUCTURED OUTPUTS guidance
+  - All user prompts now return the new AgentResponse format with agent_name, status, findings, recommended_actions (with action_id + sight), token_usage
+  - Competitor Analyst now includes citation_gaps in response format
+  - Tech & Schema Auditor now includes llms_txt_exists, faq_schema_valid, blocked_bots at top level
+- Updated analyze/route.ts:
+  - Imported buildAgentDispatch, assembleFinalReport, AnalysisInitPayload from agent-protocol
+  - Added Step 1 input validation: execution_mode from request body (auto-pilot/co-pilot)
+  - Added response_format: { type: 'json_object' } to ALL LLM calls (OpenAI JSON Mode enforcement)
+  - Added Step 2 dispatch context injection in runSubAgentWithProtocol: buildAgentDispatch() creates structured dispatch JSON in agent context
+  - Added Step 4 assembleFinalReport() call in Phase 3: produces FinalAssembledReport with overall_scores, 90_day_roadmap, all_recommended_actions, agent_findings, meta
+  - Attached _finalReport to analysis result alongside legacy format for backward compatibility
+  - ContextWindow now includes sessionId and executionMode
+  - Analysis record uses executionMode from request body instead of hardcoded 'auto-pilot'
+- Lint passes with zero errors
+- Browser QA: Navbar shows "LOVE AT FIRST SIGHT", Three Sights show "First Sight"/"Second Sight"/"Third Sight", all features working
+
+Stage Summary:
+- "LOVE AT FIRST SIGHT" correctly placed in navbar (upper-left corner) replacing "1st Sight · 2nd Sight · 3rd Sight"
+- HeroSection/FeaturesSection/HowItWorks/layout.tsx all reverted to "First Sight"
+- Complete 4-step Hub-and-Spoke JSON protocol implemented across agent-protocol.ts, agents.ts, and analyze route
+- TaskScope per agent: each agent declares action, required_engines/checkpoints, output_strict_format
+- Structured Outputs enforced: JSON Mode for OpenAI (response_format), prompt-based for others
+- FinalAssembledReport includes overall_scores, 90_day_roadmap, all_recommended_actions, meta
+- Backward compatible: _finalReport attached alongside legacy analysis format

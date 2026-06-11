@@ -25,7 +25,7 @@ const agentPills = [
 const threeSights = [
   {
     number: '1st',
-    name: 'LOVE AT FIRST SIGHT',
+    name: 'First Sight',
     label: 'SEO',
     description: 'Traditional search',
     color: 'text-emerald-400',

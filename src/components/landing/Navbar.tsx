@@ -65,7 +65,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                 seosights
               </span>
               <span className="text-[8px] tracking-[0.2em] text-emerald-400/60 uppercase leading-none mt-0.5">
-                1st Sight · 2nd Sight · 3rd Sight
+                LOVE AT FIRST SIGHT
               </span>
             </div>
 

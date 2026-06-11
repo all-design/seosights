@@ -37,7 +37,7 @@ const featureCategories = [
   {
     sight: '1st',
     category: 'SEO',
-    sightName: 'LOVE AT FIRST SIGHT',
+    sightName: 'First Sight',
     label: 'Search Engine Optimization — The traditional view of search',
     color: 'emerald',
     icon: Eye,

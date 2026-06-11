@@ -9,8 +9,11 @@ import {
   validateAgentResponse,
   mergeSubAgentResult,
   buildSubAgentContext,
+  buildAgentDispatch,
+  assembleFinalReport,
   type ContextWindow,
   type AgentResponse,
+  type AnalysisInitPayload,
 } from '@/lib/agent-protocol'
 import { randomUUID } from 'crypto'
 
@@ -267,27 +270,28 @@ async function runAgent(
   const fallback = new AgentFallback('default')
 
   const fallbackResult = await fallback.executeWithFallback(
-    // Primary: standard LLM call with retry
+    // Primary: standard LLM call with retry + JSON mode enforcement
+    // Structured Outputs: "response_format": { "type": "json_object" }
     () => retryWithBackoff(
       () => zai.chat.completions.create({
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
+        response_format: { type: 'json_object' },
       }),
       3,
       4000,
       `LLM_${agent.id}`
     ) as Promise<Record<string, unknown>>,
     // Fallback: same SDK call (SDK handles model routing internally)
-    // The model param is logged for tracking and will be used when
-    // multi-model support is added to the SDK
     (model: string) => retryWithBackoff(
       () => zai.chat.completions.create({
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
+        response_format: { type: 'json_object' },
       }),
       2, // fewer retries for fallback to avoid long waits
       3000,
@@ -421,8 +425,9 @@ async function runAgent(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { url, market } = body
+    const { url, market, execution_mode } = body
 
+    // ── Step 1: Validate input using AnalysisInitPayload ──────────────
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 })
     }
@@ -432,6 +437,7 @@ export async function POST(request: NextRequest) {
     }
 
     const targetMarket = market || 'Global'
+    const executionMode = execution_mode === 'auto-pilot' ? 'auto-pilot' as const : 'co-pilot' as const
     const parsedUrl = new URL(url)
     const domain = parsedUrl.hostname.replace('www.', '')
 
@@ -447,7 +453,7 @@ export async function POST(request: NextRequest) {
           domain,
           market: targetMarket,
           status: 'running',
-          mode: 'auto-pilot',
+          mode: executionMode,
         }
       })
       analysisId = analysisRecord.id
@@ -736,6 +742,8 @@ export async function POST(request: NextRequest) {
             aiInfo: aiInfo.slice(0, 300),
             localInfo: localInfo.slice(0, 300),
           },
+          sessionId: analysisSessionId,
+          executionMode,
         })
 
         // Progress allocation:
@@ -793,10 +801,14 @@ export async function POST(request: NextRequest) {
           // Build enhanced context from the ContextWindow for this specific agent
           const protocolContext = buildSubAgentContext(agent.id, contextWindow)
 
-          // Create enhanced agent context that includes protocol context
+          // Build the Step 2 dispatch context (task_scope) for this agent
+          const dispatch = buildAgentDispatch(agent.id, analysisSessionId, contextWindow, agent.taskScope)
+          const dispatchContext = `\n\nDISPATCH (Step 2):\n${JSON.stringify(dispatch, null, 2)}`
+
+          // Create enhanced agent context that includes protocol context + dispatch
           const enhancedContext: AgentContext = {
             ...agentContext,
-            siteContent: agentContext.siteContent + '\n\n' + protocolContext,
+            siteContent: agentContext.siteContent + '\n\n' + protocolContext + dispatchContext,
           }
 
           // First attempt
@@ -1021,13 +1033,28 @@ export async function POST(request: NextRequest) {
         yield sendProgress(82, 'Merging agent results...')
         await flush()
 
-        // Deep merge all agent results
+        // ── Step 4: Assemble Final Report (Hub-and-Spoke Protocol) ──────────
+        const analysisStartedAt = new Date().toISOString() // approximate start time
+        const finalReport = assembleFinalReport(
+          contextWindow,
+          analysisStartedAt,
+          tokenTracker.getSummary().totalTokens,
+          tokenTracker.getSummary().totalCost,
+        )
+        console.log(`[analyze] Step 4: Final report assembled — SEO: ${finalReport.overall_scores.seo_score}, AEO: ${finalReport.overall_scores.aeo_score}, GEO: ${finalReport.overall_scores.geo_score}`)
+        console.log(`[analyze] ${finalReport.all_recommended_actions.length} total recommended actions, ${finalReport.meta.agents_completed} agents completed`)
+
+        // Deep merge all agent results (legacy compatibility)
         let analysisResult: Record<string, unknown> = {}
         for (const agentResult of allAgentResults) {
           if (Object.keys(agentResult).length > 0) {
             analysisResult = deepMerge(analysisResult, agentResult)
           }
         }
+
+        // Attach the Step 4 assembled report alongside the legacy format
+        // The frontend can use either format
+        analysisResult._finalReport = finalReport
 
         // Ensure required top-level fields
         analysisResult.siteName = analysisResult.siteName || siteData.title || url
