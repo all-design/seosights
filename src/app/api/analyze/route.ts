@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { agents, batch1Agents, batch2Agents, type AgentDefinition } from '@/lib/agents'
+import { agents, batch1Agents, batch2Agents, type AgentDefinition, type AgentContext } from '@/lib/agents'
 import { TokenTracker } from '@/lib/token-tracker'
 import { AgentFallback } from '@/lib/agent-fallback'
 import { db } from '@/lib/db'
 import { sharedContextCache } from '@/lib/shared-context'
+import {
+  createContextWindow,
+  validateAgentResponse,
+  mergeSubAgentResult,
+  buildSubAgentContext,
+  type ContextWindow,
+  type AgentResponse,
+} from '@/lib/agent-protocol'
 import { randomUUID } from 'crypto'
 
 export const maxDuration = 180
@@ -674,7 +682,14 @@ export async function POST(request: NextRequest) {
         } // end of cache-miss data gathering block
 
         // ════════════════════════════════════════════════════════════════
-        // Phase 2: 8-Agent Analysis — Two parallel batches with delays
+        // Phase 2: Hub-and-Spoke Agent Protocol
+        //
+        // 1. Create ContextWindow
+        // 2. Master Director runs first → result merged into ContextWindow
+        // 3. Sub-agents run in parallel batches, each receiving context
+        // 4. After each sub-agent: validate response, retry once if invalid
+        // 5. Merge validated results into ContextWindow
+        // 6. Master Director runs final synthesis pass
         // ════════════════════════════════════════════════════════════════
 
         // Build context for agents
@@ -696,7 +711,7 @@ export async function POST(request: NextRequest) {
           .map((r) => `${r.name}: ${(r.snippet || '').slice(0, 60)}`)
           .join(' | ')
 
-        const agentContext = {
+        const agentContext: AgentContext = {
           url,
           domain,
           siteName: siteData.title || url,
@@ -708,131 +723,218 @@ export async function POST(request: NextRequest) {
           targetMarket,
         }
 
+        // ── Step 1: Create ContextWindow ──────────────────────────────────────
+        const contextWindow = createContextWindow({
+          url,
+          domain,
+          market: targetMarket,
+          siteName: siteData.title || url,
+          scanData: {
+            siteContent: siteContent.slice(0, 1500),
+            htmlStructure: htmlStructure.slice(0, 500),
+            competitorInfo: competitorInfo.slice(0, 400),
+            aiInfo: aiInfo.slice(0, 300),
+            localInfo: localInfo.slice(0, 300),
+          },
+        })
+
         // Progress allocation:
         // Phase 1 used 5-35% → Phase 2 starts at 38%
-        // Batch 1: 4 agents → 38-60% (~5.5% each with overhead)
-        // Batch 2: 4 agents → 62-82% (~5% each with overhead)
+        // Master Director: 38-42%
+        // Batch 1 (3 sub-agents): 42-58%
+        // Batch 2 (4 sub-agents): 60-78%
+        // Master Director synthesis: 78-82%
         // Phase 3: 82-100%
 
         const allAgentResults: Record<string, unknown>[] = []
 
-        // ── Batch 1: Master Director, Keyword Researcher, Competitor Analyst, Content Architect ──
-        yield sendProgress(38, 'Launching Agent Batch 1: Technical analysis...')
+        // ── Step 2: Master Director runs first ────────────────────────────────
+        yield sendProgress(38, 'Master Director: Analyzing raw data & creating plan...')
         await flush()
 
-        // Run batch 1 agents in parallel with staggered delays
-        const batch1Promises = batch1Agents.map((agent, index) => {
-          const startProgress = 40 + index * 5
-          return new Promise<{ data: Record<string, unknown> }>(async (resolve) => {
-            // Stagger each agent by 1800ms to avoid rate limits
-            await new Promise(r => setTimeout(r, index * 1800))
+        emitWS(analysisSessionId, 'agent:start', {
+          sessionId: analysisSessionId,
+          agentId: 'master-director',
+          agentName: 'Master Director',
+          action: 'Strategy lead',
+        })
 
-            // Emit agent:start via WebSocket
-            emitWS(analysisSessionId, 'agent:start', {
-              sessionId: analysisSessionId,
-              agentId: agent.id,
-              agentName: agent.name,
-              action: agent.role.split(':')[0] || 'Analyzing...',
-            })
+        const mdResult = await runAgent(zai, agents[0], agentContext, 39, (p, s) => {
+          emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: 'master-director', progress: p, message: s })
+        }, flush, tokenTracker, analysisId)
 
-            const result = await runAgent(zai, agent, agentContext, startProgress, (p, s) => {
-              // Emit agent:progress via WebSocket
-              emitWS(analysisSessionId, 'agent:progress', {
-                sessionId: analysisSessionId,
-                agentId: agent.id,
-                progress: p,
-                message: s,
-              })
-            }, flush, tokenTracker, analysisId)
+        if (Object.keys(mdResult.data).length > 0) {
+          allAgentResults.push(mdResult.data)
+          // Merge Master Director result into ContextWindow so sub-agents can access it
+          const mdValidated = validateAgentResponse(mdResult.data)
+          if (mdValidated.valid && mdValidated.response) {
+            mergeSubAgentResult(contextWindow, mdValidated.response)
+            console.log('[analyze] Master Director result merged into ContextWindow')
+          }
+          emitWS(analysisSessionId, 'agent:complete', { sessionId: analysisSessionId, agentId: 'master-director', result: 'Complete' })
+        } else {
+          emitWS(analysisSessionId, 'agent:error', { sessionId: analysisSessionId, agentId: 'master-director', error: 'Empty response from LLM' })
+          console.warn('[analyze] Master Director returned empty response — sub-agents will proceed without director context')
+        }
 
-            // Emit agent:complete or agent:error via WebSocket
-            if (Object.keys(result.data).length > 0) {
-              emitWS(analysisSessionId, 'agent:complete', {
-                sessionId: analysisSessionId,
-                agentId: agent.id,
-                result: 'Complete',
-              })
-            } else {
-              emitWS(analysisSessionId, 'agent:error', {
-                sessionId: analysisSessionId,
-                agentId: agent.id,
-                error: 'Empty response from LLM',
-              })
+        yield sendProgress(42, 'Master Director complete. Launching sub-agents...')
+        await flush()
+
+        // ── Step 3: Run sub-agents in parallel batches with validation ────────
+
+        /**
+         * Run a sub-agent with protocol validation and one retry on failure.
+         * Returns the validated data (empty object if both attempts fail).
+         */
+        async function runSubAgentWithProtocol(
+          agent: AgentDefinition,
+          progress: number,
+        ): Promise<{ data: Record<string, unknown>; validated: boolean; retried: boolean }> {
+          // Build enhanced context from the ContextWindow for this specific agent
+          const protocolContext = buildSubAgentContext(agent.id, contextWindow)
+
+          // Create enhanced agent context that includes protocol context
+          const enhancedContext: AgentContext = {
+            ...agentContext,
+            siteContent: agentContext.siteContent + '\n\n' + protocolContext,
+          }
+
+          // First attempt
+          emitWS(analysisSessionId, 'agent:start', {
+            sessionId: analysisSessionId,
+            agentId: agent.id,
+            agentName: agent.name,
+            action: agent.role.split(':')[0] || 'Analyzing...',
+          })
+
+          let result = await runAgent(zai, agent, enhancedContext, progress, (p, s) => {
+            emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: agent.id, progress: p, message: s })
+          }, flush, tokenTracker, analysisId)
+
+          // Validate the response using the agent protocol
+          const validation = validateAgentResponse(result.data)
+
+          if (validation.valid && validation.response) {
+            // Valid response — merge into ContextWindow
+            mergeSubAgentResult(contextWindow, validation.response)
+
+            // Also include the raw data for backward compatibility
+            const protocolData = result.data
+            // If the response was wrapped in protocol format, extract the data field
+            if (validation.response.data && Object.keys(validation.response.data).length > 0) {
+              // Merge the agent-specific data (not protocol metadata) into results
+              const agentData = validation.response.data as Record<string, unknown>
+              return { data: agentData, validated: true, retried: false }
             }
 
+            emitWS(analysisSessionId, 'agent:complete', { sessionId: analysisSessionId, agentId: agent.id, result: 'Complete (validated)' })
+            return { data: protocolData, validated: true, retried: false }
+          }
+
+          // Validation failed — retry once
+          console.warn(`[analyze] ${agent.name} response failed validation: ${validation.error}. Retrying...`)
+
+          emitWS(analysisSessionId, 'agent:progress', {
+            sessionId: analysisSessionId,
+            agentId: agent.id,
+            progress,
+            message: `${agent.name} validation failed — retrying...`,
+          })
+
+          // Wait a moment before retry
+          await new Promise(r => setTimeout(r, 2000))
+
+          result = await runAgent(zai, agent, enhancedContext, progress, (p, s) => {
+            emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: agent.id, progress: p, message: s })
+          }, flush, tokenTracker, analysisId)
+
+          const retryValidation = validateAgentResponse(result.data)
+
+          if (retryValidation.valid && retryValidation.response) {
+            // Retry succeeded — merge into ContextWindow
+            mergeSubAgentResult(contextWindow, retryValidation.response)
+
+            const protocolData = result.data
+            if (retryValidation.response.data && Object.keys(retryValidation.response.data).length > 0) {
+              const agentData = retryValidation.response.data as Record<string, unknown>
+              return { data: agentData, validated: true, retried: true }
+            }
+
+            emitWS(analysisSessionId, 'agent:complete', { sessionId: analysisSessionId, agentId: agent.id, result: 'Complete (retry validated)' })
+            return { data: protocolData, validated: true, retried: true }
+          }
+
+          // Both attempts failed validation — use raw data as fallback (lenient)
+          console.warn(`[analyze] ${agent.name} retry also failed validation. Using raw data as fallback.`)
+
+          if (Object.keys(result.data).length > 0) {
+            // Even though validation failed, we still have parseable data — use it
+            // This is the lenient path that preserves backward compatibility
+            emitWS(analysisSessionId, 'agent:complete', { sessionId: analysisSessionId, agentId: agent.id, result: 'Complete (unvalidated fallback)' })
+            return { data: result.data, validated: false, retried: true }
+          }
+
+          emitWS(analysisSessionId, 'agent:error', { sessionId: analysisSessionId, agentId: agent.id, error: 'Validation failed after retry' })
+          return { data: {}, validated: false, retried: true }
+        }
+
+        // ── Batch 1: Keyword Researcher, Competitor Analyst, Content Architect ──
+        const batch1SubAgents = batch1Agents.filter((a) => a.id !== 'master-director')
+
+        yield sendProgress(43, 'Launching Agent Batch 1: Research & Content...')
+        await flush()
+
+        const batch1Promises = batch1SubAgents.map((agent, index) => {
+          const startProgress = 44 + index * 5
+          return new Promise<{ data: Record<string, unknown>; validated: boolean; retried: boolean }>(async (resolve) => {
+            await new Promise(r => setTimeout(r, index * 1800))
+            const result = await runSubAgentWithProtocol(agent, startProgress)
             resolve(result)
           })
         })
 
         // Yield progress for each agent as it starts
-        for (let i = 0; i < batch1Agents.length; i++) {
-          const progressVal = 40 + i * 5
-          yield sendProgress(progressVal, `Running ${batch1Agents[i].name}...`)
+        for (let i = 0; i < batch1SubAgents.length; i++) {
+          const progressVal = 44 + i * 5
+          yield sendProgress(progressVal, `Running ${batch1SubAgents[i].name}...`)
           await flush()
-          // Wait a bit before the next agent starts (stagger is handled in the promise)
-          if (i < batch1Agents.length - 1) {
+          if (i < batch1SubAgents.length - 1) {
             await new Promise(r => setTimeout(r, 1800))
           }
         }
 
         const batch1Results = await Promise.all(batch1Promises)
-        batch1Results.forEach(r => allAgentResults.push(r.data))
+        batch1Results.forEach(r => {
+          if (Object.keys(r.data).length > 0) allAgentResults.push(r.data)
+        })
 
-        yield sendProgress(60, 'Agent Batch 1 complete. Launching Batch 2...')
+        // Log validation stats for batch 1
+        const b1Validated = batch1Results.filter(r => r.validated).length
+        const b1Retried = batch1Results.filter(r => r.retried).length
+        console.log(`[analyze] Batch 1 complete: ${b1Validated}/${batch1Results.length} validated, ${b1Retried} retried`)
+
+        yield sendProgress(58, 'Agent Batch 1 complete. Launching Batch 2...')
         await flush()
 
         // Small delay between batches
         await new Promise(resolve => setTimeout(resolve, 2000))
 
         // ── Batch 2: On-Page Auditor, Link Strategist, Tech & Schema Auditor, Backlink Prospector ──
-        yield sendProgress(62, 'Launching Agent Batch 2: Strategy & optimization...')
+        yield sendProgress(60, 'Launching Agent Batch 2: Audit & Strategy...')
         await flush()
 
         const batch2Promises = batch2Agents.map((agent, index) => {
-          const startProgress = 64 + index * 5
-          return new Promise<{ data: Record<string, unknown> }>(async (resolve) => {
+          const startProgress = 62 + index * 4
+          return new Promise<{ data: Record<string, unknown>; validated: boolean; retried: boolean }>(async (resolve) => {
             await new Promise(r => setTimeout(r, index * 1800))
-
-            // Emit agent:start via WebSocket
-            emitWS(analysisSessionId, 'agent:start', {
-              sessionId: analysisSessionId,
-              agentId: agent.id,
-              agentName: agent.name,
-              action: agent.role.split(':')[0] || 'Analyzing...',
-            })
-
-            const result = await runAgent(zai, agent, agentContext, startProgress, (p, s) => {
-              // Emit agent:progress via WebSocket
-              emitWS(analysisSessionId, 'agent:progress', {
-                sessionId: analysisSessionId,
-                agentId: agent.id,
-                progress: p,
-                message: s,
-              })
-            }, flush, tokenTracker, analysisId)
-
-            // Emit agent:complete or agent:error via WebSocket
-            if (Object.keys(result.data).length > 0) {
-              emitWS(analysisSessionId, 'agent:complete', {
-                sessionId: analysisSessionId,
-                agentId: agent.id,
-                result: 'Complete',
-              })
-            } else {
-              emitWS(analysisSessionId, 'agent:error', {
-                sessionId: analysisSessionId,
-                agentId: agent.id,
-                error: 'Empty response from LLM',
-              })
-            }
-
+            const result = await runSubAgentWithProtocol(agent, startProgress)
             resolve(result)
           })
         })
 
         // Yield progress for each agent as it starts
         for (let i = 0; i < batch2Agents.length; i++) {
-          const progressVal = 64 + i * 5
+          const progressVal = 62 + i * 4
           yield sendProgress(progressVal, `Running ${batch2Agents[i].name}...`)
           await flush()
           if (i < batch2Agents.length - 1) {
@@ -841,7 +943,52 @@ export async function POST(request: NextRequest) {
         }
 
         const batch2Results = await Promise.all(batch2Promises)
-        batch2Results.forEach(r => allAgentResults.push(r.data))
+        batch2Results.forEach(r => {
+          if (Object.keys(r.data).length > 0) allAgentResults.push(r.data)
+        })
+
+        // Log validation stats for batch 2
+        const b2Validated = batch2Results.filter(r => r.validated).length
+        const b2Retried = batch2Results.filter(r => r.retried).length
+        console.log(`[analyze] Batch 2 complete: ${b2Validated}/${batch2Results.length} validated, ${b2Retried} retried`)
+
+        // ── Step 6: Master Director final synthesis pass ──────────────────────
+        yield sendProgress(78, 'Master Director: Synthesizing final strategy...')
+        await flush()
+
+        // Build synthesis context from the full ContextWindow
+        const synthesisContext = buildSubAgentContext('master-director', contextWindow)
+        const synthesisAgentContext: AgentContext = {
+          ...agentContext,
+          siteContent: `SYNTHESIS PASS — All sub-agents have completed.\n\n${synthesisContext}`,
+        }
+
+        emitWS(analysisSessionId, 'agent:start', {
+          sessionId: analysisSessionId,
+          agentId: 'master-director',
+          agentName: 'Master Director',
+          action: 'Final synthesis',
+        })
+
+        const synthesisResult = await runAgent(zai, agents[0], synthesisAgentContext, 79, (p, s) => {
+          emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: 'master-director', progress: p, message: s })
+        }, flush, tokenTracker, analysisId)
+
+        if (Object.keys(synthesisResult.data).length > 0) {
+          // Synthesis result can refine overallScores, summary, executiveActions
+          allAgentResults.push(synthesisResult.data)
+          const synthValidated = validateAgentResponse(synthesisResult.data)
+          if (synthValidated.valid && synthValidated.response) {
+            mergeSubAgentResult(contextWindow, synthValidated.response)
+            console.log('[analyze] Master Director synthesis result merged into ContextWindow')
+          }
+          emitWS(analysisSessionId, 'agent:complete', { sessionId: analysisSessionId, agentId: 'master-director', result: 'Synthesis complete' })
+        } else {
+          emitWS(analysisSessionId, 'agent:error', { sessionId: analysisSessionId, agentId: 'master-director', error: 'Synthesis empty' })
+        }
+
+        yield sendProgress(82, 'All agents complete. Merging results...')
+        await flush()
 
         // Check if we got any results at all
         const hasAnyData = allAgentResults.some(r => Object.keys(r).length > 0)

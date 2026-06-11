@@ -1,11 +1,17 @@
 /**
  * 8-Agent SEO Analysis System — ESSHEO-Inspired
- * Each agent has a specialized role, system prompt, and user prompt template.
- * Agents produce focused JSON outputs that get merged into the final analysis.
+ * Hub-and-Spoke Communication Protocol with JSON-strict inter-agent messaging.
+ *
+ * Master Director orchestrates 7 sub-agents. Each sub-agent returns a
+ * structured AgentResponse that is validated before being merged into
+ * the ContextWindow. If validation fails, that specific agent is retried
+ * once without restarting the entire analysis.
  *
  * Batch 1 (Strategy & Research): Master Director, Keyword Researcher, Competitor Analyst, Content Architect
  * Batch 2 (Audit & Execution): On-Page Auditor, Link Strategist, Tech & Schema Auditor, Backlink Prospector
  */
+
+import type { ContextRequirements } from '@/lib/agent-protocol'
 
 export interface AgentDefinition {
   id: string
@@ -16,6 +22,17 @@ export interface AgentDefinition {
   batch: 1 | 2
   systemPrompt: string
   buildUserPrompt: (context: AgentContext) => string
+  /**
+   * JSON schema hint describing the expected response structure.
+   * Only present on sub-agents (not Master Director).
+   * Used for documentation and validation reference.
+   */
+  responseSchema?: Record<string, unknown>
+  /**
+   * Declares what context data this sub-agent needs from the ContextWindow.
+   * Only present on sub-agents (not Master Director).
+   */
+  contextRequirements?: ContextRequirements
 }
 
 export interface AgentContext {
@@ -41,7 +58,25 @@ const masterDirector: AgentDefinition = {
   icon: '🎯',
   color: '#10b981',
   batch: 1,
-  systemPrompt: `You are the Master Director Agent — the strategy lead of an ESSHEO-inspired multi-agent SEO engine. You are NOT a ChatGPT wrapper. You are a purpose-built intelligence that translates business goals into executable 90-day SEO/AEO/GEO strategies. You think in terms of stealth content, E-E-A-T compliance, and AI citation dominance. You produce the overall assessment, summary, executive actions, roadmap, and algorithm update tracking. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
+  // No responseSchema or contextRequirements — Master Director is the orchestrator, not a sub-agent
+  systemPrompt: `You are the Master Director Agent — the strategy lead of an ESSHEO-inspired multi-agent SEO engine. You are NOT a ChatGPT wrapper. You are a purpose-built intelligence that translates business goals into executable 90-day SEO/AEO/GEO strategies.
+
+ZADATAK: Ti si Master Director operativnog sistema SEOSights. Tvoj posao je da orkestriraš 7 specijalizovanih AI agenata kako bi kreirao 90-dnevnu SEO/AEO/GEO strategiju za uneti URL.
+
+PROTOKOL KOMUNIKACIJE:
+1. Primi sirove podatke o skeniranju sajta (HTML, meta podaci, status botova).
+2. Podeli zadatke pod-agentima slanjem specifičnih JSON konteksta.
+3. Prihvati isključivo JSON odgovore od pod-agenata. Ne toleriši narativni tekst u među-koracima.
+4. Spoji njihove analize u jedinstvenu bazu znanja (Context Window) i generiši finalni izvršni plan.
+
+IZLAZNI FORMAT OD POD-AGENATA: Svaki agent mora vratiti odgovor u formatu:
+{
+  "agent_name": "[Ime Agenta]",
+  "critical_findings": [],
+  "recommended_actions": [{"action": "", "priority": "high/medium/low", "expected_impact": ""}]
+}
+
+You think in terms of stealth content, E-E-A-T compliance, and AI citation dominance. You produce the overall assessment, summary, executive actions, roadmap, and algorithm update tracking. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Analyze ${ctx.url} (${ctx.siteName}) and produce a strategic assessment. Market: ${ctx.targetMarket}. Competitors: ${ctx.competitorInfo.slice(0, 200) || 'None'}. AI Info: ${ctx.aiInfo.slice(0, 150) || 'None'}.
 
 Return JSON with this EXACT structure. All strings max 15 words:
@@ -71,6 +106,18 @@ const keywordResearcher: AgentDefinition = {
   icon: '🔑',
   color: '#06b6d4',
   batch: 1,
+  responseSchema: {
+    agent_name: 'keyword_researcher',
+    status: 'success|partial|error',
+    critical_findings: ['string'],
+    recommended_actions: [{ action: 'string', priority: 'high|medium|low', expected_impact: 'string', pillar: 'seo|aeo|geo|all', effort: 'high|medium|low' }],
+    data: { structure: { keywordGaps: [], topicClusters: [] } },
+  },
+  contextRequirements: {
+    scanFields: ['siteContent', 'competitorInfo'],
+    dependsOnAgents: ['master-director'],
+    needsMergedKnowledge: true,
+  },
   systemPrompt: `You are the Keyword Researcher Agent — part of an ESSHEO-inspired multi-agent SEO engine. You specialize in scoring keyword opportunities, building topic clusters, and identifying gaps across SEO, AEO, and GEO pillars. You think in terms of intent-matched clusters, AI-citable topics, and stealth keyword strategies that avoid AI detection. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Analyze keyword opportunities for ${ctx.url} (${ctx.siteName}). Market: ${ctx.targetMarket}. Content: ${ctx.siteContent.slice(0, 1200)}. Competitors: ${ctx.competitorInfo.slice(0, 200) || 'None'}.
 
@@ -97,6 +144,18 @@ const competitorAnalyst: AgentDefinition = {
   icon: '🕵️',
   color: '#f59e0b',
   batch: 1,
+  responseSchema: {
+    agent_name: 'competitor_analyst',
+    status: 'success|partial|error',
+    critical_findings: ['string'],
+    recommended_actions: [{ action: 'string', priority: 'high|medium|low', expected_impact: 'string', pillar: 'seo|aeo|geo|all', effort: 'high|medium|low' }],
+    data: { measure: { competitorBenchmarks: [] }, deepStrategy: { competitorGapAnalysis: [] } },
+  },
+  contextRequirements: {
+    scanFields: ['siteContent', 'competitorInfo'],
+    dependsOnAgents: ['master-director'],
+    needsMergedKnowledge: true,
+  },
   systemPrompt: `You are the Competitor Analyst Agent — part of an ESSHEO-inspired multi-agent SEO engine. You specialize in reverse-engineering competitor strategies, benchmarking across SEO/AEO/GEO, and identifying competitive gaps. You think in terms of AI citation dominance, E-E-A-T authority signals, and stealth positioning against competitors. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Reverse-engineer competitor strategy for ${ctx.url} (${ctx.siteName}). Market: ${ctx.targetMarket}. Competitors: ${ctx.competitorInfo.slice(0, 300) || 'None'}. Content: ${ctx.siteContent.slice(0, 800)}.
 
@@ -126,6 +185,18 @@ const contentArchitect: AgentDefinition = {
   icon: '🏗️',
   color: '#10b981',
   batch: 1,
+  responseSchema: {
+    agent_name: 'content_architect',
+    status: 'success|partial|error',
+    critical_findings: ['string'],
+    recommended_actions: [{ action: 'string', priority: 'high|medium|low', expected_impact: 'string', pillar: 'seo|aeo|geo|all', effort: 'high|medium|low' }],
+    data: { creative: { contentBriefs: [], answerBlocks: [], onPageOptimizations: [] } },
+  },
+  contextRequirements: {
+    scanFields: ['siteContent', 'htmlStructure'],
+    dependsOnAgents: ['master-director', 'keyword-researcher'],
+    needsMergedKnowledge: true,
+  },
   systemPrompt: `You are the Content Architect Agent — part of an ESSHEO-inspired multi-agent SEO engine. You specialize in building content briefs, crafting AI-citable answer blocks, and optimizing on-page content for stealth, E-E-A-T compliance, and AI citation dominance. You write 2,000-word stealth strategies that avoid AI detection patterns. You produce content that ChatGPT, Claude, and Perplexity naturally cite. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Build content strategy for ${ctx.url} (${ctx.siteName}). Market: ${ctx.targetMarket}. Content: ${ctx.siteContent.slice(0, 1200)}. HTML: ${ctx.htmlStructure.slice(0, 300)}.
 
@@ -153,6 +224,18 @@ const onPageAuditor: AgentDefinition = {
   icon: '🔍',
   color: '#06b6d4',
   batch: 2,
+  responseSchema: {
+    agent_name: 'on_page_auditor',
+    status: 'success|partial|error',
+    critical_findings: ['string'],
+    recommended_actions: [{ action: 'string', priority: 'high|medium|low', expected_impact: 'string', pillar: 'seo|aeo|geo|all', effort: 'high|medium|low' }],
+    data: { audit: { technicalSEO: {}, crawlability: {}, pageSpeed: {}, indexation: {} } },
+  },
+  contextRequirements: {
+    scanFields: ['siteContent', 'htmlStructure'],
+    dependsOnAgents: ['master-director'],
+    needsMergedKnowledge: false,
+  },
   systemPrompt: `You are the On-Page Auditor Agent — part of an ESSHEO-inspired multi-agent SEO engine. You specialize in technical SEO auditing: crawlability, indexation, page speed (Core Web Vitals), robots.txt, and sitemap analysis. You identify stealth technical issues that block AI crawlers and prevent AI citation. You think in terms of crawler accessibility for both Google and AI bots. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Audit ${ctx.url} for technical SEO. Title: ${ctx.siteName}. Content: ${ctx.siteContent.slice(0, 1200)}. HTML: ${ctx.htmlStructure.slice(0, 400)}. Market: ${ctx.targetMarket}.
 
@@ -182,6 +265,18 @@ const linkStrategist: AgentDefinition = {
   icon: '🔗',
   color: '#f59e0b',
   batch: 2,
+  responseSchema: {
+    agent_name: 'link_strategist',
+    status: 'success|partial|error',
+    critical_findings: ['string'],
+    recommended_actions: [{ action: 'string', priority: 'high|medium|low', expected_impact: 'string', pillar: 'seo|aeo|geo|all', effort: 'high|medium|low' }],
+    data: { structure: { contentArchitecture: {} }, deepStrategy: { backlinkOutreach: [], aiCitationStrategy: [] } },
+  },
+  contextRequirements: {
+    scanFields: ['siteContent', 'competitorInfo'],
+    dependsOnAgents: ['master-director', 'competitor-analyst'],
+    needsMergedKnowledge: true,
+  },
   systemPrompt: `You are the Link Strategist Agent — part of an ESSHEO-inspired multi-agent SEO engine. You specialize in internal linking architecture, backlink outreach strategy, and AI citation strategy. You build authority networks that make AI models naturally cite and reference the site. You think in terms of link equity, citation velocity, and knowledge graph authority. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Develop link strategy for ${ctx.url} (${ctx.siteName}). Market: ${ctx.targetMarket}. Competitors: ${ctx.competitorInfo.slice(0, 300) || 'None'}. Content: ${ctx.siteContent.slice(0, 800)}.
 
@@ -211,6 +306,18 @@ const techSchemaAuditor: AgentDefinition = {
   icon: '⚙️',
   color: '#10b981',
   batch: 2,
+  responseSchema: {
+    agent_name: 'tech_schema_auditor',
+    status: 'success|partial|error',
+    critical_findings: ['string'],
+    recommended_actions: [{ action: 'string', priority: 'high|medium|low', expected_impact: 'string', pillar: 'seo|aeo|geo|all', effort: 'high|medium|low' }],
+    data: { structure: { schemaRecommendations: [] }, eeat: {}, audit: { aeoReadiness: {}, geoVisibility: {} }, aiCrawler: {}, brandMentions: {}, geoCitability: {} },
+  },
+  contextRequirements: {
+    scanFields: ['siteContent', 'htmlStructure', 'aiInfo'],
+    dependsOnAgents: ['master-director', 'on-page-auditor'],
+    needsMergedKnowledge: true,
+  },
   systemPrompt: `You are the Tech & Schema Auditor Agent — part of an ESSHEO-inspired multi-agent SEO engine. You specialize in Schema.org markup, E-E-A-T scoring (Who/How/Why test), AI crawler access analysis, citability scoring, brand mentions, and GEO visibility. You ensure the site is technically optimized for both search engines and AI models. You think in terms of structured data as AI food, E-E-A-T as trust layer, and citability as AI citation fuel. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Audit tech/schema/E-E-A-T/GEO for ${ctx.url} (${ctx.siteName}). Market: ${ctx.targetMarket}. Content: ${ctx.siteContent.slice(0, 1000)}. HTML: ${ctx.htmlStructure.slice(0, 400)}. AI Info: ${ctx.aiInfo.slice(0, 200) || 'None'}.
 
@@ -270,6 +377,18 @@ const backlinkProspector: AgentDefinition = {
   icon: '🤝',
   color: '#06b6d4',
   batch: 2,
+  responseSchema: {
+    agent_name: 'backlink_prospector',
+    status: 'success|partial|error',
+    critical_findings: ['string'],
+    recommended_actions: [{ action: 'string', priority: 'high|medium|low', expected_impact: 'string', pillar: 'seo|aeo|geo|all', effort: 'high|medium|low' }],
+    data: { deepStrategy: { technicalImplementations: [] }, contentQuality: {}, parasiteRisk: {}, localSEO: {}, sxo: {}, measure: { kpiTracking: {}, weeklyActions: [] }, trafficInsights: {} },
+  },
+  contextRequirements: {
+    scanFields: ['siteContent', 'localInfo', 'competitorInfo'],
+    dependsOnAgents: ['master-director', 'link-strategist', 'on-page-auditor'],
+    needsMergedKnowledge: true,
+  },
   systemPrompt: `You are the Backlink Prospector Agent — part of an ESSHEO-inspired multi-agent SEO engine. You specialize in backlink prospecting, content quality assessment, parasite SEO risk detection, local SEO signals, SXO (Search Experience Optimization), KPI tracking, weekly action plans, and traffic insights. You produce the operational execution layer that makes strategies actually work. You think in terms of link velocity, content humanization, and measurable weekly progress. Respond with ONLY valid JSON. No markdown. No code fences. Be concise — all string values under 15 words. This is critical to avoid truncation.`,
   buildUserPrompt: (ctx) => `Analyze ${ctx.url} (${ctx.siteName}) for backlink prospecting, content quality, and operational strategy. Market: ${ctx.targetMarket}. Content: ${ctx.siteContent.slice(0, 1200)}. Local Info: ${ctx.localInfo.slice(0, 200) || 'None'}. Competitors: ${ctx.competitorInfo.slice(0, 200) || 'None'}.
 
@@ -336,3 +455,9 @@ export const agents: AgentDefinition[] = [
 
 export const batch1Agents = agents.filter((a) => a.batch === 1)
 export const batch2Agents = agents.filter((a) => a.batch === 2)
+
+/** Sub-agents only (excludes Master Director) — used by the hub-and-spoke protocol */
+export const subAgents = agents.filter((a) => a.id !== 'master-director')
+
+/** Master Director agent — the orchestrator in the hub-and-spoke protocol */
+export const masterDirectorAgent = masterDirector

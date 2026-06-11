@@ -15,6 +15,10 @@ export interface TokenUsageRecord {
   model: string
   inputTokens: number
   outputTokens: number
+  // Optional fields for TokenUsageLog (per-analysis granularity)
+  userId?: string
+  projectId?: string
+  analysisId?: string
 }
 
 export class TokenTracker {
@@ -48,7 +52,7 @@ export class TokenTracker {
     return this.records.reduce((sum, r) => sum + this.calculateCost(r), 0)
   }
 
-  // Save all records to the database (upsert TokenUsage for today)
+  // Save all records to the database (upsert TokenUsage for today + create TokenUsageLog per record)
   async saveToDatabase() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -57,7 +61,7 @@ export class TokenTracker {
       const cost = this.calculateCost(record)
 
       try {
-        // Try to find existing record for today+agent+model
+        // --- Existing: Upsert TokenUsage (aggregated daily per agent+model) ---
         const existing = await db.tokenUsage.findFirst({
           where: {
             date: today,
@@ -93,6 +97,20 @@ export class TokenTracker {
             }
           })
         }
+
+        // --- New: Create TokenUsageLog (per-analysis granularity) ---
+        await db.tokenUsageLog.create({
+          data: {
+            userId: record.userId ?? null,
+            projectId: record.projectId ?? null,
+            analysisId: record.analysisId ?? null,
+            agentName: record.agentName,
+            modelUsed: record.model,
+            promptTokens: record.inputTokens,
+            completionTokens: record.outputTokens,
+            costUsd: cost,
+          }
+        })
       } catch (error) {
         console.error('[token-tracker] Failed to save usage:', error)
       }

@@ -13,15 +13,21 @@ datasource db {
 // ─── Existing Models ────────────────────────────────────────────────
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  name                  String?
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?
+  subscriptionStatus    String    @default("trial") // trial | active | past_due | canceled
+  tier                  String    @default("trial") // trial | starter | pro | managed
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  analyses      Analysis[]
-  webhooks      WebhookConfig[]
-  alerts        VisibilityAlert[]
+  analyses        Analysis[]
+  projects        Project[]
+  webhooks        WebhookConfig[]
+  alerts          VisibilityAlert[]
+  tokenUsageLogs  TokenUsageLog[]
 }
 
 model Post {
@@ -52,15 +58,19 @@ model Analysis {
   status    String   @default("pending") // pending | running | completed | failed
   mode      String   @default("auto-pilot") // auto-pilot | co-pilot
   userId    String?
+  projectId String?
   result    String?  // JSON string of full analysis result
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User?      @relation(fields: [userId], references: [id])
-  agentLogs AgentLog[]
-  approvals Approval[]
+  user           User?           @relation(fields: [userId], references: [id])
+  project        Project?        @relation(fields: [projectId], references: [id])
+  agentLogs      AgentLog[]
+  approvals      Approval[]
+  tokenUsageLogs TokenUsageLog[]
 
   @@index([userId])
+  @@index([projectId])
   @@index([status])
   @@index([domain])
 }
@@ -181,4 +191,49 @@ model VisibilityAlert {
   @@index([alertType])
   @@index([severity])
   @@index([isRead])
+}
+
+// ─── Enterprise SaaS Models ─────────────────────────────────────────
+
+model Project {
+  id            String    @id @default(cuid())
+  userId        String
+  url           String    // the website being tracked
+  domain        String    // extracted domain
+  targetMarket  String    @default("global")
+  executionMode String    @default("co-pilot") // co-pilot | auto-pilot
+  lastAnalysisAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyses       Analysis[]
+  tokenUsageLogs TokenUsageLog[]
+
+  @@index([userId])
+  @@index([domain])
+}
+
+model TokenUsageLog {
+  id               String   @id @default(cuid())
+  userId           String?  // nullable for anonymous scans
+  projectId        String?  // nullable
+  analysisId       String?  // nullable
+  agentName        String   // e.g. "master_director", "competitor_analyst"
+  modelUsed        String   // e.g. "gpt-4o", "claude-3-5-sonnet", "deepseek-v3"
+  promptTokens     Int
+  completionTokens Int
+  costUsd          Float    // calculated cost: (prompt * model_price) + (completion * model_price)
+  createdAt        DateTime @default(now())
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project  Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  analysis Analysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([analysisId])
+  @@index([agentName])
+  @@index([modelUsed])
+  @@index([createdAt])
 }
