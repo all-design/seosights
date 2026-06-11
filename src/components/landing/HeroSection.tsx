@@ -150,7 +150,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
-          Not a ChatGPT wrapper. A proprietary multi-agent engine that ranks you on Google, wins featured snippets, and gets cited by AI. 2,000-word stealth strategies that actually stick.
+          Own your AI presence. A proprietary multi-agent engine that ranks you on Google, wins featured snippets, and gets cited by AI. 2,000-word stealth strategies that actually stick.
         </motion.p>
 
         {/* ── Three Sights Visual ── */}
@@ -182,29 +182,39 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           ))}
         </motion.div>
 
-        {/* AI Platform Badges — "Cited by" */}
+        {/* AI Platform Badges — "Tracked across 17+ AI Engines" */}
         <motion.div
-          className="flex flex-wrap items-center justify-center gap-3 mb-8"
+          className="mb-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <span className="text-sm text-muted-foreground/70 mr-1">Cited by</span>
-          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
-            <Bot className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm font-medium text-foreground/80">ChatGPT</span>
-          </div>
-          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
-            <Brain className="w-4 h-4 text-amber-400" />
-            <span className="text-sm font-medium text-foreground/80">Claude</span>
-          </div>
-          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
-            <Search className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-medium text-foreground/80">Perplexity</span>
-          </div>
-          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
-            <Eye className="w-4 h-4 text-rose-400" />
-            <span className="text-sm font-medium text-foreground/80">AI Overviews</span>
+          <span className="text-sm text-muted-foreground/70 block mb-3">Tracked across 17+ AI Engines</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {[
+              { name: 'ChatGPT', icon: Bot, color: 'text-emerald-400' },
+              { name: 'Claude', icon: Brain, color: 'text-amber-400' },
+              { name: 'Perplexity', icon: Search, color: 'text-cyan-400' },
+              { name: 'AI Overviews', icon: Eye, color: 'text-rose-400' },
+              { name: 'Gemini', icon: Sparkles, color: 'text-blue-400' },
+              { name: 'DeepSeek', icon: Zap, color: 'text-purple-400' },
+              { name: 'Grok', icon: Bot, color: 'text-orange-400' },
+              { name: 'Copilot', icon: Search, color: 'text-teal-400' },
+            ].map((engine, idx) => (
+              <motion.div
+                key={engine.name}
+                className="flex items-center gap-1.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-3 py-1"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.5 + idx * 0.04 }}
+              >
+                <engine.icon className={`w-3.5 h-3.5 ${engine.color}`} />
+                <span className="text-xs font-medium text-foreground/80">{engine.name}</span>
+              </motion.div>
+            ))}
+            <div className="flex items-center gap-1 bg-white/5 backdrop-blur-sm border border-emerald-500/30 rounded-full px-3 py-1">
+              <span className="text-xs font-bold text-emerald-400">+9 more</span>
+            </div>
           </div>
         </motion.div>
 

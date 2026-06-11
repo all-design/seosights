@@ -21,6 +21,10 @@ import {
   Zap,
   Users,
   Sparkles,
+  Heart,
+  Target,
+  LucideIcon,
+  Crosshair,
 } from 'lucide-react'
 
 const featureCategories = [
@@ -35,8 +39,6 @@ const featureCategories = [
     iconColor: 'text-emerald-400',
     iconBg: 'bg-emerald-500/20',
     sightColor: 'text-emerald-400',
-    sightBorder: 'border-emerald-500/40',
-    sightBg: 'bg-emerald-500/10',
     features: [
       { title: 'Technical SEO Audit', description: 'Meta tags, headings, site structure, Core Web Vitals analysis' },
       { title: 'Crawlability Analysis', description: 'robots.txt, XML sitemaps, crawl budget optimization' },
@@ -56,8 +58,6 @@ const featureCategories = [
     iconColor: 'text-cyan-400',
     iconBg: 'bg-cyan-500/20',
     sightColor: 'text-cyan-400',
-    sightBorder: 'border-cyan-500/40',
-    sightBg: 'bg-cyan-500/10',
     features: [
       { title: 'FAQ & Schema Detection', description: 'Identify missing FAQ schema and structured data opportunities' },
       { title: 'Answer Block Optimization', description: 'Create 40-60 word answers targeting featured snippets' },
@@ -77,8 +77,6 @@ const featureCategories = [
     iconColor: 'text-amber-400',
     iconBg: 'bg-amber-500/20',
     sightColor: 'text-amber-400',
-    sightBorder: 'border-amber-500/40',
-    sightBg: 'bg-amber-500/10',
     features: [
       { title: 'AI Crawler Access', description: 'GPTBot, ClaudeBot, PerplexityBot crawl verification & optimization' },
       { title: 'AI Citation Tracking', description: 'Monitor how often ChatGPT, Claude, Perplexity cite your content' },
@@ -91,6 +89,34 @@ const featureCategories = [
 
 const additionalFeatures = [
   {
+    icon: Heart,
+    title: 'Sentiment Analysis',
+    description: 'Track positive, neutral, and negative brand mentions across AI engines. Know how AI models talk about you.',
+    color: 'text-pink-400',
+    bg: 'bg-pink-500/20',
+  },
+  {
+    icon: BarChart3,
+    title: 'AI Rank Tracker',
+    description: 'Monitor your AI visibility score and ranking position across 17+ engines with actionable recommendations.',
+    color: 'text-green-400',
+    bg: 'bg-green-500/20',
+  },
+  {
+    icon: Crosshair,
+    title: 'Prompt Research',
+    description: 'Estimate prompt search volume, decode intent density, and optimize content for question patterns AI engines use.',
+    color: 'text-violet-400',
+    bg: 'bg-violet-500/20',
+  },
+  {
+    icon: Link2,
+    title: 'Citation Source Analysis',
+    description: 'Track which domains influence AI output. Identify and analyze the sources AI engines cite most.',
+    color: 'text-cyan-400',
+    bg: 'bg-cyan-500/20',
+  },
+  {
     icon: Shield,
     title: 'E-E-A-T Scoring',
     description: 'Experience, Expertise, Authoritativeness, Trustworthiness framework with Who/How/Why test.',
@@ -98,18 +124,11 @@ const additionalFeatures = [
     bg: 'bg-amber-500/20',
   },
   {
-    icon: BarChart3,
-    title: 'Content Quality & Humanization',
-    description: 'AI pattern detection, filler analysis, and humanization guidance aligned with Google QRG.',
-    color: 'text-green-400',
-    bg: 'bg-green-500/20',
-  },
-  {
-    icon: Link2,
-    title: 'Parasite SEO Risk Analysis',
-    description: 'Detect if your site is at risk of being outranked by parasite SEO on your own pages.',
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/20',
+    icon: Target,
+    title: 'Competitor Benchmarking',
+    description: 'Side-by-side comparison with competitors: visibility, citations, sentiment, and ranking gaps across engines.',
+    color: 'text-orange-400',
+    bg: 'bg-orange-500/20',
   },
   {
     icon: MapPin,
@@ -129,8 +148,8 @@ const additionalFeatures = [
     icon: TrendingUp,
     title: 'Algorithm Update Tracker',
     description: 'Real-time Google algorithm update monitoring with impact analysis on your rankings.',
-    color: 'text-orange-400',
-    bg: 'bg-orange-500/20',
+    color: 'text-red-400',
+    bg: 'bg-red-500/20',
   },
 ]
 
@@ -227,7 +246,7 @@ export default function FeaturesSection() {
             </div>
             <div>
               <h3 className="text-2xl font-bold">Plus More</h3>
-              <p className="text-sm text-muted-foreground">Advanced capabilities built into every Sight</p>
+              <p className="text-sm text-muted-foreground">Advanced capabilities across every Sight</p>
             </div>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -21,10 +21,10 @@ const stats: StatItem[] = [
     source: 'Ahrefs',
   },
   {
-    value: '200K+',
-    numericValue: 200,
-    suffix: 'K+',
-    label: 'AI-optimized articles generated',
+    value: '94+',
+    numericValue: 94,
+    suffix: '+',
+    label: 'Technical checkpoints auto-audited',
     source: '',
   },
   {
@@ -35,10 +35,10 @@ const stats: StatItem[] = [
     source: '',
   },
   {
-    value: '91%',
-    numericValue: 91,
-    suffix: '%',
-    label: 'Perplexity citations come from top results',
+    value: '17+',
+    numericValue: 17,
+    suffix: '+',
+    label: 'AI engines tracked across all Sights',
     source: '',
   },
   {
