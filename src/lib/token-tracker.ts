@@ -28,13 +28,31 @@ export interface TokenUsageRecord {
 export class TokenTracker {
   private sessionId: string
   private records: TokenUsageRecord[] = []
+  private defaultUserId?: string
+  private defaultProjectId?: string
+  private defaultAnalysisId?: string
 
-  constructor(sessionId: string) {
+  constructor(sessionId: string, defaults?: { userId?: string; projectId?: string; analysisId?: string }) {
     this.sessionId = sessionId
+    if (defaults) {
+      this.defaultUserId = defaults.userId
+      this.defaultProjectId = defaults.projectId
+      this.defaultAnalysisId = defaults.analysisId
+    }
   }
 
   // Track a single LLM call
   track(record: TokenUsageRecord) {
+    // Apply defaults from constructor if not provided in the record
+    if (!record.userId && this.defaultUserId) {
+      record.userId = this.defaultUserId
+    }
+    if (!record.projectId && this.defaultProjectId) {
+      record.projectId = this.defaultProjectId
+    }
+    if (!record.analysisId && this.defaultAnalysisId) {
+      record.analysisId = this.defaultAnalysisId
+    }
     this.records.push(record)
   }
 

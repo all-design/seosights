@@ -15,6 +15,7 @@ import {
   type AgentResponse,
   type AnalysisInitPayload,
 } from '@/lib/agent-protocol'
+import { checkAllLimits, checkAgentAccess, getEnabledAgents, getPlanLimits } from '@/lib/plan-limits'
 import { randomUUID } from 'crypto'
 
 export const maxDuration = 180
@@ -441,6 +442,52 @@ export async function POST(request: NextRequest) {
     const parsedUrl = new URL(url)
     const domain = parsedUrl.hostname.replace('www.', '')
 
+    // ── Rate Limiting: Check plan limits before consuming any LLM tokens ──
+    const userId = body.userId as string | undefined
+
+    if (userId) {
+      console.log(`[analyze] Checking rate limits for user: ${userId}`)
+      const limitCheck = await checkAllLimits(userId)
+
+      if (!limitCheck.allowed) {
+        console.warn(`[analyze] Rate limit blocked for user ${userId}: ${limitCheck.reason}`)
+
+        // Emit a WebSocket event about the limit hit
+        emitWS('system', 'rate_limit:blocked', {
+          userId,
+          reason: limitCheck.reason,
+          checks: {
+            auditLimit: limitCheck.checks.auditLimit,
+            costCap: {
+              withinCap: limitCheck.checks.costCap.withinCap,
+              currentSpend: limitCheck.checks.costCap.currentMonthlySpend,
+              cap: limitCheck.checks.costCap.monthlyCap,
+              usagePercent: limitCheck.checks.costCap.usagePercent,
+            },
+          },
+        })
+
+        return NextResponse.json({
+          error: limitCheck.reason,
+          code: 'RATE_LIMIT_EXCEEDED',
+          details: {
+            auditLimit: {
+              used: limitCheck.checks.auditLimit.currentUsage,
+              limit: limitCheck.checks.auditLimit.limit,
+            },
+            costCap: {
+              used: limitCheck.checks.costCap.currentMonthlySpend,
+              cap: limitCheck.checks.costCap.monthlyCap,
+              percentUsed: Math.round(limitCheck.checks.costCap.usagePercent),
+            },
+            tier: limitCheck.checks.costCap.tier,
+          },
+        }, { status: 403 })
+      }
+
+      console.log(`[analyze] Rate limits OK for user ${userId} — tier: ${limitCheck.checks.costCap.tier}, audits: ${limitCheck.checks.auditLimit.currentUsage}/${limitCheck.checks.auditLimit.limit}, spend: $${limitCheck.checks.costCap.currentMonthlySpend.toFixed(2)}/$${limitCheck.checks.costCap.monthlyCap}`)
+    }
+
     // Generate a unique session ID for this analysis run
     const analysisSessionId = randomUUID()
 
@@ -454,6 +501,7 @@ export async function POST(request: NextRequest) {
           market: targetMarket,
           status: 'running',
           mode: executionMode,
+          userId: userId || null,
         }
       })
       analysisId = analysisRecord.id
@@ -468,7 +516,10 @@ export async function POST(request: NextRequest) {
         const zai = await ZAI.create()
 
         // Create the token tracker for this analysis session
-        const tokenTracker = new TokenTracker(analysisSessionId)
+        const tokenTracker = new TokenTracker(analysisSessionId, {
+          userId: userId,
+          analysisId: analysisId,
+        })
 
         // Emit analysis:start via WebSocket
         emitWS(analysisSessionId, 'analysis:start', { sessionId: analysisSessionId, url, market: targetMarket })
@@ -891,6 +942,17 @@ export async function POST(request: NextRequest) {
         }
 
         // ── Batch 1: Keyword Researcher, Competitor Analyst, Content Architect ──
+        // Kill-Switch: Check monthly cost cap before launching agents
+        if (userId) {
+          const { checkMonthlyCostCap } = await import('@/lib/plan-limits')
+          const costCheck = await checkMonthlyCostCap(userId)
+          if (!costCheck.withinCap) {
+            console.warn(`[analyze] Kill-switch triggered for user ${userId}: $${costCheck.currentMonthlySpend.toFixed(2)} / $${costCheck.monthlyCap}`)
+            yield sendError(`You've reached your processing limit ($${costCheck.monthlyCap.toFixed(2)}) for this month. Upgrade to Pro for unlimited execution.`)
+            return
+          }
+        }
+
         const batch1SubAgents = batch1Agents.filter((a) => a.id !== 'master-director')
 
         yield sendProgress(43, 'Launching Agent Batch 1: Research & Content...')
@@ -932,6 +994,18 @@ export async function POST(request: NextRequest) {
         await new Promise(resolve => setTimeout(resolve, 2000))
 
         // ── Batch 2: On-Page Auditor, Link Strategist, Tech & Schema Auditor, Backlink Prospector ──
+        // Kill-Switch: Re-check monthly cost cap before launching batch 2
+        if (userId) {
+          const { checkMonthlyCostCap } = await import('@/lib/plan-limits')
+          const costCheck = await checkMonthlyCostCap(userId)
+          if (!costCheck.withinCap) {
+            console.warn(`[analyze] Kill-switch triggered before batch 2 for user ${userId}: $${costCheck.currentMonthlySpend.toFixed(2)} / $${costCheck.monthlyCap}`)
+            yield sendError(`You've reached your processing limit ($${costCheck.monthlyCap.toFixed(2)}) for this month. Upgrade to Pro for unlimited execution.`)
+            return
+          }
+          console.log(`[analyze] Cost cap OK before batch 2: $${costCheck.currentMonthlySpend.toFixed(2)} / $${costCheck.monthlyCap} (${Math.round(costCheck.usagePercent)}% used)`)
+        }
+
         yield sendProgress(60, 'Launching Agent Batch 2: Audit & Strategy...')
         await flush()
 

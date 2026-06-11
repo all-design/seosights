@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { stripe, getTierFromAmount, mapSubscriptionStatus } from '@/lib/stripe'
+import { stripe, PLAN_PRICES, mapSubscriptionStatus } from '@/lib/stripe'
 import { db } from '@/lib/db'
 
 export async function POST(req: Request) {
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
         const userId = session.metadata?.userId
 
         if (userId) {
-          const tier = getTierFromAmount(session.amount_total || 0)
+          const tier = getTierFromPriceId(session.amount_total || 0)
           await db.user.update({
             where: { id: userId },
             data: {
@@ -47,16 +47,19 @@ export async function POST(req: Request) {
               tier: tier,
             },
           })
+          console.log(`[stripe:checkout] User ${userId} → tier: ${tier}`)
         }
         break
       }
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object
+
         // Find user by stripeCustomerId
         const user = await db.user.findFirst({
           where: { stripeCustomerId: subscription.customer as string },
         })
+
         if (user) {
           const updatedData: {
             subscriptionStatus: string
@@ -65,15 +68,43 @@ export async function POST(req: Request) {
             subscriptionStatus: mapSubscriptionStatus(subscription.status),
           }
 
-          // Update tier based on plan metadata if available
-          if (subscription.metadata?.plan) {
-            updatedData.tier = subscription.metadata.plan
+          // ── Enhanced tier detection ──────────────────────────────────────
+          // Priority 1: Check price ID from subscription items (most reliable)
+          if (subscription.items?.data && subscription.items.data.length > 0) {
+            const priceId = subscription.items.data[0].price?.id
+
+            if (priceId) {
+              const detectedTier = detectTierFromPriceId(priceId)
+              if (detectedTier) {
+                updatedData.tier = detectedTier
+                console.log(`[stripe:sub.updated] User ${user.id} → tier: ${detectedTier} (from priceId: ${priceId})`)
+              }
+            }
+          }
+
+          // Priority 2: Check plan metadata from Stripe
+          if (!updatedData.tier && subscription.metadata?.plan) {
+            const planFromMeta = subscription.metadata.plan.toLowerCase()
+            if (['starter', 'pro', 'managed'].includes(planFromMeta)) {
+              updatedData.tier = planFromMeta
+              console.log(`[stripe:sub.updated] User ${user.id} → tier: ${planFromMeta} (from metadata)`)
+            }
+          }
+
+          // Priority 3: Fallback to amount-based detection
+          if (!updatedData.tier && subscription.items?.data?.[0]?.price?.unit_amount) {
+            const amount = subscription.items.data[0].price.unit_amount
+            updatedData.tier = getTierFromPriceId(amount)
+            console.log(`[stripe:sub.updated] User ${user.id} → tier: ${updatedData.tier} (from amount: ${amount})`)
           }
 
           await db.user.update({
             where: { id: user.id },
             data: updatedData,
           })
+
+          // Log the tier change for audit trail
+          console.log(`[stripe:sub.updated] User ${user.id} updated: status=${updatedData.subscriptionStatus}, tier=${updatedData.tier || user.tier}`)
         }
         break
       }
@@ -88,9 +119,10 @@ export async function POST(req: Request) {
             where: { id: user.id },
             data: {
               subscriptionStatus: 'canceled',
-              tier: 'trial',
+              tier: 'free_trial',
             },
           })
+          console.log(`[stripe:sub.deleted] User ${user.id} → tier: free_trial, status: canceled`)
         }
         break
       }
@@ -105,6 +137,7 @@ export async function POST(req: Request) {
             where: { id: user.id },
             data: { subscriptionStatus: 'past_due' },
           })
+          console.log(`[stripe:payment_failed] User ${user.id} → status: past_due`)
         }
         break
       }
@@ -118,4 +151,39 @@ export async function POST(req: Request) {
   }
 
   return Response.json({ received: true })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tier Detection Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Detect tier from Stripe Price ID.
+ * Compares against configured price IDs in PLAN_PRICES.
+ */
+function detectTierFromPriceId(priceId: string): string | null {
+  // Check against configured price IDs (from environment variables)
+  if (priceId === PLAN_PRICES.starter) return 'starter'
+  if (priceId === PLAN_PRICES.pro) return 'pro'
+  if (priceId === PLAN_PRICES.managed) return 'managed'
+
+  // Fallback: pattern matching for common Stripe price ID formats
+  // This handles cases where env vars aren't set but price IDs follow conventions
+  const priceIdLower = priceId.toLowerCase()
+  if (priceIdLower.includes('starter') || priceIdLower.includes('basic')) return 'starter'
+  if (priceIdLower.includes('pro') || priceIdLower.includes('professional')) return 'pro'
+  if (priceIdLower.includes('managed') || priceIdLower.includes('enterprise') || priceIdLower.includes('agency')) return 'managed'
+
+  return null
+}
+
+/**
+ * Fallback: detect tier from payment amount (in cents).
+ * Used when price ID detection fails.
+ */
+function getTierFromPriceId(amount: number): string {
+  if (amount >= 29900) return 'managed'   // $299.00+
+  if (amount >= 7900) return 'pro'        // $79.00+
+  if (amount >= 500) return 'starter'     // $5.00+
+  return 'free_trial'
 }

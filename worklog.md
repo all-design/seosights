@@ -616,3 +616,79 @@ Stage Summary:
 - Structured Outputs enforced: JSON Mode for OpenAI (response_format), prompt-based for others
 - FinalAssembledReport includes overall_scores, 90_day_roadmap, all_recommended_actions, meta
 - Backward compatible: _finalReport attached alongside legacy analysis format
+
+---
+Task ID: session-6
+Agent: Main Orchestrator
+Task: Implement Rate Limiting & Stripe Plan Limits + Token Kill-Switch
+
+Work Log:
+- Created /src/lib/plan-limits.ts — Complete rate limiting system:
+  - PLAN_LIMITS configuration map with 4 tiers (free_trial, starter, pro, managed)
+  - Each tier defines: max_domains, max_tracked_queries, max_audits_per_month, allow_white_label, agents_enabled, monthly_cost_cap, priority_support, api_access
+  - free_trial: 1 domain, 5 queries, 3 audits/mo, 3 agents only, $2 cost cap
+  - starter ($5): 1 domain, 50 queries, 10 audits/mo, all agents, $3 cost cap (60% of revenue protected)
+  - pro ($79): 20 domains, 500 queries, 100 audits/mo, all agents, $40 cost cap, white-label, API access
+  - managed ($299): unlimited domains/queries/audits, all agents, $150 cost cap, priority support
+  - checkDomainLimit(): counts user's projects vs max_domains
+  - checkAuditLimit(): counts analyses in current month vs max_audits_per_month
+  - checkAgentAccess(): verifies agent is enabled for user's tier
+  - checkMonthlyCostCap() (Kill-Switch): sums cost_usd from token_usage_logs for current month, compares against monthly_cost_cap
+  - checkAllLimits(): combined check for subscription, audit limit, and cost cap
+  - getUserUsageStats(): comprehensive stats for frontend display
+  - getEnabledAgents(): maps tier to list of allowed agent IDs
+- Created /src/app/api/limits/route.ts — API endpoint:
+  - GET: Returns user's current usage stats and plan limits
+  - POST: Check specific action (add_domain, run_audit, run_agent) with userId
+- Updated /src/app/api/webhooks/stripe/route.ts — Enhanced tier detection:
+  - Priority 1: Price ID matching against PLAN_PRICES from environment variables
+  - Priority 2: Plan metadata from Stripe subscription object
+  - Priority 3: Pattern matching on price ID string (starter/pro/managed keywords)
+  - Priority 4: Amount-based fallback detection
+  - Subscription deletion now sets tier to 'free_trial' instead of 'trial'
+  - Added console logging for all tier changes (audit trail)
+- Updated /src/lib/stripe.ts — Added managed tier support:
+  - Added PLAN_AMOUNTS constant with monthly amounts in cents
+  - Added getTierFromPriceId() for price ID to tier mapping
+  - Added pattern matching fallback for price ID detection
+- Updated /src/app/api/analyze/route.ts — Integrated rate limiting:
+  - Added import for checkAllLimits, checkAgentAccess, getEnabledAgents, getPlanLimits
+  - Added userId extraction from request body
+  - Rate limit check before creating Analysis record: checkAllLimits() verifies subscription, audit count, and cost cap
+  - Returns 403 with RATE_LIMIT_EXCEEDED code and detailed usage info if limit exceeded
+  - Emits WebSocket event on rate limit block (rate_limit:blocked)
+  - Kill-Switch: checkMonthlyCostCap() before Batch 1 and before Batch 2
+  - If cost cap exceeded during analysis: sends error SSE and stops agent execution
+  - Passes userId to Analysis record (userId field now populated)
+  - Passes userId and analysisId to TokenTracker for proper attribution
+- Updated /src/lib/token-tracker.ts — Added default user/project/analysis context:
+  - TokenTracker constructor now accepts optional defaults: { userId?, projectId?, analysisId? }
+  - track() method applies defaults to records that don't specify these fields
+  - Ensures all token usage logs are properly attributed to users for cost cap calculation
+- Created /src/components/dashboard/UsageIndicator.tsx — Frontend usage display:
+  - Shows tier badge with color coding (Free Trial/Starter/Pro Agency/Managed)
+  - Usage bars for: Domains, Audits this month, Processing budget ($spend/$cap)
+  - AI Agents count (e.g., "3/8" for free trial, "All 8" for pro)
+  - Warning banner when approaching or exceeding limits (amber for near-limit, rose for exceeded)
+  - Upgrade button for free_trial/starter tiers
+  - Auto-refreshes usage stats every 60 seconds
+  - Anonymous user fallback: shows "Free Scanner" card with trial CTA
+- Verified all previous pending tasks are already completed:
+  - "LOVE AT FIRST SIGHT" in navbar ✅
+  - Composite indexes on TokenUsageLog ✅
+  - MODEL_COSTS pricing map with exact rates ✅
+  - 4-step agent protocol ✅
+- Lint passes with zero errors
+- Dev server compiles and serves pages successfully
+- Browser QA: Navbar shows "LOVE AT FIRST SIGHT", pricing section shows all 3 plans, no errors
+
+Stage Summary:
+- Complete rate limiting system connected to Stripe tiers
+- PLAN_LIMITS config with 4 tiers controlling domains, audits, agents, and monthly cost caps
+- Kill-Switch: monthly cost cap prevents $5 Starter users from burning $200+ in API costs
+- Cost cap checked before each batch of agents (Batch 1 and Batch 2)
+- Enhanced Stripe webhook with multi-tier detection (Price ID → metadata → pattern → amount)
+- /api/limits endpoint for frontend usage display
+- UsageIndicator component with progress bars, warning banners, and upgrade CTAs
+- TokenTracker now attributes all costs to userId for accurate cost cap calculation
+- All analysis requests with userId are rate-limited before consuming any LLM tokens

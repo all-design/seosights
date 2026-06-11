@@ -11,12 +11,37 @@ export const PLAN_PRICES = {
   managed: process.env.STRIPE_MANAGED_PRICE_ID || 'price_managed_placeholder',
 }
 
+// Monthly amounts for each plan (in cents, for fallback tier detection)
+export const PLAN_AMOUNTS = {
+  starter: 500,     // $5.00
+  pro: 7900,        // $79.00
+  managed: 29900,   // $299.00
+} as const
+
 // Map Stripe amount to tier
 export function getTierFromAmount(amount: number): string {
-  if (amount >= 29900) return 'managed'   // $299.00
-  if (amount >= 7900) return 'pro'        // $79.00
-  if (amount >= 500) return 'starter'     // $5.00
+  if (amount >= PLAN_AMOUNTS.managed) return 'managed'
+  if (amount >= PLAN_AMOUNTS.pro) return 'pro'
+  if (amount >= PLAN_AMOUNTS.starter) return 'starter'
   return 'trial'
+}
+
+/**
+ * Detect tier from Stripe Price ID.
+ * Compares against configured price IDs from environment variables.
+ */
+export function getTierFromPriceId(priceId: string): string | null {
+  if (priceId === PLAN_PRICES.starter) return 'starter'
+  if (priceId === PLAN_PRICES.pro) return 'pro'
+  if (priceId === PLAN_PRICES.managed) return 'managed'
+
+  // Fallback: pattern matching for common Stripe price ID formats
+  const lower = priceId.toLowerCase()
+  if (lower.includes('starter') || lower.includes('basic')) return 'starter'
+  if (lower.includes('pro') || lower.includes('professional')) return 'pro'
+  if (lower.includes('managed') || lower.includes('enterprise') || lower.includes('agency')) return 'managed'
+
+  return null
 }
 
 // Map Stripe subscription status to our internal status
