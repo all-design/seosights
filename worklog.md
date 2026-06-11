@@ -150,3 +150,63 @@ Stage Summary:
 - Logo transparency achieved (white background removed)
 - PDF report rebranded to "seosight"
 - All features verified via browser QA
+
+---
+Task ID: 9
+Agent: Main Agent
+Task: Implement rankscale.ai-inspired features: Free Audit Scanner (Trojan Horse), llms.txt Generator, AI Visibility Alerts, GSC Integration
+
+Work Log:
+- Scraped rankscale.ai for feature inspiration (JS-rendered, extracted schema.org data identifying key features: AI visibility tracking, citation monitoring, sentiment analysis, competitor comparison)
+- Created /src/app/api/quick-audit/route.ts — Fast lightweight scan API:
+  - Fetches page content via page_reader SDK
+  - Checks robots.txt for AI bot access (12 bots: GPTBot, ClaudeBot, PerplexityBot, etc.)
+  - Verifies llms.txt presence
+  - Analyzes blocked bots from robots.txt User-agent/Disallow directives
+  - Uses single LLM call for quick SEO/AEO/GEO scoring
+  - Returns: scores, blockedBots, allowedBots, quickFindings, aeoReadiness, geoReadiness, llmsTxtPresent, topRecommendation
+- Created /src/app/api/generate-llms-txt/route.ts — llms.txt generator API:
+  - Generates llms.txt (concise markdown following the standard format: # heading, > description, ## Info, ## URLs)
+  - Generates llms-full.txt (detailed version with ## Details, ## Products & Services, ## Use Cases, ## Technical Details, ## URLs)
+  - Uses LLM to create site-specific content based on site data and analysis context
+  - Returns both files as strings ready for download
+- Rewrote HeroSection.tsx with Free Audit Scanner (Trojan Horse strategy):
+  - Added inline URL input + "Free Scan" button at top of hero
+  - Added QuickAuditResult state and ScoreRing component
+  - After scan: shows SEO/AEO/GEO score rings, blocked/allowed bots, llms.txt status, quick findings, top recommendation
+  - CTA: "Start 1-Month Free Trial — Full Report" appears after scan results
+  - Preserved all existing hero elements (Three Sights, AI Platform Badges, Agent Pills, etc.)
+- Updated FeaturesSection.tsx with new features:
+  - Added AI Visibility Alerts (tagged NEW) — email/Slack/webhook notifications for citation drops
+  - Added Google Search Console (tagged NEW) — connect GSC for real data comparison
+  - Added llms.txt Generator (tagged NEW) — one-click download
+  - Added Free AI Visibility Scan (tagged FREE) — no-signup scanner
+  - Added AI Crawler Radar — real-time bot monitoring
+  - Added Citation Velocity — week-over-week citation growth tracking
+  - Updated GEO section: "AI Crawler Access Audit" and "llms.txt Generator" features
+  - Total: 15 additional features across all three Sights
+- Added llms.txt Generator section to AnalysisDashboard.tsx:
+  - New section in AI Crawler area with amber gradient background
+  - "Generate llms.txt & llms-full.txt" button calls /api/generate-llms-txt
+  - After generation: success indicator + download buttons for both files
+  - Added state: generatingLlmsTxt, llmsTxtContent, llmsFullTxtContent
+- Added AI Visibility Alerts section to dashboard:
+  - Citation Drop Alert — notified when Perplexity/AI Overview stops citing
+  - Rank Change Alert — track AI visibility score changes
+  - Competitor Alert — know when competitor gains your citations
+  - Alert channels: Slack, Email, Webhook (badge UI)
+- Added GSC Integration section to dashboard:
+  - Impressions vs AI Citations comparison
+  - Click-Through vs AI Position correlation
+  - "Connect GSC" button with blue styling
+- Fixed mobile horizontal overflow by adding overflow-x-hidden to page wrapper
+- Lint passes with zero errors
+- Browser QA: all sections render correctly, Free Scan works end-to-end
+
+Stage Summary:
+- Free Audit Scanner (Trojan Horse) fully functional — users can scan any URL without signup
+- llms.txt Generator API + dashboard download UI complete
+- AI Visibility Alerts and GSC Integration sections added to dashboard
+- Features section updated with 6 new features (3 tagged NEW, 1 tagged FREE)
+- Mobile overflow fix applied
+- All features browser-verified via Agent Browser QA

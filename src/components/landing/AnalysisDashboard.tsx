@@ -619,6 +619,9 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
   const [executionPhase, setExecutionPhase] = useState(0)
   const [executionProgress, setExecutionProgress] = useState(0)
   const [isExecuting, setIsExecuting] = useState(false)
+  const [generatingLlmsTxt, setGeneratingLlmsTxt] = useState(false)
+  const [llmsTxtContent, setLlmsTxtContent] = useState<string | null>(null)
+  const [llmsFullTxtContent, setLlmsFullTxtContent] = useState<string | null>(null)
 
   // Auto-execute animation effect
   useEffect(() => {
@@ -2155,6 +2158,96 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                     ))}
                   </div>
                 )}
+
+                {/* ── llms.txt Generator ── */}
+                <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-cyan-500/10 rounded-xl p-5 border border-amber-500/20">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                      <Download className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">llms.txt Generator</h3>
+                      <p className="text-xs text-muted-foreground">One-click generate AI-readable files for instant LLM discoverability</p>
+                    </div>
+                  </div>
+                  
+                  {!llmsTxtContent ? (
+                    <button
+                      onClick={async () => {
+                        setGeneratingLlmsTxt(true)
+                        try {
+                          const response = await fetch('/api/generate-llms-txt', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              url: data.url,
+                              siteName: data.siteName,
+                              analysisData: data,
+                            }),
+                          })
+                          if (!response.ok) throw new Error('Generation failed')
+                          const result = await response.json()
+                          setLlmsTxtContent(result.llmsTxt)
+                          setLlmsFullTxtContent(result.llmsFullTxt)
+                        } catch (err) {
+                          console.error('llms.txt generation failed:', err)
+                        } finally {
+                          setGeneratingLlmsTxt(false)
+                        }
+                      }}
+                      disabled={generatingLlmsTxt}
+                      className="w-full flex items-center justify-center gap-2 text-sm bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-3 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)]"
+                    >
+                      {generatingLlmsTxt ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+                      ) : (
+                        <><Sparkles className="w-4 h-4" /> Generate llms.txt & llms-full.txt</>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="text-sm text-emerald-300">Files generated successfully!</span>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([llmsTxtContent], { type: 'text/plain' })
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = 'llms.txt'
+                            document.body.appendChild(a)
+                            a.click()
+                            document.body.removeChild(a)
+                            URL.revokeObjectURL(url)
+                          }}
+                          className="flex items-center justify-center gap-2 text-sm bg-white/10 hover:bg-white/15 border border-white/10 text-foreground font-semibold px-4 py-2.5 rounded-lg transition-all"
+                        >
+                          <Download className="w-4 h-4" /> Download llms.txt
+                        </button>
+                        <button
+                          onClick={() => {
+                            const blob = new Blob([llmsFullTxtContent || ''], { type: 'text/plain' })
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = 'llms-full.txt'
+                            document.body.appendChild(a)
+                            a.click()
+                            document.body.removeChild(a)
+                            URL.revokeObjectURL(url)
+                          }}
+                          className="flex items-center justify-center gap-2 text-sm bg-white/10 hover:bg-white/15 border border-white/10 text-foreground font-semibold px-4 py-2.5 rounded-lg transition-all"
+                        >
+                          <Download className="w-4 h-4" /> Download llms-full.txt
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground/60 text-center">Deploy these files to your server root directory for instant AI discoverability</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
@@ -2833,6 +2926,107 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                 </div>
               </Collapsible>
             </div>
+          </motion.div>
+
+          {/* ── AI Visibility Alerts ────────────────────────── */}
+          <motion.div variants={item}>
+            <Card className="bg-gradient-to-r from-rose-500/10 via-background to-amber-500/10 border-rose-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center">
+                    <Bell className="w-5 h-5 text-rose-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">AI Visibility Alerts</h2>
+                    <p className="text-sm text-muted-foreground">Get notified when your AI citation signals change</p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-rose-500/30 text-rose-400 bg-rose-500/10">NEW</Badge>
+                </div>
+                <div className="grid sm:grid-cols-3 gap-4 mb-4">
+                  <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      <span className="text-sm font-bold text-rose-300">Citation Drop Alert</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Get alerted when Perplexity or Google AI Overview stops citing your site as a source</p>
+                  </div>
+                  <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-bold text-amber-300">Rank Change Alert</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Track sudden changes in your AI visibility score across ChatGPT, Claude, and Gemini</p>
+                  </div>
+                  <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm font-bold text-emerald-300">Competitor Alert</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Know when a competitor gains AI citations you lost, or appears in AI Overviews you don't</p>
+                  </div>
+                </div>
+                <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-1">Configure Alert Channels</p>
+                    <p className="text-xs text-muted-foreground">Receive alerts via email, Slack, or webhook when your AI visibility changes</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="text-xs border-white/20 text-muted-foreground cursor-pointer hover:border-emerald-500/30 hover:text-emerald-400 transition-colors">
+                      <MessageSquare className="w-3 h-3 mr-1" /> Slack
+                    </Badge>
+                    <Badge variant="outline" className="text-xs border-white/20 text-muted-foreground cursor-pointer hover:border-emerald-500/30 hover:text-emerald-400 transition-colors">
+                      <Globe className="w-3 h-3 mr-1" /> Email
+                    </Badge>
+                    <Badge variant="outline" className="text-xs border-white/20 text-muted-foreground cursor-pointer hover:border-emerald-500/30 hover:text-emerald-400 transition-colors">
+                      <Code2 className="w-3 h-3 mr-1" /> Webhook
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* ── Google Search Console Integration ────────────── */}
+          <motion.div variants={item}>
+            <Card className="bg-gradient-to-r from-blue-500/10 via-background to-emerald-500/10 border-blue-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                    <Database className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Google Search Console</h2>
+                    <p className="text-sm text-muted-foreground">Connect real search data with AI visibility insights</p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400 bg-blue-500/10">NEW</Badge>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart3 className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm font-bold text-blue-300">Impressions vs AI Citations</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Compare your GSC impression data with AI citation counts. See where traditional search and AI visibility diverge.</p>
+                  </div>
+                  <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm font-bold text-emerald-300">Click-Through vs AI Position</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Correlate your click data with AI ranking positions. Identify pages with high CTR but low AI visibility.</p>
+                  </div>
+                </div>
+                <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-1">Connect Google Search Console</p>
+                    <p className="text-xs text-muted-foreground">Link your GSC account to enable real data comparison between traditional and AI search performance</p>
+                  </div>
+                  <button className="flex items-center gap-2 text-sm bg-blue-500 hover:bg-blue-400 text-white font-semibold px-5 py-2.5 rounded-xl transition-all duration-300">
+                    <Database className="w-4 h-4" /> Connect GSC
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* ── Bottom CTA ────────────────────────────────── */}

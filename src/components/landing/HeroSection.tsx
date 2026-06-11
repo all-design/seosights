@@ -1,9 +1,11 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowRight, Bot, Brain, Search, Eye, BarChart3, TrendingUp, Shield, Zap, Sparkles } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ArrowRight, Bot, Brain, Search, Eye, BarChart3, TrendingUp, Shield, Zap, Sparkles, Globe, AlertTriangle, CheckCircle2, XCircle, Download, Lock, Loader2 } from 'lucide-react'
 
 interface HeroSectionProps {
   onStartFree?: () => void
@@ -50,7 +52,96 @@ const threeSights = [
   },
 ]
 
+interface QuickAuditResult {
+  url: string
+  domain: string
+  siteName: string
+  scores: { seo: number; aeo: number; geo: number }
+  blockedBots: { bot: string; blocked: boolean; detail: string }[]
+  allowedBots: { bot: string; blocked: boolean; detail: string }[]
+  quickFindings: {
+    critical: string[]
+    warnings: string[]
+    opportunities: string[]
+  }
+  aeoReadiness: { hasFAQ: boolean; hasSchema: boolean; answerFormatScore: number }
+  geoReadiness: { llmsTxtPresent: boolean; aiCrawlerAccess: string; entityRecognition: number }
+  llmsTxtPresent: boolean
+  topRecommendation: string
+  fullReportAvailable: boolean
+}
+
+function ScoreRing({ score, label, color, size = 80 }: { score: number; label: string; color: string; size?: number }) {
+  const radius = (size - 8) / 2
+  const circumference = 2 * Math.PI * radius
+  const progress = (score / 100) * circumference
+  const strokeColor = score >= 70 ? color : score >= 40 ? '#f59e0b' : '#ef4444'
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={strokeColor} strokeWidth="4" strokeDasharray={`${progress} ${circumference}`} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-lg font-bold text-foreground">{score}</span>
+        </div>
+      </div>
+      <span className={`text-xs font-bold ${color} uppercase tracking-wider`}>{label}</span>
+    </div>
+  )
+}
+
 export default function HeroSection({ onStartFree }: HeroSectionProps) {
+  const [scanUrl, setScanUrl] = useState('')
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanResult, setScanResult] = useState<QuickAuditResult | null>(null)
+  const [scanError, setScanError] = useState('')
+
+  const handleQuickScan = async () => {
+    if (!scanUrl.trim()) {
+      setScanError('Please enter a website URL')
+      return
+    }
+
+    let cleanUrl = scanUrl.trim()
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = 'https://' + cleanUrl
+    }
+
+    try {
+      new URL(cleanUrl)
+    } catch {
+      setScanError('Please enter a valid URL')
+      return
+    }
+
+    setScanError('')
+    setIsScanning(true)
+    setScanResult(null)
+
+    try {
+      const response = await fetch('/api/quick-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: cleanUrl }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Scan failed')
+      }
+
+      const data = await response.json()
+      setScanResult(data)
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : 'Scan failed. Please try again.')
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id)
     if (el) el.scrollIntoView({ behavior: 'smooth' })
@@ -105,60 +196,230 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </Badge>
         </motion.div>
 
+        {/* ── FREE AUDIT SCANNER (Trojan Horse) ── */}
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.15 }}
+        >
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-3">
+              <span className="text-foreground">Get Customers from </span>
+              <span className="text-emerald-400">Google</span>
+              <span className="text-foreground"> & </span>
+              <span className="text-amber-400">AI</span>
+            </h1>
+            <p className="text-base sm:text-lg text-muted-foreground mb-5">
+              Free AI Visibility Scan — see your GEO & AEO scores in seconds
+            </p>
+
+            {/* Scanner Input */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/50" />
+                <Input
+                  value={scanUrl}
+                  onChange={(e) => { setScanUrl(e.target.value); setScanError('') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleQuickScan() }}
+                  placeholder="Enter your website URL..."
+                  className="pl-12 h-14 bg-white/5 border-white/10 focus:border-emerald-500/50 focus:ring-emerald-500/30 text-lg placeholder:text-muted-foreground/40"
+                  disabled={isScanning}
+                />
+              </div>
+              <Button
+                onClick={handleQuickScan}
+                disabled={isScanning}
+                className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg h-14 px-8 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
+              >
+                {isScanning ? (
+                  <>
+                    <Loader2 className="mr-2 w-5 h-5 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    Free Scan
+                    <ArrowRight className="ml-2 w-5 h-5" />
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {scanError && (
+              <motion.p
+                className="text-rose-400 text-sm mb-3"
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {scanError}
+              </motion.p>
+            )}
+
+            {/* ── Scan Results ── */}
+            <AnimatePresence>
+              {scanResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.5 }}
+                  className="bg-card/90 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-[0_0_40px_rgba(16,185,129,0.1)] text-left"
+                >
+                  {/* Site name + domain */}
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">{scanResult.siteName}</h3>
+                      <p className="text-sm text-muted-foreground">{scanResult.domain}</p>
+                    </div>
+                    <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 bg-emerald-500/10">
+                      Free Scan
+                    </Badge>
+                  </div>
+
+                  {/* Score Rings */}
+                  <div className="flex items-center justify-center gap-6 sm:gap-10 mb-6">
+                    <ScoreRing score={scanResult.scores.seo} label="SEO" color="text-emerald-400" />
+                    <ScoreRing score={scanResult.scores.aeo} label="AEO" color="text-cyan-400" />
+                    <ScoreRing score={scanResult.scores.geo} label="GEO" color="text-amber-400" />
+                  </div>
+
+                  {/* Blocked Bots */}
+                  {scanResult.blockedBots.length > 0 && (
+                    <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                        <span className="text-sm font-bold text-rose-400">AI Crawlers Blocked</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {scanResult.blockedBots.map((b) => (
+                          <span key={b.bot} className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-500/20 border border-rose-500/30 rounded-full text-xs font-medium text-rose-300">
+                            <XCircle className="w-3 h-3" />
+                            {b.bot}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-rose-300/70 mt-2">These AI bots cannot access your site — you're invisible to their users.</p>
+                    </div>
+                  )}
+
+                  {/* Allowed Bots */}
+                  {scanResult.allowedBots.length > 0 && (
+                    <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span className="text-sm font-bold text-emerald-400">AI Crawlers Allowed</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {scanResult.allowedBots.slice(0, 5).map((b) => (
+                          <span key={b.bot} className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 border border-emerald-500/30 rounded-full text-xs font-medium text-emerald-300">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {b.bot}
+                          </span>
+                        ))}
+                        {scanResult.allowedBots.length > 5 && (
+                          <span className="text-xs text-muted-foreground self-center">+{scanResult.allowedBots.length - 5} more</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* llms.txt status */}
+                  <div className="mb-4 flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl">
+                    {scanResult.llmsTxtPresent ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    )}
+                    <div>
+                      <span className="text-sm font-medium text-foreground">llms.txt</span>
+                      <span className={`text-sm ml-2 ${scanResult.llmsTxtPresent ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {scanResult.llmsTxtPresent ? 'Found' : 'Missing'}
+                      </span>
+                      {!scanResult.llmsTxtPresent && (
+                        <p className="text-xs text-muted-foreground mt-0.5">AI models can't discover your content efficiently without llms.txt</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Findings */}
+                  <div className="space-y-2 mb-5">
+                    {scanResult.quickFindings.critical.slice(0, 2).map((f, i) => (
+                      <div key={`c-${i}`} className="flex items-start gap-2 text-sm">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                        <span className="text-rose-300">{f}</span>
+                      </div>
+                    ))}
+                    {scanResult.quickFindings.opportunities.slice(0, 2).map((f, i) => (
+                      <div key={`o-${i}`} className="flex items-start gap-2 text-sm">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                        <span className="text-emerald-300">{f}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Top Recommendation */}
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-bold text-amber-400">Top Recommendation</span>
+                    </div>
+                    <p className="text-sm text-amber-200/80">{scanResult.topRecommendation}</p>
+                  </div>
+
+                  {/* CTA: Full Report */}
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <Lock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Want the full 8-agent strategy?</span>
+                    </div>
+                    <Button
+                      onClick={onStartFree}
+                      size="lg"
+                      className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-base px-8 py-5 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300 w-full sm:w-auto"
+                    >
+                      Start 1-Month Free Trial — Full Report
+                      <ArrowRight className="ml-2 w-5 h-5" />
+                    </Button>
+                    <p className="text-xs text-muted-foreground/50 mt-3">8 AI agents · Full SEO/AEO/GEO strategy · llms.txt generator · No credit card</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+
         {/* "Not a Wrapper" Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.15 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
         >
           <Badge
             variant="outline"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm border-amber-500/50 text-amber-400 bg-amber-500/10 backdrop-blur-sm mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm border-amber-500/50 text-amber-400 bg-amber-500/10 backdrop-blur-sm mb-6"
           >
             ⚡ Not a Wrapper. A Purpose-Built SEO Engine.
           </Badge>
         </motion.div>
 
-        {/* ── Headline ── */}
-        <motion.h1
-          className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-        >
-          <span className="text-foreground">Get Customers from </span>
-          <span className="text-emerald-400">Google</span>
-          <span className="text-foreground"> & </span>
-          <span className="text-amber-400">AI</span>
-        </motion.h1>
-
         {/* Subheadline */}
         <motion.p
-          className="text-xl sm:text-2xl lg:text-3xl text-muted-foreground max-w-4xl mx-auto mb-4 leading-relaxed"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.3 }}
-        >
-          8 AI agents audit, strategize, and auto-execute your SEO —{' '}
-          <span className="text-foreground font-semibold">all while you sleep</span>.
-        </motion.p>
-
-        {/* Sub-subheadline */}
-        <motion.p
-          className="text-base sm:text-lg text-muted-foreground/70 max-w-3xl mx-auto mb-6"
+          className="text-base sm:text-lg text-muted-foreground/70 max-w-3xl mx-auto mb-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.35 }}
+          transition={{ duration: 0.6, delay: 0.25 }}
         >
-          Own your AI presence. A proprietary multi-agent engine that ranks you on Google, wins featured snippets, and gets cited by AI. 2,000-word stealth strategies that actually stick.
+          8 AI agents audit, strategize, and auto-execute your SEO, AEO & GEO —{' '}
+          <span className="text-foreground font-semibold">all while you sleep</span>.
         </motion.p>
 
         {/* ── Three Sights Visual ── */}
         <motion.div
-          className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8"
+          className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
         >
           {threeSights.map((sight, idx) => (
             <motion.div
@@ -166,7 +427,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl border ${sight.border} ${sight.bg} backdrop-blur-sm`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.45 + idx * 0.1 }}
+              transition={{ duration: 0.3, delay: 0.35 + idx * 0.1 }}
             >
               <Eye className={`w-4 h-4 ${sight.color}`} />
               <div className="text-left">
@@ -187,7 +448,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           className="mb-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
+          transition={{ duration: 0.6, delay: 0.35 }}
         >
           <span className="text-sm text-muted-foreground/70 block mb-3">Tracked across 17+ AI Engines</span>
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -206,7 +467,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                 className="flex items-center gap-1.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-3 py-1"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.5 + idx * 0.04 }}
+                transition={{ duration: 0.3, delay: 0.4 + idx * 0.04 }}
               >
                 <engine.icon className={`w-3.5 h-3.5 ${engine.color}`} />
                 <span className="text-xs font-medium text-foreground/80">{engine.name}</span>
@@ -220,10 +481,10 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
 
         {/* ── "Your 24/7 AI SEO Team" Section ── */}
         <motion.div
-          className="mb-10"
+          className="mb-8"
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.55 }}
+          transition={{ duration: 0.7, delay: 0.4 }}
         >
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3">
             <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">
@@ -240,7 +501,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium ${agent.color} backdrop-blur-sm`}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.6 + idx * 0.05 }}
+                transition={{ duration: 0.3, delay: 0.45 + idx * 0.05 }}
               >
                 <span className="text-sm">{agent.icon}</span>
                 {agent.name}
@@ -251,10 +512,10 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
 
         {/* CTA Buttons */}
         <motion.div
-          className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
+          className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.7 }}
+          transition={{ duration: 0.7, delay: 0.5 }}
         >
           <Button
             size="lg"
@@ -279,7 +540,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.9 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
         >
           <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm border border-emerald-500/20 rounded-xl px-5 py-3">
             <TrendingUp className="w-5 h-5 text-emerald-400" />

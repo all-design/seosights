@@ -25,6 +25,12 @@ import {
   Target,
   LucideIcon,
   Crosshair,
+  Bell,
+  Database,
+  Download,
+  Radar,
+  Activity,
+  ScanSearch,
 } from 'lucide-react'
 
 const featureCategories = [
@@ -78,16 +84,48 @@ const featureCategories = [
     iconBg: 'bg-amber-500/20',
     sightColor: 'text-amber-400',
     features: [
-      { title: 'AI Crawler Access', description: 'GPTBot, ClaudeBot, PerplexityBot crawl verification & optimization' },
+      { title: 'AI Crawler Access Audit', description: 'GPTBot, ClaudeBot, PerplexityBot crawl verification — know who can see you' },
       { title: 'AI Citation Tracking', description: 'Monitor how often ChatGPT, Claude, Perplexity cite your content' },
+      { title: 'llms.txt Generator', description: 'One-click generate llms.txt & llms-full.txt for instant LLM discoverability' },
       { title: 'Brand Mention Signals', description: 'Track brand mentions across Wikipedia, Reddit, YouTube, LinkedIn' },
-      { title: 'llms.txt Implementation', description: 'AI-readable content index for LLM discovery' },
       { title: 'Entity Recognition Score', description: 'Knowledge graph presence and entity authority measurement' },
     ],
   },
 ]
 
 const additionalFeatures = [
+  {
+    icon: Bell,
+    title: 'AI Visibility Alerts',
+    description: 'Get email/Slack alerts when AI citations drop on Perplexity or Google AI Overview stops citing your site. Catch problems before they hurt.',
+    color: 'text-rose-400',
+    bg: 'bg-rose-500/20',
+    tag: 'NEW',
+  },
+  {
+    icon: Database,
+    title: 'Google Search Console',
+    description: 'Connect GSC to pull real impression & click data. Compare traditional search performance with AI visibility side by side.',
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/20',
+    tag: 'NEW',
+  },
+  {
+    icon: Download,
+    title: 'llms.txt Generator',
+    description: 'One-click download of llms.txt and llms-full.txt tailored to your site. Deploy to your server and make AI models discover you instantly.',
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/20',
+    tag: 'NEW',
+  },
+  {
+    icon: ScanSearch,
+    title: 'Free AI Visibility Scan',
+    description: 'Enter any URL and instantly see your GEO/AEO scores, blocked AI crawlers, and llms.txt status. No signup required.',
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500/20',
+    tag: 'FREE',
+  },
   {
     icon: Heart,
     title: 'Sentiment Analysis',
@@ -150,6 +188,20 @@ const additionalFeatures = [
     description: 'Real-time Google algorithm update monitoring with impact analysis on your rankings.',
     color: 'text-red-400',
     bg: 'bg-red-500/20',
+  },
+  {
+    icon: Radar,
+    title: 'AI Crawler Radar',
+    description: 'Real-time monitoring of which AI bots visit your site, how often, and what they can access.',
+    color: 'text-lime-400',
+    bg: 'bg-lime-500/20',
+  },
+  {
+    icon: Activity,
+    title: 'Citation Velocity',
+    description: 'Track the speed at which AI engines pick up your content. Measure citation growth week over week.',
+    color: 'text-sky-400',
+    bg: 'bg-sky-500/20',
   },
 ]
 
@@ -263,7 +315,18 @@ export default function FeaturesSection() {
                       <feature.icon className={`w-5 h-5 ${feature.color}`} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-foreground/90 mb-1">{feature.title}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-foreground/90 mb-1">{feature.title}</h4>
+                        {feature.tag && (
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${
+                            feature.tag === 'NEW' ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' :
+                            feature.tag === 'FREE' ? 'border-amber-500/50 text-amber-400 bg-amber-500/10' :
+                            'border-white/20 text-foreground/50'
+                          }`}>
+                            {feature.tag}
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">{feature.description}</p>
                     </div>
                   </CardContent>
