@@ -3,7 +3,7 @@
 import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Globe, Search, Bot, BarChart3, ArrowRight } from 'lucide-react'
+import { Eye, Globe, Search, Bot, BarChart3, ArrowRight } from 'lucide-react'
 
 const steps = [
   {
@@ -19,8 +19,8 @@ const steps = [
   {
     number: '02',
     icon: Search,
-    title: '8 Agents Analyze',
-    description: 'Master Director orchestrates Keyword Researcher, Competitor Analyst, Content Architect, On-Page Auditor, Link Strategist, Tech & Schema Auditor, and Backlink Prospector — all running in parallel.',
+    title: '8 Agents Analyze All Three Sights',
+    description: 'Master Director orchestrates 7 specialist agents — analyzing your First Sight (SEO), Second Sight (AEO), and Third Sight (GEO) in parallel.',
     color: 'text-cyan-400',
     bg: 'bg-cyan-500/20',
     border: 'border-cyan-500/30',
@@ -30,7 +30,7 @@ const steps = [
     number: '03',
     icon: Bot,
     title: 'Auto-Execute Strategy',
-    description: 'Your 90-day plan auto-generates with weekly actions, code snippets, content briefs, and backlink targets — ready to deploy immediately while you sleep.',
+    description: 'Your 90-day plan auto-generates with weekly actions, code snippets, content briefs, and backlink targets — ready to deploy while you sleep.',
     color: 'text-amber-400',
     bg: 'bg-amber-500/20',
     border: 'border-amber-500/30',
@@ -39,8 +39,8 @@ const steps = [
   {
     number: '04',
     icon: BarChart3,
-    title: 'Track & Dominate',
-    description: 'Monitor your progress with KPI tracking, algorithm update alerts, and roadmap milestones across SEO, AEO, and GEO.',
+    title: 'Track & Dominate Every Sight',
+    description: 'Monitor your progress across all Three Sights with KPI tracking, algorithm alerts, and roadmap milestones.',
     color: 'text-rose-400',
     bg: 'bg-rose-500/20',
     border: 'border-rose-500/30',
@@ -64,12 +64,19 @@ export default function HowItWorksSection() {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
+          <Badge
+            variant="outline"
+            className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-amber-500/50 text-amber-400 bg-amber-500/10 backdrop-blur-sm mb-6"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            From URL to All Three Sights in Under 2 Minutes
+          </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             How It{' '}
             <span className="text-emerald-400">Works</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            From URL to complete strategy in under 2 minutes.
+            One URL. Three Sights. One unified strategy — auto-executed by 8 AI agents.
           </p>
         </motion.div>
 

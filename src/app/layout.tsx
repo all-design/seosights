@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "seosights — Get Customers from Google & AI | SEO · AEO · GEO",
+  title: "seosights — Three Sights. One Unified AI Engine. | SEO · AEO · GEO",
   description:
-    "seosights writes, audits, and auto-executes SEO strategies proven to rank on Google AND get cited by ChatGPT, Claude, and Perplexity. All while you sleep.",
+    "seosights gives you Three Sights on modern search: First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents audit, strategize, and auto-execute — all while you sleep.",
   keywords: [
     "AI SEO",
     "AEO",
@@ -32,24 +32,25 @@ export const metadata: Metadata = {
     "E-E-A-T",
     "AI crawler",
     "SEO autopilot",
+    "Three Sights",
   ],
   authors: [{ name: "seosights" }],
   icons: {
     icon: "/logo-transparent.png",
   },
   openGraph: {
-    title: "seosights — Get Customers from Google & AI",
+    title: "seosights — Three Sights. One Unified AI Engine.",
     description:
-      "8 AI agents audit, strategize, and auto-execute your SEO — ranking you on Google AND getting you cited by AI. All while you sleep.",
+      "seosights gives you Three Sights on modern search: First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents work 24/7 — all while you sleep.",
     url: "https://seosights.com",
     siteName: "seosights",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "seosights — Get Customers from Google & AI",
+    title: "seosights — Three Sights. One Unified AI Engine.",
     description:
-      "8 AI agents audit, strategize, and auto-execute your SEO — ranking you on Google AND getting you cited by AI. All while you sleep.",
+      "seosights gives you Three Sights on modern search: First Sight (SEO), Second Sight (AEO), and Third Sight (GEO). 8 AI agents work 24/7.",
   },
 };
 

@@ -76,12 +76,11 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
           transition={{ duration: 0.6 }}
         >
           <h2 className="text-4xl sm:text-5xl font-bold mb-6">
-            Ready to Get Customers from{' '}
-            <span className="text-emerald-400">Google</span> &{' '}
-            <span className="text-amber-400">AI</span>?
+            Ready to See All{' '}
+            <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">Three Sights</span>?
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Set it up once. Your 8 AI agents work 24/7 — auditing, writing, and ranking. Without the agency fees.
+            Set it up once. Your 8 AI agents work 24/7 — auditing, writing, and ranking across every Sight. Without the agency fees.
           </p>
         </motion.div>
 

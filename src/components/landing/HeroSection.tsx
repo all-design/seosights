@@ -20,6 +20,36 @@ const agentPills = [
   { name: 'Backlink Prospector', icon: '🤝', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
 ]
 
+const threeSights = [
+  {
+    number: '1st',
+    name: 'First Sight',
+    label: 'SEO',
+    description: 'Traditional search',
+    color: 'text-emerald-400',
+    border: 'border-emerald-500/40',
+    bg: 'bg-emerald-500/10',
+  },
+  {
+    number: '2nd',
+    name: 'Second Sight',
+    label: 'AEO',
+    description: 'AI assistants',
+    color: 'text-cyan-400',
+    border: 'border-cyan-500/40',
+    bg: 'bg-cyan-500/10',
+  },
+  {
+    number: '3rd',
+    name: 'Third Sight',
+    label: 'GEO',
+    description: 'Generative engines',
+    color: 'text-amber-400',
+    border: 'border-amber-500/40',
+    bg: 'bg-amber-500/10',
+  },
+]
+
 export default function HeroSection({ onStartFree }: HeroSectionProps) {
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id)
@@ -45,7 +75,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
         {/* ── Text-only Logo: seosights (big) + tagline centered below ── */}
         <motion.div
-          className="mb-8"
+          className="mb-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -56,7 +86,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
             </span>
           </h2>
           <p className="text-xs sm:text-sm tracking-[0.35em] text-emerald-400/60 uppercase mt-2 text-center">
-            Vision · Analytics · Rank
+            Multiple pillars, one unified AI engine
           </p>
         </motion.div>
 
@@ -71,7 +101,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
             className="inline-flex items-center gap-2 px-4 py-2 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-4"
           >
             <Sparkles className="w-4 h-4" />
-            Complete SEO · AEO · GEO Platform
+            Three Sights. One Platform.
           </Badge>
         </motion.div>
 
@@ -89,7 +119,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </Badge>
         </motion.div>
 
-        {/* ── Soro-inspired Headline ── */}
+        {/* ── Headline ── */}
         <motion.h1
           className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6"
           initial={{ opacity: 0, y: 30 }}
@@ -102,7 +132,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           <span className="text-amber-400">AI</span>
         </motion.h1>
 
-        {/* Soro-inspired Subheadline */}
+        {/* Subheadline */}
         <motion.p
           className="text-xl sm:text-2xl lg:text-3xl text-muted-foreground max-w-4xl mx-auto mb-4 leading-relaxed"
           initial={{ opacity: 0, y: 30 }}
@@ -120,18 +150,44 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
-          Not a ChatGPT wrapper. A proprietary multi-agent engine that ranks you on Google{' '}
-          <span className="text-emerald-400">(SEO)</span>, wins featured snippets{' '}
-          <span className="text-cyan-400">(AEO)</span>, and gets cited by AI{' '}
-          <span className="text-amber-400">(GEO)</span>. 2,000-word stealth strategies that actually stick.
+          Not a ChatGPT wrapper. A proprietary multi-agent engine that ranks you on Google, wins featured snippets, and gets cited by AI. 2,000-word stealth strategies that actually stick.
         </motion.p>
+
+        {/* ── Three Sights Visual ── */}
+        <motion.div
+          className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          {threeSights.map((sight, idx) => (
+            <motion.div
+              key={sight.label}
+              className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl border ${sight.border} ${sight.bg} backdrop-blur-sm`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: 0.45 + idx * 0.1 }}
+            >
+              <Eye className={`w-4 h-4 ${sight.color}`} />
+              <div className="text-left">
+                <span className={`text-xs font-bold ${sight.color} uppercase tracking-wider`}>
+                  {sight.name}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-foreground">{sight.label}</span>
+                  <span className="text-xs text-muted-foreground">· {sight.description}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
 
         {/* AI Platform Badges — "Cited by" */}
         <motion.div
           className="flex flex-wrap items-center justify-center gap-3 mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
         >
           <span className="text-sm text-muted-foreground/70 mr-1">Cited by</span>
           <div className="flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5">
@@ -157,7 +213,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           className="mb-10"
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.45 }}
+          transition={{ duration: 0.7, delay: 0.55 }}
         >
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3">
             <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">
@@ -174,7 +230,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium ${agent.color} backdrop-blur-sm`}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.5 + idx * 0.06 }}
+                transition={{ duration: 0.3, delay: 0.6 + idx * 0.05 }}
               >
                 <span className="text-sm">{agent.icon}</span>
                 {agent.name}
@@ -183,12 +239,12 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </div>
         </motion.div>
 
-        {/* CTA Buttons — Soro style */}
+        {/* CTA Buttons */}
         <motion.div
           className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.6 }}
+          transition={{ duration: 0.7, delay: 0.7 }}
         >
           <Button
             size="lg"
@@ -208,12 +264,12 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </Button>
         </motion.div>
 
-        {/* Floating Stats — Soro-style proof */}
+        {/* Floating Stats */}
         <motion.div
           className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
+          transition={{ duration: 0.8, delay: 0.9 }}
         >
           <div className="flex items-center gap-3 bg-white/5 backdrop-blur-sm border border-emerald-500/20 rounded-xl px-5 py-3">
             <TrendingUp className="w-5 h-5 text-emerald-400" />

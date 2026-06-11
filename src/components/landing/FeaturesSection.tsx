@@ -25,13 +25,18 @@ import {
 
 const featureCategories = [
   {
+    sight: '1st',
     category: 'SEO',
-    label: 'Search Engine Optimization',
+    sightName: 'First Sight',
+    label: 'Search Engine Optimization — The traditional view of search',
     color: 'emerald',
-    icon: Search,
+    icon: Eye,
     borderColor: 'border-l-emerald-500',
     iconColor: 'text-emerald-400',
     iconBg: 'bg-emerald-500/20',
+    sightColor: 'text-emerald-400',
+    sightBorder: 'border-emerald-500/40',
+    sightBg: 'bg-emerald-500/10',
     features: [
       { title: 'Technical SEO Audit', description: 'Meta tags, headings, site structure, Core Web Vitals analysis' },
       { title: 'Crawlability Analysis', description: 'robots.txt, XML sitemaps, crawl budget optimization' },
@@ -41,13 +46,18 @@ const featureCategories = [
     ],
   },
   {
+    sight: '2nd',
     category: 'AEO',
-    label: 'Answer Engine Optimization',
+    sightName: 'Second Sight',
+    label: 'Answer Engine Optimization — The AI assistant view',
     color: 'cyan',
-    icon: Bot,
+    icon: Eye,
     borderColor: 'border-l-cyan-500',
     iconColor: 'text-cyan-400',
     iconBg: 'bg-cyan-500/20',
+    sightColor: 'text-cyan-400',
+    sightBorder: 'border-cyan-500/40',
+    sightBg: 'bg-cyan-500/10',
     features: [
       { title: 'FAQ & Schema Detection', description: 'Identify missing FAQ schema and structured data opportunities' },
       { title: 'Answer Block Optimization', description: 'Create 40-60 word answers targeting featured snippets' },
@@ -57,13 +67,18 @@ const featureCategories = [
     ],
   },
   {
+    sight: '3rd',
     category: 'GEO',
-    label: 'Generative Engine Optimization',
+    sightName: 'Third Sight',
+    label: 'Generative Engine Optimization — The AI engine view',
     color: 'amber',
-    icon: Brain,
+    icon: Eye,
     borderColor: 'border-l-amber-500',
     iconColor: 'text-amber-400',
     iconBg: 'bg-amber-500/20',
+    sightColor: 'text-amber-400',
+    sightBorder: 'border-amber-500/40',
+    sightBg: 'bg-amber-500/10',
     features: [
       { title: 'AI Crawler Access', description: 'GPTBot, ClaudeBot, PerplexityBot crawl verification & optimization' },
       { title: 'AI Citation Tracking', description: 'Monitor how often ChatGPT, Claude, Perplexity cite your content' },
@@ -139,21 +154,21 @@ export default function FeaturesSection() {
             variant="outline"
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-cyan-500/50 text-cyan-400 bg-cyan-500/10 backdrop-blur-sm mb-6"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            Comprehensive Feature Set
+            <Eye className="w-3.5 h-3.5" />
+            Three Sights. One Unified AI Engine.
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Three Pillars.{' '}
+            Three Sights.{' '}
             <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">
               One Platform.
             </span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Everything you need to dominate search, get cited by AI, and build lasting authority.
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+            Every modern search channel is a different view — a different <span className="text-foreground font-medium">Sight</span>. seosights gives you all three, powered by one AI engine.
           </p>
         </motion.div>
 
-        {/* Three Pillar Feature Sections */}
+        {/* Three Sights Feature Sections */}
         <div className="space-y-12 mb-16">
           {featureCategories.map((cat, ci) => (
             <motion.div
@@ -164,11 +179,19 @@ export default function FeaturesSection() {
             >
               <div className="flex items-center gap-3 mb-6">
                 <div className={`w-10 h-10 rounded-xl ${cat.iconBg} flex items-center justify-center`}>
-                  <cat.icon className={`w-5 h-5 ${cat.iconColor}`} />
+                  <Eye className={`w-5 h-5 ${cat.iconColor}`} />
                 </div>
-                <div>
-                  <h3 className="text-2xl font-bold">{cat.category}</h3>
-                  <p className="text-sm text-muted-foreground">{cat.label}</p>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold uppercase tracking-wider ${cat.sightColor}`}>
+                        {cat.sightName}
+                      </span>
+                      <span className="text-xs text-muted-foreground/50">—</span>
+                      <h3 className="text-2xl font-bold">{cat.category}</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{cat.label}</p>
+                  </div>
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -204,7 +227,7 @@ export default function FeaturesSection() {
             </div>
             <div>
               <h3 className="text-2xl font-bold">Plus More</h3>
-              <p className="text-sm text-muted-foreground">Advanced capabilities built into every plan</p>
+              <p className="text-sm text-muted-foreground">Advanced capabilities built into every Sight</p>
             </div>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

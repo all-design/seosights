@@ -204,13 +204,13 @@ export default function PricingSection({ onStartFree }: PricingSectionProps) {
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-6"
           >
             <Star className="w-3.5 h-3.5" />
-            One Tool to Do It All
+            One Tool. Three Sights. Zero Agency Fees.
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Save <span className="text-amber-400">$5,000/month</span> vs Agencies
+            Save <span className="text-amber-400">$5,000/month</span> vs Agencies. See All Three Sights.
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            No contracts. Cancel anytime. Start free, scale as you grow — from solo founders to full-service agencies.
+            No contracts. Cancel anytime. Start free, scale as you grow — from solo founders to full-service agencies. All Three Sights included.
           </p>
         </motion.div>
 

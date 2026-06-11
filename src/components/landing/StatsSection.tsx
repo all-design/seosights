@@ -17,7 +17,7 @@ const stats: StatItem[] = [
     value: '8X',
     numericValue: 8,
     suffix: 'X',
-    label: 'More AI citations with strong link profiles',
+    label: 'More AI citations across all Three Sights',
     source: 'Ahrefs',
   },
   {
