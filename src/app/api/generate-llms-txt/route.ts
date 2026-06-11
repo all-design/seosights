@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { TokenTracker } from '@/lib/token-tracker'
+import { randomUUID } from 'crypto'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -7,6 +9,8 @@ export const dynamic = 'force-dynamic'
  * llms.txt Generator API
  * Generates both llms.txt (concise) and llms-full.txt (detailed)
  * tailored to the user's website based on analysis data.
+ *
+ * Now with token & cost tracking.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +24,9 @@ export async function POST(request: NextRequest) {
     const parsedUrl = new URL(url)
     const domain = parsedUrl.hostname.replace('www.', '')
     const origin = parsedUrl.origin
+
+    const sessionId = randomUUID()
+    const tokenTracker = new TokenTracker(sessionId)
 
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const zai = await ZAI.create()
@@ -43,6 +50,15 @@ export async function POST(request: NextRequest) {
             .slice(0, 5000)
           title = rawData.title || title
         }
+
+        // Track page_reader data gathering
+        tokenTracker.track({
+          agentId: 'llms-txt-page-reader',
+          agentName: 'llms.txt Generator (Page Reader)',
+          model: 'default',
+          inputTokens: tokenTracker.estimateTokens(url),
+          outputTokens: tokenTracker.estimateTokens(content),
+        })
       } catch {
         content = ''
       }
@@ -54,6 +70,7 @@ export async function POST(request: NextRequest) {
       : ''
 
     // ── Generate llms.txt (concise version) ──
+    const llmsTxtSystemPrompt = 'You generate valid llms.txt files following the standard format. Return ONLY markdown content. No code fences.'
     const llmsTxtPrompt = `Generate a valid llms.txt file for this website. The llms.txt standard is a markdown file placed at /llms.txt that helps LLMs understand a website's content.
 
 Website: ${url}
@@ -85,21 +102,35 @@ Rules:
 6. Use REALISTIC URLs based on the domain: ${origin}/path
 7. Return ONLY the markdown content, no code fences, no extra text`
 
+    const llmsTxtInputTokens = tokenTracker.estimateTokens(llmsTxtSystemPrompt + llmsTxtPrompt)
+    let llmsTxtOutputTokens = 0
+
     let llmsTxt = ''
     try {
       const result = await zai.chat.completions.create({
         messages: [
-          { role: 'system', content: 'You generate valid llms.txt files following the standard format. Return ONLY markdown content. No code fences.' },
+          { role: 'system', content: llmsTxtSystemPrompt },
           { role: 'user', content: llmsTxtPrompt },
         ],
       })
       llmsTxt = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
       llmsTxt = llmsTxt.replace(/```(?:markdown|md)?\s*/g, '').replace(/```\s*$/g, '').trim()
+
+      llmsTxtOutputTokens = tokenTracker.estimateTokens(llmsTxt)
+      tokenTracker.track({
+        agentId: 'llms-txt-generator',
+        agentName: 'llms.txt Generator (Concise)',
+        model: 'default',
+        inputTokens: llmsTxtInputTokens,
+        outputTokens: llmsTxtOutputTokens,
+      })
     } catch (error) {
       console.error('[generate-llms-txt] llms.txt generation error:', error instanceof Error ? error.message : 'Unknown')
+      tokenTracker.trackFailure('llms-txt-generator', 'llms.txt Generator (Concise)', 'default')
     }
 
     // ── Generate llms-full.txt (detailed version) ──
+    const llmsFullTxtSystemPrompt = 'You generate valid llms-full.txt files following the extended standard format. Return ONLY markdown content. No code fences.'
     const llmsFullTxtPrompt = `Generate a valid llms-full.txt file for this website. The llms-full.txt is the extended version of llms.txt with more detailed content that LLMs can use for comprehensive understanding.
 
 Website: ${url}
@@ -146,18 +177,31 @@ Rules:
 5. Include specific details, not generic filler
 6. Return ONLY the markdown content, no code fences, no extra text`
 
+    const llmsFullTxtInputTokens = tokenTracker.estimateTokens(llmsFullTxtSystemPrompt + llmsFullTxtPrompt)
+    let llmsFullTxtOutputTokens = 0
+
     let llmsFullTxt = ''
     try {
       const result = await zai.chat.completions.create({
         messages: [
-          { role: 'system', content: 'You generate valid llms-full.txt files following the extended standard format. Return ONLY markdown content. No code fences.' },
+          { role: 'system', content: llmsFullTxtSystemPrompt },
           { role: 'user', content: llmsFullTxtPrompt },
         ],
       })
       llmsFullTxt = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
       llmsFullTxt = llmsFullTxt.replace(/```(?:markdown|md)?\s*/g, '').replace(/```\s*$/g, '').trim()
+
+      llmsFullTxtOutputTokens = tokenTracker.estimateTokens(llmsFullTxt)
+      tokenTracker.track({
+        agentId: 'llms-txt-generator',
+        agentName: 'llms.txt Generator (Full)',
+        model: 'default',
+        inputTokens: llmsFullTxtInputTokens,
+        outputTokens: llmsFullTxtOutputTokens,
+      })
     } catch (error) {
       console.error('[generate-llms-txt] llms-full.txt generation error:', error instanceof Error ? error.message : 'Unknown')
+      tokenTracker.trackFailure('llms-txt-generator', 'llms.txt Generator (Full)', 'default')
     }
 
     // Fallback if LLM failed
@@ -186,11 +230,23 @@ ${title || domain} is a website at ${url}. For more information, visit the site 
 `
     }
 
+    // Save token usage to database (fire and forget)
+    const tokenSummary = tokenTracker.getSummary()
+    console.log(`[generate-llms-txt] Token usage: ${tokenSummary.totalTokens} tokens, $${tokenSummary.totalCost.toFixed(4)} estimated cost`)
+
+    tokenTracker.saveToDatabase().catch((err) => {
+      console.error('[generate-llms-txt] Failed to save token tracking:', err instanceof Error ? err.message : 'Unknown')
+    })
+
     return NextResponse.json({
       llmsTxt,
       llmsFullTxt,
       domain,
       url,
+      _tokenSummary: {
+        totalTokens: tokenSummary.totalTokens,
+        totalCost: tokenSummary.totalCost,
+      },
     })
   } catch (error) {
     return NextResponse.json(

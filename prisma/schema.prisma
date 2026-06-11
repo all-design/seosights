@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,12 +10,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Existing Models ────────────────────────────────────────────────
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  analyses      Analysis[]
+  webhooks      WebhookConfig[]
+  alerts        VisibilityAlert[]
 }
 
 model Post {
@@ -37,4 +40,145 @@ model Lead {
   email     String
   website   String?
   createdAt DateTime @default(now())
+}
+
+// ─── New Models ─────────────────────────────────────────────────────
+
+model Analysis {
+  id        String   @id @default(cuid())
+  url       String
+  domain    String
+  market    String   @default("Global")
+  status    String   @default("pending") // pending | running | completed | failed
+  mode      String   @default("auto-pilot") // auto-pilot | co-pilot
+  userId    String?
+  result    String?  // JSON string of full analysis result
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User?      @relation(fields: [userId], references: [id])
+  agentLogs AgentLog[]
+  approvals Approval[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([domain])
+}
+
+model AgentLog {
+  id           String    @id @default(cuid())
+  analysisId   String
+  agentId      String    // e.g. "master-director", "keyword-researcher"
+  agentName    String    // e.g. "Master Director"
+  action       String    // what the agent is doing, e.g. "Scanning Perplexity mentions..."
+  status       String    // running | completed | failed
+  tokensUsed   Int       @default(0)
+  costUsd      Float     @default(0)
+  model        String    @default("default")
+  result       String?   // JSON string of agent result
+  error        String?   // error message if failed
+  startedAt    DateTime
+  completedAt  DateTime?
+
+  analysis     Analysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([agentId])
+  @@index([status])
+}
+
+model Approval {
+  id               String    @id @default(cuid())
+  analysisId       String
+  agentId          String    // which agent produced the action
+  agentName        String
+  actionType       String    // e.g. "meta-tag-change", "content-publish", "robots-update"
+  actionDescription String   // what the agent wants to do
+  actionData       String    // JSON string with the proposed change details
+  status           String    @default("pending") // pending | approved | rejected | expired
+  reviewedAt       DateTime?
+  reviewedBy       String?   // user who reviewed
+  createdAt        DateTime  @default(now())
+
+  analysis         Analysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([status])
+  @@index([actionType])
+}
+
+model AgentPrompt {
+  id                 String   @id @default(cuid())
+  agentId            String   @unique // e.g. "master-director"
+  agentName          String
+  systemPrompt       String   // the system prompt text
+  userPromptTemplate String   // the user prompt template with {{variables}}
+  model              String   @default("default") // primary LLM model
+  fallbackModel      String?  // fallback model if primary fails
+  isActive           Boolean  @default(true)
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([isActive])
+}
+
+model TokenUsage {
+  id                String   @id @default(cuid())
+  date              DateTime // the day this record is for
+  agentId           String
+  agentName         String
+  model             String
+  totalInputTokens  Int      @default(0)
+  totalOutputTokens Int      @default(0)
+  totalTokens       Int      @default(0)
+  estimatedCostUsd  Float    @default(0)
+  apiCalls          Int      @default(0)
+  failures          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([date, agentId, model])
+  @@index([date])
+  @@index([agentId])
+  @@index([model])
+}
+
+model WebhookConfig {
+  id              String    @id @default(cuid())
+  userId          String
+  type            String    // "slack" | "discord" | "custom"
+  url             String    // webhook URL
+  events          String    // JSON array of event types to listen for
+  isActive        Boolean   @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([isActive])
+}
+
+model VisibilityAlert {
+  id        String   @id @default(cuid())
+  userId    String
+  domain    String   // the domain being monitored
+  alertType String   // "citation_drop" | "ai_overview_lost" | "bot_blocked" | "score_change"
+  severity  String   @default("warning") // info | warning | critical
+  message   String
+  data      String?  // JSON with alert details
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domain])
+  @@index([alertType])
+  @@index([severity])
+  @@index([isRead])
 }

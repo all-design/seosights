@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useAppStore, SEOAnalysis } from '@/lib/store'
+import { useAppStore, SEOAnalysis, Approval } from '@/lib/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -54,7 +54,14 @@ import {
   Code2,
   Grid3X3,
   Check,
+  User,
+  ShieldCheck,
+  PenTool,
+  Webhook,
 } from 'lucide-react'
+import PendingApprovalsPanel from '@/components/dashboard/PendingApprovalsPanel'
+import GSCPanel from '@/components/dashboard/GSCPanel'
+import AlertsPanel from '@/components/dashboard/AlertsPanel'
 
 const container = {
   hidden: { opacity: 0 },
@@ -606,11 +613,11 @@ function deriveGEOStrategy(data: SEOAnalysis): StrategyAction[] {
 // ══════════════════════════════════════════════════════════════
 // MAIN DASHBOARD
 // ══════════════════════════════════════════════════════════════
-export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () => void }) {
-  const { analysis, reset } = useAppStore()
+export default function AnalysisDashboard({ onStartFree, onOpenWebhooks }: { onStartFree?: () => void; onOpenWebhooks?: () => void }) {
+  const { analysis, reset, mode, setMode, pendingApprovals, currentAnalysisId, setPendingApprovals, setCurrentAnalysisId } = useAppStore()
   const data = analysis as SEOAnalysis | null
   const [exporting, setExporting] = useState(false)
-  const [playbookTab, setPlaybookTab] = useState<'seo' | 'aeo' | 'geo'>('seo')
+  const [playbookTab, setPlaybookTab] = useState<'seo' | 'aeo' | 'geo' | 'gsc'>('seo')
   const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null)
   const [copiedSnippet, setCopiedSnippet] = useState<number | null>(null)
   const [copiedWin, setCopiedWin] = useState<number | null>(null)
@@ -622,6 +629,75 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
   const [generatingLlmsTxt, setGeneratingLlmsTxt] = useState(false)
   const [llmsTxtContent, setLlmsTxtContent] = useState<string | null>(null)
   const [llmsFullTxtContent, setLlmsFullTxtContent] = useState<string | null>(null)
+  const [showApprovalsPanel, setShowApprovalsPanel] = useState(false)
+  const [showAlertsPanel, setShowAlertsPanel] = useState(false)
+  const [alertUnreadCount, setAlertUnreadCount] = useState(0)
+
+  // Extract analysisId from the _meta field if present
+  useEffect(() => {
+    if (data && typeof data === 'object' && '_meta' in data) {
+      const meta = (data as Record<string, unknown>)._meta as { analysisId?: string; mode?: string }
+      if (meta?.analysisId) {
+        setCurrentAnalysisId(meta.analysisId)
+      }
+      if (meta?.mode === 'co-pilot') {
+        setMode('co-pilot')
+      }
+    }
+  }, [data, setCurrentAnalysisId, setMode])
+
+  // Fetch pending approvals when in co-pilot mode
+  useEffect(() => {
+    if (mode === 'co-pilot' && currentAnalysisId) {
+      const fetchApprovals = async () => {
+        try {
+          const response = await fetch(`/api/approvals?analysisId=${currentAnalysisId}&status=pending`)
+          if (response.ok) {
+            const result = await response.json()
+            if (result.approvals && Array.isArray(result.approvals)) {
+              setPendingApprovals(result.approvals.map((a: Record<string, unknown>) => ({
+                id: a.id as string,
+                analysisId: a.analysisId as string,
+                agentId: a.agentId as string,
+                agentName: a.agentName as string,
+                actionType: a.actionType as Approval['actionType'],
+                actionDescription: a.actionDescription as string,
+                actionData: a.actionData as string,
+                status: a.status as Approval['status'],
+                createdAt: a.createdAt as string,
+              })))
+            }
+          }
+        } catch { /* ignore */ }
+      }
+      fetchApprovals()
+      // Poll every 5 seconds for new approvals
+      const interval = setInterval(fetchApprovals, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [mode, currentAnalysisId, setPendingApprovals])
+
+  const pendingCount = pendingApprovals.filter(a => a.status === 'pending').length
+
+  // Derive the domain from the URL
+  const alertDomain = data?.url ? (() => { try { return new URL(data.url.startsWith('http') ? data.url : `https://${data.url}`).hostname } catch { return data.url.replace(/^[\/]+/, '').split('/')[0] } })() : ''
+
+  // Fetch unread alert count for the current domain
+  useEffect(() => {
+    if (!alertDomain) return
+    const fetchAlertCount = async () => {
+      try {
+        const response = await fetch(`/api/alerts?domain=${encodeURIComponent(alertDomain)}&isRead=false`)
+        if (response.ok) {
+          const result = await response.json()
+          setAlertUnreadCount(result.unreadCount || 0)
+        }
+      } catch { /* ignore */ }
+    }
+    fetchAlertCount()
+    const interval = setInterval(fetchAlertCount, 30000)
+    return () => clearInterval(interval)
+  }, [alertDomain])
 
   // Auto-execute animation effect
   useEffect(() => {
@@ -736,6 +812,69 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Mode Toggle */}
+            <div className="flex items-center bg-white/5 rounded-lg border border-white/10 p-0.5">
+              <button
+                onClick={() => setMode('auto-pilot')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                  mode === 'auto-pilot'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Bot className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Auto-Pilot</span>
+              </button>
+              <button
+                onClick={() => setMode('co-pilot')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 relative ${
+                  mode === 'co-pilot'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Co-Pilot</span>
+                {pendingCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-amber-500 text-black text-[9px] font-bold flex items-center justify-center">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Visibility Alerts Bell */}
+            <button
+              onClick={() => setShowAlertsPanel(true)}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all"
+            >
+              <Bell className="w-4 h-4 text-cyan-400" />
+              {alertUnreadCount > 0 && (
+                <>
+                  <span className="text-xs font-semibold text-cyan-400">{alertUnreadCount}</span>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                  </span>
+                </>
+              )}
+            </button>
+
+            {/* Pending Approvals Bell */}
+            {mode === 'co-pilot' && pendingCount > 0 && (
+              <button
+                onClick={() => setShowApprovalsPanel(true)}
+                className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
+              >
+                <Bell className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-semibold text-amber-400">{pendingCount}</span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                </span>
+              </button>
+            )}
+
             {/* Agent Execution Indicator */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
               <span className="relative flex h-2 w-2">
@@ -744,6 +883,17 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               </span>
               <span className="text-xs font-semibold text-emerald-400">8 Agents Active</span>
             </div>
+            {/* Webhook Settings Button */}
+            {onOpenWebhooks && (
+              <button
+                onClick={onOpenWebhooks}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+                title="Webhook Integrations (Ctrl+Shift+W)"
+              >
+                <Webhook className="w-4 h-4" />
+                <span className="hidden sm:inline">Webhooks</span>
+              </button>
+            )}
             <button
               onClick={handleExportPDF}
               disabled={exporting}
@@ -1352,6 +1502,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                     { key: 'seo' as const, label: 'SEO Strategy', icon: Search, color: 'emerald', count: seoStrategy.length },
                     { key: 'aeo' as const, label: 'AEO Strategy', icon: MessageSquare, color: 'cyan', count: aeoStrategy.length },
                     { key: 'geo' as const, label: 'GEO Strategy', icon: Brain, color: 'amber', count: geoStrategy.length },
+                    { key: 'gsc' as const, label: 'GSC', icon: Globe, color: 'cyan', count: 0 },
                   ].map((tab) => (
                     <button
                       key={tab.key}
@@ -1364,24 +1515,32 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
                     >
                       <tab.icon className="w-4 h-4" />
                       {tab.label}
-                      <Badge variant="outline" className={`text-[10px] ${playbookTab === tab.key ? (tab.color === 'emerald' ? 'border-emerald-500/30 text-emerald-400' : tab.color === 'cyan' ? 'border-cyan-500/30 text-cyan-400' : 'border-amber-500/30 text-amber-400') : 'border-white/20 text-muted-foreground'}`}>
-                        {tab.count}
-                      </Badge>
+                      {tab.key !== 'gsc' && (
+                        <Badge variant="outline" className={`text-[10px] ${playbookTab === tab.key ? (tab.color === 'emerald' ? 'border-emerald-500/30 text-emerald-400' : tab.color === 'cyan' ? 'border-cyan-500/30 text-cyan-400' : 'border-amber-500/30 text-amber-400') : 'border-white/20 text-muted-foreground'}`}>
+                          {tab.count}
+                        </Badge>
+                      )}
                     </button>
                   ))}
                 </div>
                 {/* Tab Content */}
                 <div className="p-5">
-                  <div className="grid gap-3">
-                    {(playbookTab === 'seo' ? seoStrategy : playbookTab === 'aeo' ? aeoStrategy : geoStrategy).map((action, i) => (
-                      <StrategyActionCard key={`${playbookTab}-${i}`} action={action} index={i} />
-                    ))}
-                    {(playbookTab === 'seo' ? seoStrategy : playbookTab === 'aeo' ? aeoStrategy : geoStrategy).length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        No specific {playbookTab.toUpperCase()} strategy actions derived. Your {playbookTab.toUpperCase()} score looks good!
+                  {playbookTab === 'gsc' ? (
+                    <GSCPanel domain={data.url ? new URL(data.url.startsWith('http') ? data.url : `https://${data.url}`).hostname : undefined} />
+                  ) : (
+                    <>
+                      <div className="grid gap-3">
+                        {(playbookTab === 'seo' ? seoStrategy : playbookTab === 'aeo' ? aeoStrategy : geoStrategy).map((action, i) => (
+                          <StrategyActionCard key={`${playbookTab}-${i}`} action={action} index={i} />
+                        ))}
+                        {(playbookTab === 'seo' ? seoStrategy : playbookTab === 'aeo' ? aeoStrategy : geoStrategy).length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground text-sm">
+                            No specific {playbookTab.toUpperCase()} strategy actions derived. Your {playbookTab.toUpperCase()} score looks good!
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -3056,6 +3215,55 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
           </motion.div>
         </motion.div>
       </main>
+
+      {/* ── Co-Pilot Pending Approvals Panel ──────────────────── */}
+      <PendingApprovalsPanel
+        isOpen={showApprovalsPanel}
+        onClose={() => setShowApprovalsPanel(false)}
+      />
+
+      {/* ── AI Visibility Alerts Panel ────────────────────────── */}
+      <AlertsPanel
+        isOpen={showAlertsPanel}
+        onClose={() => setShowAlertsPanel(false)}
+        domain={alertDomain}
+      />
+
+      {/* ── Co-Pilot Mode Banner ──────────────────────────────── */}
+      {mode === 'co-pilot' && !showApprovalsPanel && (
+        <motion.div
+          className="fixed bottom-6 right-6 z-30"
+          initial={{ opacity: 0, y: 20, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <button
+            onClick={() => setShowApprovalsPanel(true)}
+            className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 backdrop-blur-xl shadow-[0_0_30px_rgba(245,158,11,0.2)] hover:bg-amber-500/20 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-amber-400">Co-Pilot Mode</p>
+              <p className="text-[11px] text-amber-400/60">
+                {pendingCount > 0
+                  ? `${pendingCount} action${pendingCount > 1 ? 's' : ''} awaiting approval`
+                  : 'No pending approvals'}
+              </p>
+            </div>
+            {pendingCount > 0 && (
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+              </span>
+            )}
+            <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-xs font-bold">
+              {pendingCount}
+            </Badge>
+          </button>
+        </motion.div>
+      )}
     </div>
   )
 }

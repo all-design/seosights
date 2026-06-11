@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { agents, batch1Agents, batch2Agents, type AgentDefinition } from '@/lib/agents'
+import { TokenTracker } from '@/lib/token-tracker'
+import { AgentFallback } from '@/lib/agent-fallback'
+import { db } from '@/lib/db'
+import { sharedContextCache } from '@/lib/shared-context'
+import { randomUUID } from 'crypto'
 
 export const maxDuration = 180
 export const dynamic = 'force-dynamic'
 
-function sendProgress(progress: number, step: string): string {
-  return `data: ${JSON.stringify({ type: 'progress', progress, step })}\n\n`
+function sendProgress(progress: number, step: string, sessionId?: string): string {
+  const payload: Record<string, unknown> = { type: 'progress', progress, step }
+  if (sessionId) payload.sessionId = sessionId
+  return `data: ${JSON.stringify(payload)}\n\n`
 }
 
 function sendComplete(analysis: unknown): string {
@@ -17,6 +24,23 @@ function sendError(message: string): string {
 }
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+/**
+ * Emit a WebSocket event to the agent-stream service via REST.
+ * Non-blocking — failures are logged but don't break the analysis.
+ */
+async function emitWS(sessionId: string, event: string, data: Record<string, unknown>): Promise<void> {
+  try {
+    await fetch('http://localhost:3003/emit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, event, data }),
+    })
+  } catch (err) {
+    // WebSocket emission is best-effort — don't break the analysis
+    console.warn(`[analyze] Failed to emit WS event ${event}:`, err instanceof Error ? err.message : 'Unknown')
+  }
+}
 
 /**
  * Retry wrapper with exponential backoff for 429 errors
@@ -202,6 +226,7 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
 
 /**
  * Run a single agent and return its parsed JSON result.
+ * Also tracks token usage via tokenTracker.
  */
 async function runAgent(
   zai: { chat: { completions: { create: (opts: unknown) => Promise<unknown> } } },
@@ -209,7 +234,9 @@ async function runAgent(
   context: AgentContext,
   progress: number,
   sendProgressFn: (progress: number, step: string) => void,
-  flushFn: () => Promise<void>
+  flushFn: () => Promise<void>,
+  tokenTracker: TokenTracker,
+  analysisId: string,
 ): Promise<{ data: Record<string, unknown>; progress: number }> {
   const progressLabel = `Running ${agent.name}...`
   sendProgressFn(progress, progressLabel)
@@ -217,39 +244,170 @@ async function runAgent(
 
   console.log(`[analyze] Starting ${agent.name} (batch ${agent.batch})`)
 
-  let result: { choices?: Array<{ message?: { content?: string } }> } | null = null
-  try {
-    result = await retryWithBackoff(
+  const startedAt = new Date()
+  const systemPrompt = agent.systemPrompt
+  const userPrompt = agent.buildUserPrompt(context)
+  const inputTokens = tokenTracker.estimateTokens(systemPrompt + userPrompt)
+
+  // ── Fallback-aware LLM call ──────────────────────────────────────────────
+  // The AgentFallback system tries the primary model first, then falls back
+  // through the configured model chain on 429/5xx/timeout errors.
+  // Since z-ai-web-dev-sdk handles model routing internally, the fallback
+  // currently retries the same SDK call but logs which model was attempted,
+  // providing infrastructure for when multi-model support is added.
+
+  const fallback = new AgentFallback('default')
+
+  const fallbackResult = await fallback.executeWithFallback(
+    // Primary: standard LLM call with retry
+    () => retryWithBackoff(
       () => zai.chat.completions.create({
         messages: [
-          { role: 'system', content: agent.systemPrompt },
-          { role: 'user', content: agent.buildUserPrompt(context) },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
       }),
       3,
       4000,
       `LLM_${agent.id}`
+    ) as Promise<Record<string, unknown>>,
+    // Fallback: same SDK call (SDK handles model routing internally)
+    // The model param is logged for tracking and will be used when
+    // multi-model support is added to the SDK
+    (model: string) => retryWithBackoff(
+      () => zai.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+      2, // fewer retries for fallback to avoid long waits
+      3000,
+      `LLM_${agent.id}_fallback_${model}`
+    ) as Promise<Record<string, unknown>>,
+    3,    // max attempts across primary + fallbacks
+    2000  // base delay between fallback attempts
+  )
+
+  const llmFailed = !fallbackResult.success
+  const usedModel = fallbackResult.model
+  const usedFallback = fallbackResult.usedFallback
+
+  // Log fallback usage for the Superadmin panel
+  if (usedFallback && fallbackResult.success) {
+    console.log(
+      `[analyze] ${agent.name} used FALLBACK model "${usedModel}" (attempt ${fallbackResult.attempt}) — primary model failed`
     )
-  } catch (llmError) {
-    console.error(`[analyze] ${agent.name} LLM call failed after retries:`, llmError instanceof Error ? llmError.message : 'Unknown')
   }
 
-  const raw = result?.choices?.[0]?.message?.content || ''
-  console.log(`[analyze] ${agent.name} response length:`, raw.length)
+  // Extract the LLM response from the fallback result
+  const llmResponse = fallbackResult.data as { choices?: Array<{ message?: { content?: string } }> } | null
+  const raw = llmResponse?.choices?.[0]?.message?.content || ''
+  const outputTokens = raw.length > 0 ? tokenTracker.estimateTokens(raw) : 0
+
+  // Track token usage for this agent's LLM call
+  if (!llmFailed && outputTokens > 0) {
+    tokenTracker.track({
+      agentId: agent.id,
+      agentName: agent.name,
+      model: usedModel,
+      inputTokens,
+      outputTokens,
+    })
+  }
+
+  // Track failure if LLM call failed
+  if (llmFailed) {
+    tokenTracker.trackFailure(agent.id, agent.name, usedModel)
+  }
+
+  console.log(`[analyze] ${agent.name} response length:`, raw.length, `(~${inputTokens} in / ${outputTokens} out tokens)`, usedFallback ? `[FALLBACK: ${usedModel}]` : '')
+
+  // Build a summary of fallback attempts for AgentLog
+  const fallbackSummary = fallbackResult.logs.length > 1
+    ? ` | Fallback attempts: ${fallbackResult.logs.map(l => `${l.model}(${l.success ? 'ok' : 'fail'})`).join('\u2192')}`
+    : ''
 
   if (!raw) {
     console.warn(`[analyze] ${agent.name} returned empty response`)
+
+    // Create AgentLog entry for failed/empty agent
+    try {
+      await db.agentLog.create({
+        data: {
+          analysisId,
+          agentId: agent.id,
+          agentName: agent.name,
+          action: agent.role.split(':')[0] || 'Analyzing...',
+          status: llmFailed ? 'failed' : 'completed',
+          tokensUsed: inputTokens + outputTokens,
+          costUsd: tokenTracker.calculateCost({ agentId: agent.id, agentName: agent.name, model: usedModel, inputTokens, outputTokens }),
+          model: usedModel,
+          error: (llmFailed ? `LLM call failed after retries (${fallback.getAttemptSummary()})` : 'Empty response from LLM') + fallbackSummary,
+          startedAt,
+          completedAt: new Date(),
+        }
+      })
+    } catch (logError) {
+      console.error('[analyze] Failed to create AgentLog:', logError instanceof Error ? logError.message : 'Unknown')
+    }
+
     return { data: {}, progress }
   }
 
+  let parsed: Record<string, unknown> = {}
   try {
-    const parsed = repairAndParseJSON(raw)
+    parsed = repairAndParseJSON(raw)
     console.log(`[analyze] ${agent.name} parsed successfully, keys:`, Object.keys(parsed).join(', '))
-    return { data: parsed, progress }
   } catch (e) {
     console.error(`[analyze] ${agent.name} JSON parse failed:`, e instanceof Error ? e.message : 'Unknown error')
+
+    // Create AgentLog entry for parse failure
+    try {
+      await db.agentLog.create({
+        data: {
+          analysisId,
+          agentId: agent.id,
+          agentName: agent.name,
+          action: agent.role.split(':')[0] || 'Analyzing...',
+          status: 'failed',
+          tokensUsed: inputTokens + outputTokens,
+          costUsd: tokenTracker.calculateCost({ agentId: agent.id, agentName: agent.name, model: usedModel, inputTokens, outputTokens }),
+          model: usedModel,
+          error: `JSON parse failed: ${e instanceof Error ? e.message : 'Unknown error'}${fallbackSummary}`,
+          startedAt,
+          completedAt: new Date(),
+        }
+      })
+    } catch (logError) {
+      console.error('[analyze] Failed to create AgentLog:', logError instanceof Error ? logError.message : 'Unknown')
+    }
+
     return { data: {}, progress }
   }
+
+  // Create AgentLog entry for successful agent run
+  try {
+    await db.agentLog.create({
+      data: {
+        analysisId,
+        agentId: agent.id,
+        agentName: agent.name,
+        action: agent.role.split(':')[0] || 'Analyzing...',
+        status: 'completed',
+        tokensUsed: inputTokens + outputTokens,
+        costUsd: tokenTracker.calculateCost({ agentId: agent.id, agentName: agent.name, model: usedModel, inputTokens, outputTokens }),
+        model: usedModel,
+        result: JSON.stringify(parsed).slice(0, 10000), // Truncate to avoid DB bloat
+        startedAt,
+        completedAt: new Date(),
+      }
+    })
+  } catch (logError) {
+    console.error('[analyze] Failed to create AgentLog:', logError instanceof Error ? logError.message : 'Unknown')
+  }
+
+  return { data: parsed, progress }
 }
 
 export async function POST(request: NextRequest) {
@@ -269,20 +427,85 @@ export async function POST(request: NextRequest) {
     const parsedUrl = new URL(url)
     const domain = parsedUrl.hostname.replace('www.', '')
 
+    // Generate a unique session ID for this analysis run
+    const analysisSessionId = randomUUID()
+
+    // Create an Analysis record in the database
+    let analysisId = analysisSessionId
+    try {
+      const analysisRecord = await db.analysis.create({
+        data: {
+          url,
+          domain,
+          market: targetMarket,
+          status: 'running',
+          mode: 'auto-pilot',
+        }
+      })
+      analysisId = analysisRecord.id
+    } catch (dbError) {
+      console.error('[analyze] Failed to create Analysis record:', dbError instanceof Error ? dbError.message : 'Unknown')
+      // Continue with the session ID as fallback
+    }
+
     async function* generateEvents(): AsyncGenerator<string> {
       try {
         const ZAI = (await import('z-ai-web-dev-sdk')).default
         const zai = await ZAI.create()
 
+        // Create the token tracker for this analysis session
+        const tokenTracker = new TokenTracker(analysisSessionId)
+
+        // Emit analysis:start via WebSocket
+        emitWS(analysisSessionId, 'analysis:start', { sessionId: analysisSessionId, url, market: targetMarket })
+
+        // ════════════════════════════════════════════════════════════════
+        // Shared Context Cache: Master Director scans once, other agents read
+        // from cache. Avoids duplicate scraping and token waste for the same
+        // URL within 30 minutes.
+        // ════════════════════════════════════════════════════════════════
+
+        // Check if there's a fresh cache entry for this URL+market combo
+        const cachedContext = sharedContextCache.get(url, targetMarket)
+
+        let siteData: { title?: string; html?: string; url?: string; text?: string }
+        let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }>
+        let aiSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }>
+        let localSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }>
+        let htmlStructure: string
+
+        if (cachedContext) {
+          // ── Cache HIT: Skip data gathering, use cached results ──
+          console.log(`[analyze] Cache HIT for ${url}:${targetMarket} — skipping data gathering phase (age: ${Math.round((Date.now() - cachedContext.createdAt) / 1000)}s)`)
+          yield sendProgress(5, 'Using cached scan data...', analysisSessionId)
+          await flush()
+
+          siteData = {
+            title: cachedContext.siteData.title,
+            html: cachedContext.siteData.html,
+            url: cachedContext.url,
+            text: cachedContext.siteData.text,
+          }
+          searchResults = cachedContext.searchResults
+          aiSearchResults = cachedContext.aiSearchResults
+          localSearchResults = cachedContext.localSearchResults
+          htmlStructure = cachedContext.htmlStructure
+
+          yield sendProgress(35, 'Cached data loaded. Proceeding to agent analysis...')
+          await flush()
+        } else {
+          // ── Cache MISS: Run data gathering phase ──
+          console.log(`[analyze] Cache MISS for ${url}:${targetMarket} — running data gathering phase`)
+
         // ════════════════════════════════════════════════════════════════
         // Phase 1: Data Gathering — SEQUENTIAL to avoid rate limits
         // ════════════════════════════════════════════════════════════════
 
-        // Step 1: Page scan
-        yield sendProgress(5, 'Scanning website content & structure...')
+        // Step 1: Page scan — include sessionId in the first SSE event
+        yield sendProgress(5, 'Scanning website content & structure...', analysisSessionId)
         await flush()
 
-        let siteData: { title?: string; html?: string; url?: string; text?: string } = { title: url, url, text: '' }
+        siteData = { title: url, url, text: '' }
         try {
           const pageResult = await retryWithBackoff(
             () => withTimeout(
@@ -311,6 +534,17 @@ export async function POST(request: NextRequest) {
               url: rawData.url || url,
               text: plainText,
             }
+
+            // Track page_reader token usage (data-gathering pseudo-agent)
+            const pageInputTokens = tokenTracker.estimateTokens(url)
+            const pageOutputTokens = tokenTracker.estimateTokens(htmlContent + plainText)
+            tokenTracker.track({
+              agentId: 'data-gathering-page-reader',
+              agentName: 'Data Gathering (Page Reader)',
+              model: 'default',
+              inputTokens: pageInputTokens,
+              outputTokens: pageOutputTokens,
+            })
           }
         } catch {
           siteData = { title: url, url, text: '' }
@@ -320,7 +554,7 @@ export async function POST(request: NextRequest) {
         yield sendProgress(18, 'Analyzing competitive landscape...')
         await flush()
 
-        let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+        searchResults = []
         try {
           await new Promise(resolve => setTimeout(resolve, 1500))
           const compResults = await retryWithBackoff(
@@ -334,6 +568,17 @@ export async function POST(request: NextRequest) {
             'web_search_competitors'
           )
           searchResults = Array.isArray(compResults) ? compResults : []
+
+          // Track web_search token usage (competitors)
+          const searchInputTokens = tokenTracker.estimateTokens(`best ${siteData.title || domain} alternatives competitors`)
+          const searchOutputTokens = tokenTracker.estimateTokens(JSON.stringify(searchResults))
+          tokenTracker.track({
+            agentId: 'data-gathering-web-search',
+            agentName: 'Data Gathering (Web Search)',
+            model: 'default',
+            inputTokens: searchInputTokens,
+            outputTokens: searchOutputTokens,
+          })
         } catch {
           searchResults = []
         }
@@ -342,7 +587,7 @@ export async function POST(request: NextRequest) {
         yield sendProgress(28, 'Checking AI citation signals...')
         await flush()
 
-        let aiSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+        aiSearchResults = []
         try {
           await new Promise(resolve => setTimeout(resolve, 2000))
           const aiResults = await retryWithBackoff(
@@ -356,12 +601,23 @@ export async function POST(request: NextRequest) {
             'web_search_ai'
           )
           aiSearchResults = Array.isArray(aiResults) ? aiResults : []
+
+          // Track web_search token usage (AI citation)
+          const aiSearchInputTokens = tokenTracker.estimateTokens(`${domain} AI citation authority ChatGPT Perplexity`)
+          const aiSearchOutputTokens = tokenTracker.estimateTokens(JSON.stringify(aiSearchResults))
+          tokenTracker.track({
+            agentId: 'data-gathering-web-search',
+            agentName: 'Data Gathering (Web Search)',
+            model: 'default',
+            inputTokens: aiSearchInputTokens,
+            outputTokens: aiSearchOutputTokens,
+          })
         } catch {
           aiSearchResults = []
         }
 
         // Step 4: Local SEO search (only if non-global market)
-        let localSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
+        localSearchResults = []
         if (targetMarket !== 'Global') {
           yield sendProgress(32, `Analyzing local SEO for ${targetMarket}...`)
           await flush()
@@ -378,10 +634,44 @@ export async function POST(request: NextRequest) {
               'web_search_local'
             )
             localSearchResults = Array.isArray(localResults) ? localResults : []
+
+            // Track web_search token usage (local)
+            const localSearchInputTokens = tokenTracker.estimateTokens(`${domain} ${targetMarket} local SEO business`)
+            const localSearchOutputTokens = tokenTracker.estimateTokens(JSON.stringify(localSearchResults))
+            tokenTracker.track({
+              agentId: 'data-gathering-web-search',
+              agentName: 'Data Gathering (Web Search)',
+              model: 'default',
+              inputTokens: localSearchInputTokens,
+              outputTokens: localSearchOutputTokens,
+            })
           } catch {
             localSearchResults = []
           }
         }
+
+          // Save all gathered data to the shared context cache for future requests
+          sharedContextCache.set(url, targetMarket, {
+            url,
+            domain,
+            siteData: {
+              title: siteData.title || url,
+              html: siteData.html || '',
+              text: siteData.text || '',
+            },
+            robotsTxt: '',
+            llmsTxtExists: false,
+            blockedBots: [],
+            allowedBots: [],
+            searchResults,
+            aiSearchResults,
+            localSearchResults,
+            htmlStructure: siteData.html ? extractHtmlStructure(siteData.html) : '',
+            createdAt: Date.now(),
+          })
+          console.log(`[analyze] Saved data to shared context cache for ${url}:${targetMarket}`)
+
+        } // end of cache-miss data gathering block
 
         // ════════════════════════════════════════════════════════════════
         // Phase 2: 8-Agent Analysis — Two parallel batches with delays
@@ -389,7 +679,7 @@ export async function POST(request: NextRequest) {
 
         // Build context for agents
         const siteContent = siteData.text?.slice(0, 2500) || 'No content available'
-        const htmlStructure = siteData.html ? extractHtmlStructure(siteData.html) : ''
+        htmlStructure = htmlStructure || (siteData.html ? extractHtmlStructure(siteData.html) : '')
 
         const competitorInfo = searchResults
           .slice(0, 3)
@@ -436,9 +726,40 @@ export async function POST(request: NextRequest) {
           return new Promise<{ data: Record<string, unknown> }>(async (resolve) => {
             // Stagger each agent by 1800ms to avoid rate limits
             await new Promise(r => setTimeout(r, index * 1800))
+
+            // Emit agent:start via WebSocket
+            emitWS(analysisSessionId, 'agent:start', {
+              sessionId: analysisSessionId,
+              agentId: agent.id,
+              agentName: agent.name,
+              action: agent.role.split(':')[0] || 'Analyzing...',
+            })
+
             const result = await runAgent(zai, agent, agentContext, startProgress, (p, s) => {
-              // We yield progress directly from here
-            }, flush)
+              // Emit agent:progress via WebSocket
+              emitWS(analysisSessionId, 'agent:progress', {
+                sessionId: analysisSessionId,
+                agentId: agent.id,
+                progress: p,
+                message: s,
+              })
+            }, flush, tokenTracker, analysisId)
+
+            // Emit agent:complete or agent:error via WebSocket
+            if (Object.keys(result.data).length > 0) {
+              emitWS(analysisSessionId, 'agent:complete', {
+                sessionId: analysisSessionId,
+                agentId: agent.id,
+                result: 'Complete',
+              })
+            } else {
+              emitWS(analysisSessionId, 'agent:error', {
+                sessionId: analysisSessionId,
+                agentId: agent.id,
+                error: 'Empty response from LLM',
+              })
+            }
+
             resolve(result)
           })
         })
@@ -471,7 +792,40 @@ export async function POST(request: NextRequest) {
           const startProgress = 64 + index * 5
           return new Promise<{ data: Record<string, unknown> }>(async (resolve) => {
             await new Promise(r => setTimeout(r, index * 1800))
-            const result = await runAgent(zai, agent, agentContext, startProgress, () => {}, flush)
+
+            // Emit agent:start via WebSocket
+            emitWS(analysisSessionId, 'agent:start', {
+              sessionId: analysisSessionId,
+              agentId: agent.id,
+              agentName: agent.name,
+              action: agent.role.split(':')[0] || 'Analyzing...',
+            })
+
+            const result = await runAgent(zai, agent, agentContext, startProgress, (p, s) => {
+              // Emit agent:progress via WebSocket
+              emitWS(analysisSessionId, 'agent:progress', {
+                sessionId: analysisSessionId,
+                agentId: agent.id,
+                progress: p,
+                message: s,
+              })
+            }, flush, tokenTracker, analysisId)
+
+            // Emit agent:complete or agent:error via WebSocket
+            if (Object.keys(result.data).length > 0) {
+              emitWS(analysisSessionId, 'agent:complete', {
+                sessionId: analysisSessionId,
+                agentId: agent.id,
+                result: 'Complete',
+              })
+            } else {
+              emitWS(analysisSessionId, 'agent:error', {
+                sessionId: analysisSessionId,
+                agentId: agent.id,
+                error: 'Empty response from LLM',
+              })
+            }
+
             resolve(result)
           })
         })
@@ -493,6 +847,22 @@ export async function POST(request: NextRequest) {
         const hasAnyData = allAgentResults.some(r => Object.keys(r).length > 0)
         if (!hasAnyData) {
           console.error('[analyze] All agent LLM calls failed after retries')
+
+          // Save token tracking even on failure
+          try {
+            await tokenTracker.saveToDatabase()
+          } catch (e) {
+            console.error('[analyze] Failed to save token tracking on error:', e instanceof Error ? e.message : 'Unknown')
+          }
+
+          // Update Analysis record status
+          try {
+            await db.analysis.update({
+              where: { id: analysisId },
+              data: { status: 'failed' }
+            })
+          } catch { /* ignore */ }
+
           yield sendError('AI analysis service is currently busy. Please try again in 30 seconds.')
           return
         }
@@ -672,10 +1042,65 @@ export async function POST(request: NextRequest) {
         await new Promise((resolve) => setTimeout(resolve, 300))
 
         yield sendProgress(100, 'Analysis complete!')
+
+        // Emit analysis:complete via WebSocket
+        emitWS(analysisSessionId, 'analysis:complete', { sessionId: analysisSessionId })
+
+        // ════════════════════════════════════════════════════════════════
+        // Save token usage to database (non-blocking, at the end)
+        // ════════════════════════════════════════════════════════════════
+        const tokenSummary = tokenTracker.getSummary()
+        console.log(`[analyze] Token usage summary: ${tokenSummary.totalTokens} tokens, $${tokenSummary.totalCost.toFixed(4)} estimated cost`)
+        console.log(`[analyze] By agent:`, Object.entries(tokenSummary.byAgent).map(([id, data]) => `${id}: ${data.tokens} tokens, $${data.cost.toFixed(4)}`).join('; '))
+
+        // Attach token summary to analysis result
+        analysisResult._tokenSummary = {
+          totalTokens: tokenSummary.totalTokens,
+          totalCost: tokenSummary.totalCost,
+          byAgent: tokenSummary.byAgent,
+        }
+
+        // Save token tracking to database (fire and forget, don't block the response)
+        tokenTracker.saveToDatabase().catch((err) => {
+          console.error('[analyze] Failed to save token tracking:', err instanceof Error ? err.message : 'Unknown')
+        })
+
+        // Update Analysis record with completed status and result
+        try {
+          await db.analysis.update({
+            where: { id: analysisId },
+            data: {
+              status: 'completed',
+              result: JSON.stringify(analysisResult).slice(0, 500000), // Limit to prevent DB issues
+            }
+          })
+        } catch (dbError) {
+          console.error('[analyze] Failed to update Analysis record:', dbError instanceof Error ? dbError.message : 'Unknown')
+        }
+
         yield sendComplete(analysisResult)
+
+        // Fire and forget webhook dispatch
+        try {
+          const { WebhookDispatcher } = await import('@/lib/webhook-dispatcher')
+          const dispatcher = new WebhookDispatcher()
+          dispatcher.dispatch('system', { type: 'analysis.complete', domain, message: `Analysis complete for ${domain}` }).catch(() => {})
+        } catch {}
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Analysis failed'
         console.error('[analyze] Error:', msg)
+
+        // Emit analysis:error via WebSocket
+        emitWS(analysisSessionId, 'analysis:error', { sessionId: analysisSessionId, error: msg })
+
+        // Update Analysis record with failed status
+        try {
+          await db.analysis.update({
+            where: { id: analysisId },
+            data: { status: 'failed' }
+          })
+        } catch { /* ignore */ }
+
         yield sendError(msg)
       }
     }

@@ -33,6 +33,15 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
     }
   }
 
+  const handleLogoClick = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Trigger the global admin logo click handler if available
+    const globalClick = (window as unknown as Record<string, unknown>).__seosightsLogoClick
+    if (typeof globalClick === 'function') {
+      ;(globalClick as () => void)()
+    }
+  }
+
   return (
     <>
       <motion.nav
@@ -49,8 +58,8 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
           <div className="flex items-center justify-between h-16">
             {/* Text-only Logo */}
             <div
-              className="flex flex-col items-start cursor-pointer"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="flex flex-col items-start cursor-pointer select-none"
+              onClick={handleLogoClick}
             >
               <span className="font-bold text-xl tracking-tight leading-none bg-gradient-to-r from-emerald-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent">
                 seosights

@@ -1,6 +1,20 @@
 import { create } from 'zustand'
 
 export type AppView = 'landing' | 'analyzing' | 'dashboard'
+export type AnalysisMode = 'auto-pilot' | 'co-pilot'
+
+// Approval interface for Human-in-the-Loop system
+export interface Approval {
+  id: string
+  analysisId: string
+  agentId: string
+  agentName: string
+  actionType: 'meta-tag-change' | 'content-publish' | 'robots-update' | 'schema-update' | 'content-modification'
+  actionDescription: string
+  actionData: string  // JSON string with the proposed change
+  status: 'pending' | 'approved' | 'rejected' | 'expired'
+  createdAt: string
+}
 
 // Three Pillar Scores
 export interface PillarScores {
@@ -292,6 +306,10 @@ interface AppState {
   analysisStep: string
   analysisError: string
   activeAgent: string | null
+  sessionId: string
+  mode: AnalysisMode
+  pendingApprovals: Approval[]
+  currentAnalysisId: string | null
   setView: (view: AppView) => void
   setTargetUrl: (url: string) => void
   setTargetMarket: (market: string) => void
@@ -300,8 +318,15 @@ interface AppState {
   setAnalysisStep: (step: string) => void
   setAnalysisError: (error: string) => void
   setActiveAgent: (agent: string | null) => void
+  setSessionId: (sessionId: string) => void
+  setMode: (mode: AnalysisMode) => void
+  setPendingApprovals: (approvals: Approval[]) => void
+  addPendingApproval: (approval: Approval) => void
+  removePendingApproval: (id: string) => void
+  updatePendingApproval: (id: string, status: Approval['status']) => void
+  setCurrentAnalysisId: (id: string | null) => void
   reset: () => void
-  startAnalysis: (url: string, market?: string) => void
+  startAnalysis: (url: string, market?: string, mode?: AnalysisMode) => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -313,6 +338,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   analysisStep: '',
   analysisError: '',
   activeAgent: null,
+  sessionId: '',
+  mode: 'auto-pilot',
+  pendingApprovals: [],
+  currentAnalysisId: null,
   setView: (view) => set({ view }),
   setTargetUrl: (url) => set({ targetUrl: url }),
   setTargetMarket: (market) => set({ targetMarket: market }),
@@ -321,8 +350,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAnalysisStep: (step) => set({ analysisStep: step }),
   setAnalysisError: (error) => set({ analysisError: error }),
   setActiveAgent: (agent) => set({ activeAgent: agent }),
-  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '', activeAgent: null }),
-  startAnalysis: (url: string, market?: string) => {
-    set({ targetUrl: url, targetMarket: market || 'Global', view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null, activeAgent: null })
+  setSessionId: (sessionId) => set({ sessionId }),
+  setMode: (mode) => set({ mode }),
+  setPendingApprovals: (approvals) => set({ pendingApprovals: approvals }),
+  addPendingApproval: (approval) => set((state) => ({ pendingApprovals: [...state.pendingApprovals, approval] })),
+  removePendingApproval: (id) => set((state) => ({ pendingApprovals: state.pendingApprovals.filter((a) => a.id !== id) })),
+  updatePendingApproval: (id, status) => set((state) => ({
+    pendingApprovals: state.pendingApprovals.map((a) =>
+      a.id === id ? { ...a, status } : a
+    ),
+  })),
+  setCurrentAnalysisId: (id) => set({ currentAnalysisId: id }),
+  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '', activeAgent: null, sessionId: '', mode: 'auto-pilot', pendingApprovals: [], currentAnalysisId: null }),
+  startAnalysis: (url: string, market?: string, mode?: AnalysisMode) => {
+    set({ targetUrl: url, targetMarket: market || 'Global', mode: mode || get().mode, view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null, activeAgent: null, sessionId: '', pendingApprovals: [], currentAnalysisId: null })
   },
 }))

@@ -11,8 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X, Globe, ArrowRight, MapPin } from 'lucide-react'
-import { useAppStore } from '@/lib/store'
+import { X, Globe, ArrowRight, MapPin, Bot, User } from 'lucide-react'
+import { useAppStore, AnalysisMode } from '@/lib/store'
 
 const markets = [
   { value: 'Global', label: '🌍 Global' },
@@ -59,6 +59,7 @@ interface URLInputModalProps {
 export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
   const [url, setUrl] = useState('')
   const [market, setMarket] = useState('Global')
+  const [mode, setMode] = useState<AnalysisMode>('auto-pilot')
   const [error, setError] = useState('')
   const { startAnalysis } = useAppStore()
 
@@ -81,7 +82,7 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
     }
 
     setError('')
-    startAnalysis(cleanUrl, market)
+    startAnalysis(cleanUrl, market, mode)
     onClose()
   }
 
@@ -171,6 +172,55 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
                   </Select>
                 </div>
 
+                {/* Mode Selector */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Execution Mode</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMode('auto-pilot')}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 ${
+                        mode === 'auto-pilot'
+                          ? 'border-emerald-500/50 bg-emerald-500/10'
+                          : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        mode === 'auto-pilot' ? 'bg-emerald-500/20' : 'bg-white/5'
+                      }`}>
+                        <Bot className={`w-5 h-5 ${mode === 'auto-pilot' ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                      </div>
+                      <span className={`text-sm font-semibold ${mode === 'auto-pilot' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                        Auto-Pilot
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60 text-center leading-tight">
+                        Agents execute automatically
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode('co-pilot')}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 ${
+                        mode === 'co-pilot'
+                          ? 'border-amber-500/50 bg-amber-500/10'
+                          : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        mode === 'co-pilot' ? 'bg-amber-500/20' : 'bg-white/5'
+                      }`}>
+                        <User className={`w-5 h-5 ${mode === 'co-pilot' ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                      </div>
+                      <span className={`text-sm font-semibold ${mode === 'co-pilot' ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                        Co-Pilot
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60 text-center leading-tight">
+                        Agents need your approval
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
                 {error && (
                   <motion.p
                     className="text-rose-400 text-sm text-center"
@@ -185,7 +235,7 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
                   onClick={handleSubmit}
                   className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg h-14 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
                 >
-                  Analyze My Site
+                  {mode === 'auto-pilot' ? 'Analyze My Site' : 'Analyze & Review Actions'}
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </div>

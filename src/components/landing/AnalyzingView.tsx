@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { io, Socket } from 'socket.io-client'
 import { useAppStore, SEOAnalysis } from '@/lib/store'
-import { Globe, Loader2, AlertTriangle, ArrowLeft, MapPin, RefreshCw, Clock } from 'lucide-react'
+import { Globe, Loader2, AlertTriangle, ArrowLeft, MapPin, RefreshCw, Clock, Terminal } from 'lucide-react'
 
 const phases = [
   { label: 'Scanning your website', icon: '🔍', phase: 'Phase 1' },
@@ -44,6 +45,45 @@ const SIMULATED_STEPS = [
   { progress: 95, step: 'Finalizing your strategy...', delay: 62000 },
 ]
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent Log Entry Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AgentLogEntry {
+  id: string
+  timestamp: number
+  agentId: string
+  agentName: string
+  agentIcon: string
+  action: string
+  status: 'running' | 'complete' | 'error'
+  duration?: number // seconds when complete
+}
+
+// Map agent IDs to their icons
+const AGENT_ICON_MAP: Record<string, string> = {
+  'master-director': '🎯',
+  'keyword-researcher': '🔑',
+  'competitor-analyst': '🕵️',
+  'content-architect': '🏗️',
+  'on-page-auditor': '🔍',
+  'link-strategist': '🔗',
+  'tech-schema-auditor': '⚙️',
+  'backlink-prospector': '🤝',
+}
+
+// Map agent IDs to their colors
+const AGENT_COLOR_MAP: Record<string, string> = {
+  'master-director': 'text-emerald-400',
+  'keyword-researcher': 'text-cyan-400',
+  'competitor-analyst': 'text-amber-400',
+  'content-architect': 'text-emerald-400',
+  'on-page-auditor': 'text-cyan-400',
+  'link-strategist': 'text-amber-400',
+  'tech-schema-auditor': 'text-emerald-400',
+  'backlink-prospector': 'text-cyan-400',
+}
+
 export default function AnalyzingView() {
   const {
     targetUrl,
@@ -51,11 +91,14 @@ export default function AnalyzingView() {
     analysisProgress,
     analysisStep,
     analysisError,
+    sessionId,
+    mode,
     setAnalysisProgress,
     setAnalysisStep,
     setAnalysis,
     setView,
     setAnalysisError,
+    setSessionId,
   } = useAppStore()
 
   const analyzedUrlRef = useRef<string | null>(null)
@@ -65,10 +108,221 @@ export default function AnalyzingView() {
   const simulationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const sseProgressRef = useRef<number>(0) // Track latest SSE progress
 
+  // Agent log state
+  const [agentLogs, setAgentLogs] = useState<AgentLogEntry[]>([])
+  const logContainerRef = useRef<HTMLDivElement>(null)
+  const socketRef = useRef<Socket | null>(null)
+  const agentStartTimesRef = useRef<Map<string, number>>(new Map())
+
   // Clear all simulation timers
   const clearSimulationTimers = useCallback(() => {
     simulationTimersRef.current.forEach((t) => clearTimeout(t))
     simulationTimersRef.current = []
+  }, [])
+
+  // Auto-scroll the log container
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
+    }
+  }, [agentLogs])
+
+  // ── WebSocket Connection ─────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionId) return
+
+    // Connect to the agent-stream WebSocket service
+    const socket = io('/?XTransformPort=3003', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    })
+
+    socketRef.current = socket
+
+    socket.on('connect', () => {
+      console.log('[AnalyzingView] WebSocket connected:', socket.id)
+      // Join the session room
+      socket.emit('join:session', sessionId)
+    })
+
+    socket.on('session:joined', (data: { sessionId: string; eventCount: number }) => {
+      console.log('[AnalyzingView] Joined session:', data.sessionId, 'replay events:', data.eventCount)
+    })
+
+    socket.on('session:replay', (data: { sessionId: string; events: Array<{ event: string; data: Record<string, unknown>; timestamp: number }> }) => {
+      // Replay stored events
+      for (const evt of data.events) {
+        handleSocketEvent(evt.event, evt.data, evt.timestamp)
+      }
+    })
+
+    // ── Agent Events ──────────────────────────────────────────────
+    socket.on('agent:start', (data: Record<string, unknown>) => {
+      handleSocketEvent('agent:start', data, Date.now())
+    })
+
+    socket.on('agent:progress', (data: Record<string, unknown>) => {
+      handleSocketEvent('agent:progress', data, Date.now())
+    })
+
+    socket.on('agent:complete', (data: Record<string, unknown>) => {
+      handleSocketEvent('agent:complete', data, Date.now())
+    })
+
+    socket.on('agent:error', (data: Record<string, unknown>) => {
+      handleSocketEvent('agent:error', data, Date.now())
+    })
+
+    socket.on('analysis:start', (data: Record<string, unknown>) => {
+      handleSocketEvent('analysis:start', data, Date.now())
+    })
+
+    socket.on('analysis:complete', () => {
+      // Analysis complete — WebSocket side
+    })
+
+    socket.on('analysis:error', (data: Record<string, unknown>) => {
+      console.error('[AnalyzingView] Analysis error via WebSocket:', data)
+    })
+
+    socket.on('disconnect', (reason) => {
+      console.log('[AnalyzingView] WebSocket disconnected:', reason)
+    })
+
+    socket.on('connect_error', (err) => {
+      console.warn('[AnalyzingView] WebSocket connect error:', err.message)
+    })
+
+    return () => {
+      socket.disconnect()
+      socketRef.current = null
+    }
+  }, [sessionId])
+
+  // Handle incoming socket events and update agent log state
+  const handleSocketEvent = useCallback((event: string, data: Record<string, unknown>, timestamp: number) => {
+    const agentId = (data.agentId as string) || ''
+    const agentName = (data.agentName as string) || agentId
+
+    if (event === 'agent:start') {
+      const action = (data.action as string) || 'Starting...'
+      agentStartTimesRef.current.set(agentId, timestamp)
+
+      setAgentLogs((prev) => [
+        ...prev,
+        {
+          id: `${agentId}-${timestamp}`,
+          timestamp,
+          agentId,
+          agentName,
+          agentIcon: AGENT_ICON_MAP[agentId] || '🤖',
+          action,
+          status: 'running',
+        },
+      ])
+    } else if (event === 'agent:progress') {
+      const message = (data.message as string) || 'Working...'
+      // Update the last running entry for this agent, or add a progress line
+      setAgentLogs((prev) => {
+        const lastIdx = [...prev].reverse().findIndex((e) => e.agentId === agentId && e.status === 'running')
+        if (lastIdx !== -1) {
+          const actualIdx = prev.length - 1 - lastIdx
+          const updated = [...prev]
+          updated[actualIdx] = { ...updated[actualIdx], action: message }
+          return updated
+        }
+        return [
+          ...prev,
+          {
+            id: `${agentId}-progress-${timestamp}`,
+            timestamp,
+            agentId,
+            agentName,
+            agentIcon: AGENT_ICON_MAP[agentId] || '🤖',
+            action: message,
+            status: 'running',
+          },
+        ]
+      })
+    } else if (event === 'agent:complete') {
+      const startTime = agentStartTimesRef.current.get(agentId) || timestamp
+      const durationSec = ((timestamp - startTime) / 1000).toFixed(1)
+      agentStartTimesRef.current.delete(agentId)
+
+      setAgentLogs((prev) => {
+        // Mark the last running entry for this agent as complete
+        const lastIdx = [...prev].reverse().findIndex((e) => e.agentId === agentId && e.status === 'running')
+        if (lastIdx !== -1) {
+          const actualIdx = prev.length - 1 - lastIdx
+          const updated = [...prev]
+          updated[actualIdx] = {
+            ...updated[actualIdx],
+            status: 'complete',
+            duration: parseFloat(durationSec),
+            action: (data.result as string) || updated[actualIdx].action,
+          }
+          return updated
+        }
+        return [
+          ...prev,
+          {
+            id: `${agentId}-complete-${timestamp}`,
+            timestamp,
+            agentId,
+            agentName,
+            agentIcon: AGENT_ICON_MAP[agentId] || '🤖',
+            action: (data.result as string) || 'Complete',
+            status: 'complete',
+            duration: parseFloat(durationSec),
+          },
+        ]
+      })
+    } else if (event === 'agent:error') {
+      const errorMsg = (data.error as string) || 'Failed'
+      agentStartTimesRef.current.delete(agentId)
+
+      setAgentLogs((prev) => {
+        const lastIdx = [...prev].reverse().findIndex((e) => e.agentId === agentId && e.status === 'running')
+        if (lastIdx !== -1) {
+          const actualIdx = prev.length - 1 - lastIdx
+          const updated = [...prev]
+          updated[actualIdx] = {
+            ...updated[actualIdx],
+            status: 'error',
+            action: errorMsg,
+          }
+          return updated
+        }
+        return [
+          ...prev,
+          {
+            id: `${agentId}-error-${timestamp}`,
+            timestamp,
+            agentId,
+            agentName,
+            agentIcon: AGENT_ICON_MAP[agentId] || '🤖',
+            action: errorMsg,
+            status: 'error',
+          },
+        ]
+      })
+    } else if (event === 'analysis:start') {
+      setAgentLogs((prev) => [
+        ...prev,
+        {
+          id: `analysis-start-${timestamp}`,
+          timestamp,
+          agentId: 'system',
+          agentName: 'Analysis Engine',
+          agentIcon: '🚀',
+          action: `Starting analysis for ${data.url || 'unknown URL'}`,
+          status: 'complete',
+          duration: 0,
+        },
+      ])
+    }
   }, [])
 
   // Elapsed time counter
@@ -127,7 +381,7 @@ export default function AnalyzingView() {
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: targetUrl, market: targetMarket }),
+          body: JSON.stringify({ url: targetUrl, market: targetMarket, mode }),
           signal,
         })
 
@@ -172,6 +426,11 @@ export default function AnalyzingView() {
                 // SSE progress always overrides simulated progress
                 setAnalysisProgress(parsed.progress)
                 setAnalysisStep(parsed.step)
+
+                // Set sessionId from the first SSE event if present
+                if (parsed.sessionId && !sessionId) {
+                  setSessionId(parsed.sessionId)
+                }
               } else if (parsed.type === 'complete') {
                 clearTimeout(timeoutId)
                 clearSimulationTimers()
@@ -217,7 +476,7 @@ export default function AnalyzingView() {
       clearSimulationTimers()
       analyzedUrlRef.current = null
     }
-  }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError, retryCount, startSimulatedProgress, clearSimulationTimers])
+  }, [targetUrl, targetMarket, setAnalysisProgress, setAnalysisStep, setAnalysis, setView, setAnalysisError, setSessionId, retryCount, startSimulatedProgress, clearSimulationTimers, sessionId])
 
   const currentStepIndex = phases.findIndex((s) =>
     analysisStep.toLowerCase().includes(s.label.toLowerCase().split(' ')[0].toLowerCase())
@@ -228,6 +487,8 @@ export default function AnalyzingView() {
     const market = targetMarket
     analyzedUrlRef.current = null
     sseProgressRef.current = 0
+    setAgentLogs([])
+    agentStartTimesRef.current.clear()
     useAppStore.getState().reset()
     setRetryCount((prev) => prev + 1)
     // Re-trigger analysis after a short delay
@@ -244,6 +505,11 @@ export default function AnalyzingView() {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
     return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  const formatTimestamp = (ts: number) => {
+    const d = new Date(ts)
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
   }
 
   if (analysisError) {
@@ -396,6 +662,103 @@ export default function AnalyzingView() {
             )
           })}
         </div>
+
+        {/* ── Live Agent Log Panel ────────────────────────────────── */}
+        <motion.div
+          className="mt-6 rounded-xl border border-white/10 overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-black/40 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-400">Live Agent Stream</span>
+              <span className="relative flex h-2.5 w-2.5 ml-1">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground/50">
+              {agentLogs.length} events
+            </span>
+          </div>
+
+          {/* Log entries */}
+          <div
+            ref={logContainerRef}
+            className="max-h-[300px] overflow-y-auto bg-black/60 font-mono text-xs"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(255,255,255,0.1) transparent',
+            }}
+          >
+            {agentLogs.length === 0 ? (
+              <div className="px-4 py-8 text-muted-foreground/40 text-center">
+                Waiting for agent events...
+              </div>
+            ) : (
+              <div className="p-2">
+                <AnimatePresence initial={false}>
+                  {agentLogs.map((entry) => (
+                    <motion.div
+                      key={entry.id}
+                      initial={{ opacity: 0, x: -10, height: 0 }}
+                      animate={{ opacity: 1, x: 0, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 transition-colors"
+                    >
+                      {/* Timestamp */}
+                      <span className="text-muted-foreground/40 w-14 shrink-0 text-[10px]">
+                        {formatTimestamp(entry.timestamp)}
+                      </span>
+
+                      {/* Agent icon */}
+                      <span className="text-sm shrink-0">{entry.agentIcon}</span>
+
+                      {/* Agent name */}
+                      <span className={`shrink-0 font-semibold ${AGENT_COLOR_MAP[entry.agentId] || 'text-foreground'}`}>
+                        {entry.agentName}
+                      </span>
+
+                      {/* Separator */}
+                      <span className="text-muted-foreground/30 shrink-0">—</span>
+
+                      {/* Action */}
+                      <span className="text-muted-foreground truncate flex-1">
+                        {entry.action}
+                      </span>
+
+                      {/* Status indicator */}
+                      <span className="shrink-0 ml-auto">
+                        {entry.status === 'running' && (
+                          <span className="flex items-center gap-1">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                            </span>
+                            <span className="text-emerald-400 text-[10px]">Running</span>
+                          </span>
+                        )}
+                        {entry.status === 'complete' && (
+                          <span className="text-emerald-500 flex items-center gap-1">
+                            <span>✓</span>
+                            <span className="text-muted-foreground/60">{entry.duration?.toFixed(1)}s</span>
+                          </span>
+                        )}
+                        {entry.status === 'error' && (
+                          <span className="text-rose-400 text-[10px]">✗ error</span>
+                        )}
+                      </span>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </motion.div>
       </div>
     </div>
   )

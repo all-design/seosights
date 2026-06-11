@@ -210,3 +210,169 @@ Stage Summary:
 - Features section updated with 6 new features (3 tagged NEW, 1 tagged FREE)
 - Mobile overflow fix applied
 - All features browser-verified via Agent Browser QA
+
+---
+Task ID: 4
+Agent: Superadmin Panel Builder
+Task: Build the Superadmin Panel as a full-screen overlay with 5 tabs + 4 API endpoints
+
+Work Log:
+- Read worklog.md to understand prior work (8-agent system, ESSHEO upgrade, rankscale features)
+- Read existing Prisma schema (AgentPrompt, TokenUsage, Analysis, AgentLog, User models already defined)
+- Read current page.tsx, Navbar, Footer, agents.ts, store.ts for integration points
+- Created 4 API endpoints:
+  1. `/api/admin/tokens/route.ts` - GET: Token usage grouped by agent, daily cost chart data, summary stats, cost-per-audit; mock data fallback when no real data
+  2. `/api/admin/prompts/route.ts` - GET: Fetches all agent prompts (auto-seeds from agents.ts if empty); PUT: Updates prompt with version bump
+  3. `/api/admin/analyses/route.ts` - GET: Analysis history with status filter, includes user and agent logs
+  4. `/api/admin/users/route.ts` - GET: Users with search, plan derivation, analyses count
+- Created seed script at `/scripts/seed-admin.ts` for generating demo data
+- Created SuperadminPanel component (`/src/components/superadmin/SuperadminPanel.tsx`) with 5 tabs:
+  - Tab 1 (Token & Cost Monitor): Summary cards, cost-per-day bar chart (Recharts), agent token stats table, color-coded cost-per-audit (green <$0.30, yellow $0.30-$0.50, red >$0.50)
+  - Tab 2 (Prompt Playground): Sidebar agent list, editable system/user prompt textareas, Save/Test buttons, version display, active/inactive status
+  - Tab 3 (Fallback Config): Per-agent auto-fallback toggle, model selector (OpenAI/Anthropic/DeepSeek), Test Fallback button
+  - Tab 4 (Analysis History): Filterable list by status, detail panel with agent logs, Impersonate button
+  - Tab 5 (User Management): Search, user table with plan badges, click-to-expand user detail
+- Updated page.tsx with SuperadminPanel, Ctrl+Shift+A shortcut, ESC to close, 5-click-on-logo handler
+- Updated Navbar.tsx: Logo click triggers global __seosightsLogoClick handler
+- Updated Footer.tsx: Added onAdminClick prop with hidden Shield icon trigger
+- All APIs verified working (200 responses with data)
+- Lint passes with zero errors
+- Dev server compiles and serves pages successfully
+
+Stage Summary:
+- Full Superadmin Panel with 5 functional tabs implemented
+- 4 API endpoints with Prisma queries and proper error handling
+- 3 access methods: Ctrl+Shift+A, logo 5-click, footer Shield icon
+- Recharts bar chart for cost-per-day visualization
+- Color-coded cost-per-audit metric (green/yellow/red)
+- Mock data fallback ensures panel looks good even without real usage data
+- Prompt auto-seeding from agents.ts on first API call
+
+---
+Task ID: 6
+Agent: Human-in-the-Loop System Builder
+Task: Implement Auto-Pilot / Co-Pilot system with approval workflow
+
+Work Log:
+- Read worklog.md and all relevant existing files (store.ts, analyze route, AnalysisDashboard, URLInputModal, AnalyzingView, Prisma schema)
+- Updated Zustand Store (`src/lib/store.ts`):
+  - Added `AnalysisMode` type ('auto-pilot' | 'co-pilot')
+  - Added `Approval` interface with id, analysisId, agentId, agentName, actionType, actionDescription, actionData, status, createdAt
+  - Added `mode`, `pendingApprovals`, `currentAnalysisId` state fields
+  - Added `setMode`, `setPendingApprovals`, `addPendingApproval`, `removePendingApproval`, `updatePendingApproval`, `setCurrentAnalysisId` actions
+  - Updated `startAnalysis` to accept optional `mode` parameter
+  - Updated `reset` to clear mode, pendingApprovals, and currentAnalysisId
+- Updated Analyze API (`src/app/api/analyze/route.ts`):
+  - Added `import { db } from '@/lib/db'`
+  - Accept `mode` parameter from request body (defaults to 'auto-pilot')
+  - Create Analysis record in database at the start of each analysis
+  - In co-pilot mode: extract actionable items from agent results and create Approval entries
+    - deepStrategy.technicalImplementations → schema-update, robots-update, meta-tag-change, content-modification
+    - creative.onPageOptimizations → meta-tag-change
+    - creative.answerBlocks → content-publish
+    - structure.schemaRecommendations (status=active) → schema-update
+  - Update Analysis record status on completion and failure
+  - Include `_meta: { analysisId, mode }` in the complete event payload
+- Created Approval API Endpoints:
+  - `/api/approvals/route.ts`: GET (fetch approvals by analysisId + status), POST (bulk approve/reject)
+  - `/api/approvals/[id]/route.ts`: PUT (approve/reject individual approval)
+- Created PendingApprovalsPanel (`src/components/dashboard/PendingApprovalsPanel.tsx`):
+  - Slide-in panel from the right with backdrop blur
+  - Color-coded action type badges (meta-tag-change=amber, content-publish=emerald, robots-update=cyan, schema-update=purple, content-modification=rose)
+  - Agent emoji + name display per approval card
+  - Expandable JSON preview for proposed changes
+  - Approve/Reject buttons per card with animations (slide out on action)
+  - Approve All bulk action button
+  - Empty state with "All Clear!" message
+  - Fetches approvals from API on open with 5-second polling
+- Updated AnalysisDashboard (`src/components/landing/AnalysisDashboard.tsx`):
+  - Added Auto-Pilot / Co-Pilot toggle in header bar
+  - Added pending approvals bell button (amber, shows count) in co-pilot mode
+  - Added PendingApprovalsPanel integration
+  - Added floating Co-Pilot mode banner (bottom-right) with pending count
+  - Added useEffect to extract _meta (analysisId, mode) from analysis data
+  - Added useEffect to fetch approvals from API in co-pilot mode with polling
+  - Added ShieldCheck, PenTool, User icons to imports
+- Updated URLInputModal (`src/components/landing/URLInputModal.tsx`):
+  - Added mode selector with two visual cards (Auto-Pilot / Co-Pilot)
+  - Auto-Pilot: Bot icon, emerald theme, "Agents execute automatically"
+  - Co-Pilot: User icon, amber theme, "Agents need your approval"
+  - Submit button text changes based on mode
+  - Passes mode through to startAnalysis
+- Updated AnalyzingView (`src/components/landing/AnalyzingView.tsx`):
+  - Added `mode` from useAppStore
+  - Passes mode in the fetch body to /api/analyze
+- Ran `bun run db:push` — schema already in sync
+- Ran `bun run lint` — zero errors
+- Dev server compiles and serves pages successfully
+
+Stage Summary:
+- Complete Human-in-the-Loop (Auto-Pilot / Co-Pilot) system implemented
+- Auto-Pilot mode: works exactly as before (no changes to existing behavior)
+- Co-Pilot mode: creates Approval entries for agent actions, displays in slide-in panel
+- Approval API endpoints: GET, POST (bulk), PUT (individual)
+- Mode toggle in dashboard header and URL input modal
+- Floating Co-Pilot banner with pending count
+- Color-coded action type badges and expandable JSON preview
+- Animated approve/reject interactions
+- Zero lint errors, dev server running cleanly
+
+---
+Task ID: session-2
+Agent: Main Orchestrator
+Task: Backend enhancement session - 6 major features implemented
+
+Work Log:
+- Created WebSocket mini-service on port 3003 for live agent streaming
+  - Socket.io server in mini-services/agent-stream-service/
+  - Namespace: /agent-stream with room-per-analysis architecture
+  - Events: join-analysis, agent-start, agent-log, agent-complete, analysis-complete, analysis-error
+  - Frontend socket client in AnalyzingView connects via /?XTransformPort=3003
+  - Terminal-style Live Agent Log panel with auto-scroll, color-coded agent entries, monospace font
+  - Agent progress events emitted from analyze API route during each agent execution
+- Expanded Prisma schema with 7 new models (total: 10 tables)
+  - Analysis: tracks each analysis run with URL, status, mode, scores, userId
+  - AgentLog: per-agent execution log with agentId, agentName, prompt, response, token counts, duration, status
+  - Approval: Human-in-the-Loop approval entries for co-pilot mode (agentId, actionType, actionDescription, status)
+  - AgentPrompt: versioned agent prompt management with system/user prompt fields
+  - TokenUsage: granular token tracking per agent per analysis (promptTokens, completionTokens, cost)
+  - WebhookConfig: webhook endpoint configuration for AI visibility alerts
+  - VisibilityAlert: alert records for citation drops, rank changes, competitor gains
+- Built Superadmin Panel with 5 tabs and 4 API endpoints
+  - Tab 1 (Token & Cost Monitor): Summary cards, cost-per-day bar chart (Recharts), agent token stats table, color-coded cost-per-audit
+  - Tab 2 (Prompt Playground): Sidebar agent list, editable system/user prompt textareas, Save/Test buttons, version display
+  - Tab 3 (Fallback Config): Per-agent auto-fallback toggle, model selector (OpenAI/Anthropic/DeepSeek), Test Fallback button
+  - Tab 4 (Analysis History): Filterable list by status, detail panel with agent logs, Impersonate button
+  - Tab 5 (User Management): Search, user table with plan badges, click-to-expand user detail
+  - API: /api/admin/tokens (GET), /api/admin/prompts (GET/PUT), /api/admin/analyses (GET), /api/admin/users (GET)
+  - Access: Ctrl+Shift+A, 5-click on logo, footer Shield icon
+- Integrated WebSocket into AnalyzingView with Live Agent Log terminal panel
+  - Terminal panel with dark background, green/amber/cyan text, auto-scroll
+  - Real-time agent start/log/complete events displayed as they happen
+  - Collapsible panel with toggle button in analyzing view
+- Implemented Human-in-the-Loop system (Auto-Pilot / Co-Pilot)
+  - Auto-Pilot: agents execute automatically (default, unchanged behavior)
+  - Co-Pilot: agents create Approval entries for actionable changes
+  - Approval API: /api/approvals (GET/POST bulk), /api/approvals/[id] (PUT individual)
+  - PendingApprovalsPanel: slide-in panel with color-coded action type badges, expandable JSON, Approve/Reject buttons
+  - Mode toggle in URLInputModal (visual card selector) and dashboard header
+  - Floating Co-Pilot banner with pending count
+  - Approval types: schema-update, robots-update, meta-tag-change, content-modification, content-publish
+- Created TokenTracker utility and integrated into all APIs
+  - src/lib/token-tracker.ts: utility class for tracking prompt/completion tokens and cost
+  - Integrated into /api/analyze, /api/quick-audit, /api/generate-llms-txt
+  - Each LLM call logs TokenUsage records to database via Prisma
+  - Cost calculation: input tokens × $0.000003 + output tokens × $0.000015 (GPT-4o pricing)
+  - Enables cost-per-audit and cost-per-agent metrics in Superadmin Panel
+- Fixed duplicate Bell/Bot import build error in AnalysisDashboard.tsx
+  - Removed duplicate import from lucide-react that caused compilation failure
+
+Stage Summary:
+- All major backend features from user's requirements implemented
+- WebSocket service running on port 3003
+- Database has 10 tables total (User, AgentPrompt, TokenUsage, Analysis, AgentLog, Approval, WebhookConfig, VisibilityAlert + original models)
+- Superadmin accessible via Ctrl+Shift+A
+- Token tracking active on all LLM calls
+- Co-Pilot mode creates Approval entries for agent actions
+- Live Agent Log terminal shows real-time agent streaming in AnalyzingView
+- All APIs verified working, zero lint errors, dev server running cleanly

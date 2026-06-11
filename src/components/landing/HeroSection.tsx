@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { ArrowRight, Bot, Brain, Search, Eye, BarChart3, TrendingUp, Shield, Zap, Sparkles, Globe, AlertTriangle, CheckCircle2, XCircle, Download, Lock, Loader2 } from 'lucide-react'
+import { ArrowRight, Bot, Brain, Search, Eye, BarChart3, TrendingUp, Shield, Zap, Sparkles, Globe, AlertTriangle, CheckCircle2, XCircle, Download, Lock, Loader2, Link2 } from 'lucide-react'
 
 interface HeroSectionProps {
   onStartFree?: () => void
@@ -366,6 +366,36 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                     </div>
                     <p className="text-sm text-amber-200/80">{scanResult.topRecommendation}</p>
                   </div>
+
+                  {/* Compare with GSC Card */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.3 }}
+                    className="mb-5 p-4 bg-gradient-to-r from-cyan-500/10 via-background to-emerald-500/10 border border-cyan-500/20 rounded-xl"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-cyan-500/20 flex items-center justify-center shrink-0">
+                        <Link2 className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-bold text-cyan-400 mb-1">Compare with Google Search Console</h4>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Want to see how your Google rankings correlate with AI visibility? Pages ranking #1-3 are 3X more likely to be cited by AI engines.
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-1">
+                            <BarChart3 className="w-3 h-3 text-emerald-400" />
+                            <span className="text-[10px] text-emerald-300 font-medium">GSC Correlation</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1">
+                            <Brain className="w-3 h-3 text-amber-400" />
+                            <span className="text-[10px] text-amber-300 font-medium">3X AI Boost</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
 
                   {/* CTA: Full Report */}
                   <div className="text-center">

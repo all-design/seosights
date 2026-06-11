@@ -1,8 +1,13 @@
 'use client'
 
 import { Separator } from '@/components/ui/separator'
+import { Shield } from 'lucide-react'
 
-export default function Footer() {
+interface FooterProps {
+  onAdminClick?: () => void
+}
+
+export default function Footer({ onAdminClick }: FooterProps) {
   return (
     <footer className="mt-auto">
       <Separator className="bg-white/10" />
@@ -38,6 +43,17 @@ export default function Footer() {
               <span className="text-sm text-muted-foreground/50 flex items-center gap-1.5">
                 Built with <span className="text-emerald-400 font-medium">seosights</span>
               </span>
+              {/* Hidden admin trigger - small shield icon */}
+              {onAdminClick && (
+                <button
+                  onClick={onAdminClick}
+                  className="text-muted-foreground/20 hover:text-emerald-400/40 transition-colors"
+                  aria-label="Admin"
+                  title="Admin Panel"
+                >
+                  <Shield className="w-3 h-3" />
+                </button>
+              )}
             </div>
           </div>
         </div>

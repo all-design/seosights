@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { TokenTracker } from '@/lib/token-tracker'
+import { randomUUID } from 'crypto'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -13,6 +15,8 @@ export const dynamic = 'force-dynamic'
  * - Quick findings
  * 
  * Does NOT run the full 8-agent analysis — that requires the full trial.
+ * 
+ * Now with token & cost tracking.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +33,9 @@ export async function POST(request: NextRequest) {
 
     const parsedUrl = new URL(url)
     const domain = parsedUrl.hostname.replace('www.', '')
+
+    const sessionId = randomUUID()
+    const tokenTracker = new TokenTracker(sessionId)
 
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const zai = await ZAI.create()
@@ -53,6 +60,15 @@ export async function POST(request: NextRequest) {
           html: htmlContent.slice(0, 2000),
           text: plainText,
         }
+
+        // Track page_reader data gathering
+        tokenTracker.track({
+          agentId: 'quick-audit-page-reader',
+          agentName: 'Quick Audit (Page Reader)',
+          model: 'default',
+          inputTokens: tokenTracker.estimateTokens(url),
+          outputTokens: tokenTracker.estimateTokens(htmlContent + plainText),
+        })
       }
     } catch {
       siteData = { title: url, text: '' }
@@ -71,6 +87,15 @@ export async function POST(request: NextRequest) {
           .replace(/\s+/g, ' ')
           .trim()
           .slice(0, 2000)
+
+        // Track robots.txt data gathering
+        tokenTracker.track({
+          agentId: 'quick-audit-page-reader',
+          agentName: 'Quick Audit (Page Reader)',
+          model: 'default',
+          inputTokens: tokenTracker.estimateTokens(`${parsedUrl.origin}/robots.txt`),
+          outputTokens: tokenTracker.estimateTokens(robotsTxt),
+        })
       }
     } catch {
       robotsTxt = ''
@@ -86,6 +111,15 @@ export async function POST(request: NextRequest) {
         const ld = llmsResult.data || llmsResult
         const content = (ld.html || ld.text || '').trim()
         llmsTxtExists = content.length > 10
+
+        // Track llms.txt check
+        tokenTracker.track({
+          agentId: 'quick-audit-page-reader',
+          agentName: 'Quick Audit (Page Reader)',
+          model: 'default',
+          inputTokens: tokenTracker.estimateTokens(`${parsedUrl.origin}/llms.txt`),
+          outputTokens: tokenTracker.estimateTokens(content),
+        })
       }
     } catch {
       llmsTxtExists = false
@@ -130,6 +164,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Step 5: Quick analysis using LLM ──
+    const systemPrompt = 'You are a fast, accurate SEO/AEO/GEO auditor. Return ONLY valid JSON. No markdown. No code fences. Be concise.'
     const quickAnalysisPrompt = `You are a fast SEO/AEO/GEO auditor. Analyze this website quickly and return ONLY valid JSON.
 
 Website: ${url}
@@ -157,17 +192,30 @@ SCORES: Be realistic. Average site: SEO 30-50, AEO 20-35, GEO 15-30.
 QUANTITY: 2-3 critical, 2-3 warnings, 2-3 opportunities.
 IMPORTANT: Return ONLY raw JSON. No code fences.`
 
+    const inputTokens = tokenTracker.estimateTokens(systemPrompt + quickAnalysisPrompt)
+    let outputTokens = 0
+
     let analysisResult: Record<string, unknown> = {}
     try {
       const result = await zai.chat.completions.create({
         messages: [
-          { role: 'system', content: 'You are a fast, accurate SEO/AEO/GEO auditor. Return ONLY valid JSON. No markdown. No code fences. Be concise.' },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: quickAnalysisPrompt },
         ],
       })
 
       const raw = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
-      
+      outputTokens = tokenTracker.estimateTokens(raw)
+
+      // Track the LLM call
+      tokenTracker.track({
+        agentId: 'quick-audit-llm',
+        agentName: 'Quick Audit (LLM)',
+        model: 'default',
+        inputTokens,
+        outputTokens,
+      })
+
       const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
       let jsonStr = fenceMatch ? fenceMatch[1].trim() : raw
       const braceStart = jsonStr.indexOf('{')
@@ -175,7 +223,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences.`
       if (braceStart !== -1 && braceEnd > braceStart) {
         jsonStr = jsonStr.slice(braceStart, braceEnd + 1)
       }
-      
+
       try {
         analysisResult = JSON.parse(jsonStr)
       } catch {
@@ -184,6 +232,8 @@ IMPORTANT: Return ONLY raw JSON. No code fences.`
       }
     } catch (error) {
       console.error('[quick-audit] LLM error:', error instanceof Error ? error.message : 'Unknown')
+      // Track the failure
+      tokenTracker.trackFailure('quick-audit-llm', 'Quick Audit (LLM)', 'default')
     }
 
     // ── Build response ──
@@ -195,6 +245,14 @@ IMPORTANT: Return ONLY raw JSON. No code fences.`
     }
     const aeoReadiness = (analysisResult.aeoReadiness as Record<string, unknown>) || { hasFAQ: false, hasSchema: false, answerFormatScore: 20 }
     const geoReadiness = (analysisResult.geoReadiness as Record<string, unknown>) || { llmsTxtPresent: llmsTxtExists, aiCrawlerAccess: blockedBots.length > 0 ? 'partial' : 'unknown', entityRecognition: 15 }
+
+    // Save token usage to database (fire and forget)
+    const tokenSummary = tokenTracker.getSummary()
+    console.log(`[quick-audit] Token usage: ${tokenSummary.totalTokens} tokens, $${tokenSummary.totalCost.toFixed(4)} estimated cost`)
+
+    tokenTracker.saveToDatabase().catch((err) => {
+      console.error('[quick-audit] Failed to save token tracking:', err instanceof Error ? err.message : 'Unknown')
+    })
 
     return NextResponse.json({
       url,
@@ -213,6 +271,10 @@ IMPORTANT: Return ONLY raw JSON. No code fences.`
       llmsTxtPresent: llmsTxtExists,
       topRecommendation: (analysisResult.topRecommendation as string) || 'Run full 8-agent analysis for complete SEO/AEO/GEO strategy',
       fullReportAvailable: true,
+      _tokenSummary: {
+        totalTokens: tokenSummary.totalTokens,
+        totalCost: tokenSummary.totalCost,
+      },
     })
   } catch (error) {
     return NextResponse.json(
