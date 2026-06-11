@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "seosight — Vision. Analytics. Rank. | SEO · AEO · GEO",
+  title: "seosights — Get Customers from Google & AI | SEO · AEO · GEO",
   description:
-    "AI-powered SEO, AEO & GEO platform that ranks you on Google AND gets cited by ChatGPT, Claude, and Perplexity. Vision. Analytics. Rank.",
+    "seosights writes, audits, and auto-executes SEO strategies proven to rank on Google AND get cited by ChatGPT, Claude, and Perplexity. All while you sleep.",
   keywords: [
     "AI SEO",
     "AEO",
@@ -26,29 +26,30 @@ export const metadata: Metadata = {
     "AI citations",
     "ChatGPT SEO",
     "Perplexity citations",
-    "seosight",
+    "seosights",
     "SEO strategy",
     "AI search optimization",
     "E-E-A-T",
     "AI crawler",
+    "SEO autopilot",
   ],
-  authors: [{ name: "seosight" }],
+  authors: [{ name: "seosights" }],
   icons: {
     icon: "/logo-transparent.png",
   },
   openGraph: {
-    title: "seosight — Vision. Analytics. Rank.",
+    title: "seosights — Get Customers from Google & AI",
     description:
-      "AI-powered SEO, AEO & GEO platform that ranks you on Google AND gets cited by ChatGPT, Claude, and Perplexity.",
-    url: "https://seosight.ai",
-    siteName: "seosight",
+      "8 AI agents audit, strategize, and auto-execute your SEO — ranking you on Google AND getting you cited by AI. All while you sleep.",
+    url: "https://seosights.com",
+    siteName: "seosights",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "seosight — Vision. Analytics. Rank.",
+    title: "seosights — Get Customers from Google & AI",
     description:
-      "AI-powered SEO, AEO & GEO platform that ranks you on Google AND gets cited by ChatGPT, Claude, and Perplexity.",
+      "8 AI agents audit, strategize, and auto-execute your SEO — ranking you on Google AND getting you cited by AI. All while you sleep.",
   },
 };
 

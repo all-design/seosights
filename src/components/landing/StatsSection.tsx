@@ -21,10 +21,10 @@ const stats: StatItem[] = [
     source: 'Ahrefs',
   },
   {
-    value: '325%',
-    numericValue: 325,
-    suffix: '%',
-    label: 'More AI citations from earned media vs own content',
+    value: '200K+',
+    numericValue: 200,
+    suffix: 'K+',
+    label: 'AI-optimized articles generated',
     source: '',
   },
   {

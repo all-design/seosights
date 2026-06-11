@@ -164,8 +164,8 @@ class PDFBuilder {
   constructor() {
     this.doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     this.doc.setProperties({
-      title: 'seosight — SEO/AEO/GEO Analysis Report',
-      author: 'seosight',
+      title: 'seosights — SEO/AEO/GEO Analysis Report',
+      author: 'seosights',
       subject: 'Comprehensive Search Intelligence Report',
     })
   }
@@ -404,7 +404,7 @@ class PDFBuilder {
     this.doc.setFontSize(32)
     this.doc.setFont('helvetica', 'bold')
     this.setColor(C.white)
-    this.doc.text('seosight', PW / 2, 38, { align: 'center' })
+    this.doc.text('seosights', PW / 2, 38, { align: 'center' })
 
     // Tagline
     this.doc.setFontSize(10)
@@ -485,7 +485,7 @@ class PDFBuilder {
     this.doc.text('SEO (Search Engine Optimization)  \u00B7  AEO (Answer Engine Optimization)  \u00B7  GEO (Generative Engine Optimization)', PW / 2, PH - 40, { align: 'center', maxWidth: CW })
     this.doc.setFontSize(6)
     this.setColor(C.border)
-    this.doc.text(`\u00A9 ${new Date().getFullYear()} seosight \u2014 Confidential`, PW / 2, PH - 30, { align: 'center' })
+    this.doc.text(`\u00A9 ${new Date().getFullYear()} seosights \u2014 Confidential`, PW / 2, PH - 30, { align: 'center' })
 
     // Start content on new page
     this.doc.addPage()

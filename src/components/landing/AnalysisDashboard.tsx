@@ -719,7 +719,7 @@ export default function AnalysisDashboard({ onStartFree }: { onStartFree?: () =>
               <Zap className="w-5 h-5 text-emerald-400" />
             </div>
             <span className="font-bold text-lg tracking-tight">
-              seosight
+              seosights
             </span>
             <Separator />
             <span className="text-sm text-muted-foreground hidden sm:block">{data.siteName || data.url}</span>

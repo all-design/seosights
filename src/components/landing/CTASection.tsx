@@ -76,13 +76,12 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
           transition={{ duration: 0.6 }}
         >
           <h2 className="text-4xl sm:text-5xl font-bold mb-6">
-            Ready to Dominate{' '}
-            <span className="text-emerald-400">SEO</span>,{' '}
-            <span className="text-cyan-400">AEO</span> &{' '}
-            <span className="text-amber-400">GEO</span>?
+            Ready to Get Customers from{' '}
+            <span className="text-emerald-400">Google</span> &{' '}
+            <span className="text-amber-400">AI</span>?
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Start your free trial today. No credit card required. Get your first audit in under 2 minutes.
+            Set it up once. Your 8 AI agents work 24/7 — auditing, writing, and ranking. Without the agency fees.
           </p>
         </motion.div>
 

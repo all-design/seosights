@@ -43,21 +43,24 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
       }} />
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
-        {/* Logo + Brand */}
+        {/* ── Text-only Logo: seosights (big) + tagline centered below ── */}
         <motion.div
-          className="flex items-center justify-center gap-3 mb-8"
+          className="mb-8"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <img src="/logo-transparent.png" alt="seosight" className="h-12 w-auto" />
-          <div className="flex flex-col items-start">
-            <span className="font-bold text-2xl tracking-tight">seosight</span>
-            <span className="text-[10px] tracking-[0.25em] text-emerald-400/70 uppercase">Vision · Analytics · Rank</span>
-          </div>
+          <h2 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-none">
+            <span className="bg-gradient-to-r from-emerald-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent">
+              seosights
+            </span>
+          </h2>
+          <p className="text-xs sm:text-sm tracking-[0.35em] text-emerald-400/60 uppercase mt-2 text-center">
+            Vision · Analytics · Rank
+          </p>
         </motion.div>
 
-        {/* Badge */}
+        {/* Badge: SEO · AEO · GEO */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -86,43 +89,44 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </Badge>
         </motion.div>
 
-        {/* Headline */}
+        {/* ── Soro-inspired Headline ── */}
         <motion.h1
-          className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight mb-6"
+          className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
         >
-          <span className="bg-gradient-to-r from-emerald-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent">
-            Vision. Analytics. Rank.
-          </span>
+          <span className="text-foreground">Get Customers from </span>
+          <span className="text-emerald-400">Google</span>
+          <span className="text-foreground"> & </span>
+          <span className="text-amber-400">AI</span>
         </motion.h1>
 
-        {/* Subheadline */}
+        {/* Soro-inspired Subheadline */}
         <motion.p
           className="text-xl sm:text-2xl lg:text-3xl text-muted-foreground max-w-4xl mx-auto mb-4 leading-relaxed"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.3 }}
         >
-          Rank on Google{' '}
-          <span className="text-emerald-400 font-semibold">(SEO)</span>, Win Featured Snippets{' '}
-          <span className="text-cyan-400 font-semibold">(AEO)</span>,{' '}
-          <span className="text-foreground font-semibold">AND</span> Get Cited by AI{' '}
-          <span className="text-amber-400 font-semibold">(GEO)</span>
+          8 AI agents audit, strategize, and auto-execute your SEO —{' '}
+          <span className="text-foreground font-semibold">all while you sleep</span>.
         </motion.p>
 
-        {/* Sub-subheadline — Updated powerful positioning */}
+        {/* Sub-subheadline */}
         <motion.p
           className="text-base sm:text-lg text-muted-foreground/70 max-w-3xl mx-auto mb-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
-          Not a ChatGPT wrapper. A proprietary multi-agent engine built for stealth, E-E-A-T compliance, and AI citation dominance. 8 agents. Real-time SERP scraping. 2,000-word stealth strategies that actually stick.
+          Not a ChatGPT wrapper. A proprietary multi-agent engine that ranks you on Google{' '}
+          <span className="text-emerald-400">(SEO)</span>, wins featured snippets{' '}
+          <span className="text-cyan-400">(AEO)</span>, and gets cited by AI{' '}
+          <span className="text-amber-400">(GEO)</span>. 2,000-word stealth strategies that actually stick.
         </motion.p>
 
-        {/* AI Platform Badges */}
+        {/* AI Platform Badges — "Cited by" */}
         <motion.div
           className="flex flex-wrap items-center justify-center gap-3 mb-8"
           initial={{ opacity: 0, y: 20 }}
@@ -179,7 +183,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </div>
         </motion.div>
 
-        {/* CTA Buttons */}
+        {/* CTA Buttons — Soro style */}
         <motion.div
           className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
           initial={{ opacity: 0, y: 30 }}
@@ -204,7 +208,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           </Button>
         </motion.div>
 
-        {/* Floating Stats */}
+        {/* Floating Stats — Soro-style proof */}
         <motion.div
           className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center"
           initial={{ opacity: 0, y: 40 }}

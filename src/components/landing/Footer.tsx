@@ -9,10 +9,12 @@ export default function Footer() {
       <div className="bg-background/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <img src="/logo-transparent.png" alt="seosight" className="h-6 w-auto" />
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-lg tracking-tight leading-none bg-gradient-to-r from-emerald-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent">
+                seosights
+              </span>
               <span className="text-sm text-muted-foreground">
-                © {new Date().getFullYear()} seosight. All rights reserved.
+                © {new Date().getFullYear()} seosights. All rights reserved.
               </span>
             </div>
             <div className="flex items-center gap-6">
@@ -29,7 +31,7 @@ export default function Footer() {
                 Terms of Service
               </a>
               <span className="text-sm text-muted-foreground/50 flex items-center gap-1.5">
-                Built with <span className="text-emerald-400 font-medium">seosight</span>
+                Built with <span className="text-emerald-400 font-medium">seosights</span>
               </span>
             </div>
           </div>

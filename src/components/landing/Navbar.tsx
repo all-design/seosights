@@ -47,21 +47,17 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-              <img
-                src="/logo-transparent.png"
-                alt="seosight"
-                className="h-8 w-auto"
-              />
-              <div className="flex flex-col">
-                <span className="font-bold text-lg tracking-tight leading-none">
-                  seosight
-                </span>
-                <span className="text-[9px] tracking-[0.2em] text-emerald-400/70 uppercase leading-none mt-0.5">
-                  Vision · Analytics · Rank
-                </span>
-              </div>
+            {/* Text-only Logo */}
+            <div
+              className="flex flex-col items-start cursor-pointer"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            >
+              <span className="font-bold text-xl tracking-tight leading-none bg-gradient-to-r from-emerald-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent">
+                seosights
+              </span>
+              <span className="text-[8px] tracking-[0.2em] text-emerald-400/60 uppercase leading-none mt-0.5">
+                Vision · Analytics · Rank
+              </span>
             </div>
 
             {/* Desktop Navigation */}

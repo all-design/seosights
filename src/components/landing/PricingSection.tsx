@@ -83,7 +83,7 @@ const plans = [
     price: '$79',
     period: '/month',
     freeTrial: null,
-    description: 'For SEO agencies and marketing teams generating reports for their clients.',
+    description: 'For SEO agencies and marketing teams generating reports for their clients. Save $5,000/month vs hiring.',
     features: [
       {
         icon: Check,
@@ -130,7 +130,7 @@ const plans = [
     price: 'Contact',
     period: '',
     freeTrial: null,
-    description: 'For clients who want complete dominance in their niche through advanced SEO and GEO execution.',
+    description: 'Complete dominance in your niche. Our team + 8 AI agents handle everything while you focus on your business.',
     features: [
       {
         icon: Users,
@@ -192,7 +192,7 @@ export default function PricingSection({ onStartFree }: PricingSectionProps) {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px]" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+        {/* Header — Soro style */}
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: 30 }}
@@ -204,16 +204,13 @@ export default function PricingSection({ onStartFree }: PricingSectionProps) {
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-6"
           >
             <Star className="w-3.5 h-3.5" />
-            Simple, Transparent Pricing
+            One Tool to Do It All
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Choose Your{' '}
-            <span className="bg-gradient-to-r from-emerald-400 via-amber-400 to-cyan-400 bg-clip-text text-transparent">
-              Plan
-            </span>
+            Save <span className="text-amber-400">$5,000/month</span> vs Agencies
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Start free, scale as you grow. From solo bloggers to full-service agencies.
+            No contracts. Cancel anytime. Start free, scale as you grow — from solo founders to full-service agencies.
           </p>
         </motion.div>
 
@@ -305,7 +302,7 @@ export default function PricingSection({ onStartFree }: PricingSectionProps) {
           ))}
         </div>
 
-        {/* Bottom note */}
+        {/* Bottom note — Soro style */}
         <motion.div
           className="text-center mt-12"
           initial={{ opacity: 0 }}
@@ -313,7 +310,7 @@ export default function PricingSection({ onStartFree }: PricingSectionProps) {
           transition={{ duration: 0.5, delay: 0.8 }}
         >
           <p className="text-muted-foreground text-sm">
-            All plans include full SEO · AEO · GEO analysis. No credit card required for free trial.
+            All plans include full SEO · AEO · GEO analysis. No credit card required for free trial. No contracts — cancel anytime.
           </p>
         </motion.div>
       </div>
