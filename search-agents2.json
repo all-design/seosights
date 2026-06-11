@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://www.youtube.com/watch?v=COMnNlUakQk",
+    "name": "Claude Code Just Replaced Your Entire SEO Stack - 12 skills Demo",
+    "snippet": "5 AI agents run your entire SEO audit in parallel. You get a health score, a PDF report you can send to clients, schema markup generation ...\nI built 12 SEO tools for Claude Code that do what agencies charge $5-10K/month for audit, schema, GEO, content, images, sitemap, hreflang, ...",
+    "host_name": "www.youtube.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://claude-seo.md",
+    "name": "Claude SEO - Free AI SEO Audit Tool for Claude Code",
+    "snippet": "Instead of a browser-based dashboard, Claude SEO runs in your terminal. You type /seo audit and 9 AI agents analyze your website in parallel ...\nFree, open-source AI SEO audit tool for Claude Code. 25 sub-skills, 18 subagents, 3 extensions. Technical SEO, E-E-A-T, schema, GEO, ...\nClaude SEO is a free, open-source AI SEO audit tool: 25 sub-skills, 18 subagents, 3 extensions, one command. You type /seo audit and go make ...",
+    "host_name": "claude-seo.md",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/ClaudeAI/comments/1rlkatj/my_new_claude_skill_seo_consultant_13_subagents",
+    "name": "My New Claude Skill - SEO consultant - 13 sub-agents, 17 scripts to",
+    "snippet": "I built a skill for Claude (works with Codex and Antigravity as well) that turns your IDE into something you'd normally pay an SEO agency for.\nMy New Claude Skill - SEO consultant - 13 sub-agents, 17 scripts to analyze your business or website end to end. Built with Claude.",
+    "host_name": "www.reddit.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/AgriciDaniel/claude-seo",
+    "name": "AgriciDaniel/claude-seo: Universal SEO skill for Claude Code. 25",
+    "snippet": "Claude SEO is an open-source SEO analysis plugin for Claude Code. It runs 25 sub-skills and 18 specialist agents in parallel across technical SEO, ...",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.nocodesaas.io/p/i-got-claude-code-to-build-my-entire",
+    "name": "I Got Claude Code to Build My Entire SEO Strategy - NoCode SaaS",
+    "snippet": "How two free tools gave Claude Code the power to research keywords, analyse competitors and hand me a content plan in 20 minutes.",
+    "host_name": "www.nocodesaas.io",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

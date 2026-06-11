@@ -1,29 +1,34 @@
 ---
-Task ID: 1
+Task ID: 2
 Agent: Main Agent
-Task: Rebrand from "Agent OS" to "seosight", add logo, update landing page, add pricing and features sections
+Task: Remove white background from logo, integrate 8 AI agents into analysis pipeline
 
 Work Log:
-- Analyzed uploaded logo using VLM — identified brand name "seosight" with tagline "VISION. ANALYTICS. RANK."
-- Copied logo to /public/logo.png
-- Updated layout.tsx: metadata title/description/keywords/icons/openGraph/twitter to seosight branding
-- Created new Navbar.tsx with seosight logo image, tagline, updated nav links (Features, Pricing, How It Works, Get Started)
-- Created new HeroSection.tsx with seosight branding, logo display, grid pattern background, "Vision. Analytics. Rank." headline, 4 stat badges
-- Created PricingSection.tsx with 3 pricing tiers:
-  - Starter: $5/month with 1 month free trial (AEO/GEO tracking, E-E-A-T audit, AI Crawler Status, SEO Check, 1 Domain)
-  - Pro Agency: $79/month "Most Popular" (White-Label Reports, 20 Domains, Entity/Brand Mentions, PDF/CSV Export, B2B Outreach)
-  - Managed: Contact Us (Complete Project Takeover, Technical Perfection, Authority Building, Strategic Interlinking, Content Humanization, Dedicated Account Manager)
-- Created FeaturesSection.tsx with Three Pillars (SEO, AEO, GEO) each with 5 feature cards, plus 6 additional features
-- Created HowItWorksSection.tsx with 4 steps (Enter URL → AI Scans → Get Strategy → Track & Dominate)
-- Updated CTASection.tsx with prominent "Analyze My Site — Free" button, contact form for Managed service, trust signals
-- Updated Footer.tsx with seosight logo and branding
-- Updated page.tsx to use new section order: Hero → Stats → Features → How It Works → Pricing → CTA → Footer
-- Updated AnalysisDashboard.tsx branding (header logo, CTA text)
-- Verified with agent-browser: Landing page renders correctly, all sections visible, pricing cards show correct prices, modal works, no console errors
+- Used Python Pillow to remove white/near-white pixels from logo (made transparent)
+- Read Notion page (JS-rendered, couldn't extract) and claude-seo.md for agent role definitions
+- Created /src/lib/agents.ts with 8 specialized agents:
+  1. Crawler Agent (Technical SEO audit)
+  2. Schema Architect (Structured data, AEO readiness)
+  3. Content Analyst (Content quality, humanization, parasite risk)
+  4. E-E-A-T Auditor (Trust signals, Who/How/Why test)
+  5. GEO Specialist (AI crawler, citability, brand mentions, knowledge graph)
+  6. Link Architect (Backlink outreach, AI citation strategy)
+  7. Local Scout (Local SEO, GBP, NAP, reviews)
+  8. SXO Strategist (Strategy lead: intent, roadmap, KPIs, content briefs, technical implementations)
+- Refactored /src/app/api/analyze/route.ts to use 8 agents in 2 parallel batches:
+  - Batch 1 (40-60%): Crawler, Schema Architect, Content Analyst, E-E-A-T Auditor
+  - Batch 2 (62-82%): GEO Specialist, Link Architect, Local Scout, SXO Strategist
+  - Agents run with 1800ms stagger to avoid rate limits
+  - Deep merge of all agent results with comprehensive fallbacks
+- Updated AnalyzingView with 8 agent phases in progress display
+- Updated How It Works section: Step 2 = "8 Agents Analyze", Step 3 = "Auto-Execute Strategy"
+- Updated Hero subtitle to mention "8 specialized AI agents"
+- Verified logo transparency in browser (no white background)
+- Verified all sections render correctly with no errors
 
 Stage Summary:
-- Complete rebrand from "Agent OS" to "seosight" with logo, tagline "Vision. Analytics. Rank."
-- Three pricing tiers implemented as requested ($5 Starter, $79 Pro Agency, Contact Us Managed)
-- Features section with SEO/AEO/GEO pillars plus additional capabilities
-- How It Works section with 4-step process
-- All sections verified via browser QA with no errors
+- Logo now has transparent background
+- 8-agent system fully integrated with specialized prompts
+- Two-batch parallel execution with rate limit protection
+- All agent results deep-merged into compatible SEOAnalysis format
+- Browser QA passed with zero errors

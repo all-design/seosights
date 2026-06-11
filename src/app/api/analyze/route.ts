@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { agents, batch1Agents, batch2Agents, type AgentDefinition } from '@/lib/agents'
 
 export const maxDuration = 180
 export const dynamic = 'force-dynamic'
@@ -166,6 +167,91 @@ function extractHtmlStructure(html: string): string {
   return result || 'No structure data available'
 }
 
+/**
+ * Deep merge helper for combining agent results.
+ * Merges nested objects, concatenates arrays.
+ */
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...target }
+  for (const key of Object.keys(source)) {
+    if (key in result) {
+      const targetVal = result[key]
+      const sourceVal = source[key]
+      if (
+        targetVal && sourceVal &&
+        typeof targetVal === 'object' && typeof sourceVal === 'object' &&
+        !Array.isArray(targetVal) && !Array.isArray(sourceVal)
+      ) {
+        result[key] = deepMerge(
+          targetVal as Record<string, unknown>,
+          sourceVal as Record<string, unknown>
+        )
+      } else if (Array.isArray(targetVal) && Array.isArray(sourceVal)) {
+        // For arrays from different agents, concatenate (e.g., deepStrategy fields)
+        result[key] = [...targetVal, ...sourceVal]
+      } else {
+        // Source overwrites target for primitive values
+        result[key] = sourceVal
+      }
+    } else {
+      result[key] = source[key]
+    }
+  }
+  return result
+}
+
+/**
+ * Run a single agent and return its parsed JSON result.
+ */
+async function runAgent(
+  zai: { chat: { completions: { create: (opts: unknown) => Promise<unknown> } } },
+  agent: AgentDefinition,
+  context: AgentContext,
+  progress: number,
+  sendProgressFn: (progress: number, step: string) => void,
+  flushFn: () => Promise<void>
+): Promise<{ data: Record<string, unknown>; progress: number }> {
+  const progressLabel = `Running ${agent.name}...`
+  sendProgressFn(progress, progressLabel)
+  await flushFn()
+
+  console.log(`[analyze] Starting ${agent.name} (batch ${agent.batch})`)
+
+  let result: { choices?: Array<{ message?: { content?: string } }> } | null = null
+  try {
+    result = await retryWithBackoff(
+      () => zai.chat.completions.create({
+        messages: [
+          { role: 'system', content: agent.systemPrompt },
+          { role: 'user', content: agent.buildUserPrompt(context) },
+        ],
+      }),
+      3,
+      4000,
+      `LLM_${agent.id}`
+    )
+  } catch (llmError) {
+    console.error(`[analyze] ${agent.name} LLM call failed after retries:`, llmError instanceof Error ? llmError.message : 'Unknown')
+  }
+
+  const raw = result?.choices?.[0]?.message?.content || ''
+  console.log(`[analyze] ${agent.name} response length:`, raw.length)
+
+  if (!raw) {
+    console.warn(`[analyze] ${agent.name} returned empty response`)
+    return { data: {}, progress }
+  }
+
+  try {
+    const parsed = repairAndParseJSON(raw)
+    console.log(`[analyze] ${agent.name} parsed successfully, keys:`, Object.keys(parsed).join(', '))
+    return { data: parsed, progress }
+  } catch (e) {
+    console.error(`[analyze] ${agent.name} JSON parse failed:`, e instanceof Error ? e.message : 'Unknown error')
+    return { data: {}, progress }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -230,13 +316,12 @@ export async function POST(request: NextRequest) {
           siteData = { title: url, url, text: '' }
         }
 
-        // Step 2: Competitor search (sequential, not parallel)
+        // Step 2: Competitor search
         yield sendProgress(18, 'Analyzing competitive landscape...')
         await flush()
 
         let searchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
         try {
-          // Delay before next API call to avoid rate limit
           await new Promise(resolve => setTimeout(resolve, 1500))
           const compResults = await retryWithBackoff(
             () => withTimeout(
@@ -253,7 +338,7 @@ export async function POST(request: NextRequest) {
           searchResults = []
         }
 
-        // Step 3: AI citation search (after delay)
+        // Step 3: AI citation search
         yield sendProgress(28, 'Checking AI citation signals...')
         await flush()
 
@@ -275,7 +360,7 @@ export async function POST(request: NextRequest) {
           aiSearchResults = []
         }
 
-        // Step 4: Local SEO search (only if non-global market, after delay)
+        // Step 4: Local SEO search (only if non-global market)
         let localSearchResults: Array<{ name?: string; url?: string; snippet?: string; host_name?: string }> = []
         if (targetMarket !== 'Global') {
           yield sendProgress(32, `Analyzing local SEO for ${targetMarket}...`)
@@ -299,12 +384,10 @@ export async function POST(request: NextRequest) {
         }
 
         // ════════════════════════════════════════════════════════════════
-        // Phase 2: LLM Analysis — SEQUENTIAL with delays + retry
+        // Phase 2: 8-Agent Analysis — Two parallel batches with delays
         // ════════════════════════════════════════════════════════════════
 
-        yield sendProgress(38, 'Running comprehensive AI analysis...')
-        await flush()
-
+        // Build context for agents
         const siteContent = siteData.text?.slice(0, 2500) || 'No content available'
         const htmlStructure = siteData.html ? extractHtmlStructure(siteData.html) : ''
 
@@ -323,319 +406,261 @@ export async function POST(request: NextRequest) {
           .map((r) => `${r.name}: ${(r.snippet || '').slice(0, 60)}`)
           .join(' | ')
 
-        // ── Call 1: Audit + Bonus Scores ──────────────────────────
-        const auditSystemPrompt = 'You are an elite SEO/AEO/GEO strategist. Respond with ONLY valid JSON. No markdown. No code fences. Be concise - string values under 15 words. This is critical to avoid truncation.'
-
-        const auditUserPrompt = `Analyze ${url} for market: ${targetMarket}. Title: ${siteData.title}. Content: ${siteContent.slice(0, 1500)}. HTML: ${htmlStructure.slice(0, 500)}. Competitors: ${competitorInfo.slice(0, 300) || 'None'}. AI: ${aiInfo.slice(0, 200) || 'None'}. Local: ${localInfo.slice(0, 200) || 'None'}.
-
-Return JSON with this EXACT structure. All strings max 15 words:
-
-{
-  "siteName": "name",
-  "market": "${targetMarket}",
-  "overallScores": { "seo": 1-100, "aeo": 1-100, "geo": 1-100, "combined": 1-100 },
-  "audit": {
-    "technicalSEO": { "score": 1-100, "issues": [{ "issue": "short", "severity": "critical|warning|info", "fix": "short" }] },
-    "crawlability": { "score": 1-100, "issues": [{ "issue": "short", "impact": "short" }] },
-    "pageSpeed": { "score": 1-100, "coreVitals": [{ "metric": "LCP|INP|CLS", "value": "est", "status": "good|needs-improvement|poor" }] },
-    "indexation": { "score": 1-100, "indexedPages": 0, "orphanPages": 0, "issues": ["short"] },
-    "aeoReadiness": { "score": 1-100, "hasFAQ": false, "hasSchema": false, "hasStructuredData": false, "answerFormatScore": 1-100, "issues": ["short"] },
-    "geoVisibility": { "score": 1-100, "citedByAI": ["AI name"], "entityRecognition": 1-100, "knowledgeGraphPresence": false, "issues": ["short"] }
-  },
-  "eeat": {
-    "overallScore": 1-100,
-    "experience": { "score": 1-100, "findings": ["short"] },
-    "expertise": { "score": 1-100, "findings": ["short"] },
-    "authoritativeness": { "score": 1-100, "findings": ["short"] },
-    "trustworthiness": { "score": 1-100, "findings": ["short"] },
-    "whoHowWhyTest": { "who": "who", "how": "how", "why": "why" }
-  },
-  "geoCitability": {
-    "overallScore": 1-100,
-    "citabilityScore": { "score": 1-100, "weight": 25, "findings": ["short"] },
-    "structuralReadability": { "score": 1-100, "weight": 20, "findings": ["short"] },
-    "multiModalContent": { "score": 1-100, "weight": 15, "findings": ["short"] },
-    "authorityBrandSignals": { "score": 1-100, "weight": 20, "findings": ["short"] },
-    "technicalAccessibility": { "score": 1-100, "weight": 20, "findings": ["short"] }
-  },
-  "aiCrawler": {
-    "aiCrawlerAccess": [{ "bot": "GPTBot", "allowed": true, "recommendation": "short" }],
-    "robotsTxtAnalysis": ["short"],
-    "llmsTxtPresence": false,
-    "jsRenderingDependency": "high|medium|low",
-    "ssrVsCsr": "short"
-  },
-  "brandMentions": {
-    "brandMentionScore": 1-100,
-    "backlinkCorrelation": "short",
-    "platformPresence": [{ "platform": "Wikipedia", "detected": false, "strength": "none|weak|moderate|strong" }],
-    "citationSources": [{ "engine": "ChatGPT", "topSource": "source", "percentage": 48 }]
-  },
-  "contentQuality": {
-    "overallScore": 1-100,
-    "contentDepth": 1-100,
-    "aiPatternRisk": "low|medium|high",
-    "humanizationTips": ["short"],
-    "fillerDetected": ["short"],
-    "originalityIndicators": ["short"]
-  },
-  "parasiteRisk": {
-    "riskLevel": "low|medium|high",
-    "findings": ["short"],
-    "recommendations": ["short"]
-  },
-  "localSEO": {
-    "applicable": false,
-    "gbpSignals": { "score": 1-100, "findings": ["short"] },
-    "napConsistency": { "score": 1-100, "findings": ["short"] },
-    "reviewSignals": { "score": 1-100, "findings": ["short"] },
-    "businessType": "type or N/A"
-  },
-  "sxo": {
-    "pageTypeMatch": "short",
-    "serpIntentMatch": "informational|transactional|navigational|mixed",
-    "userPersonaScores": [{ "persona": "name", "score": 1-100 }],
-    "recommendations": ["short"]
-  }
-}
-
-QUANTITY: 3-4 technicalSEO issues, 2 crawlability, 3 coreVitals (always LCP, INP, CLS), 2 indexation issues, 2 aeoReadiness issues, 2 geoVisibility issues, 2 findings per eeat dimension, 1 finding per geoCitability dimension, 3-4 aiCrawlerAccess (GPTBot, ClaudeBot, PerplexityBot, Bytespider), 2 robotsTxtAnalysis, 3-4 platformPresence (Wikipedia, Reddit, YouTube, LinkedIn), 2 citationSources, 2 humanizationTips, 2 fillerDetected, 2 originalityIndicators, 2 parasiteRisk findings+recs, 1-2 localSEO finding per sub, 2 sxo persona+recs.
-
-SCORES: Realistic. Average site: 30-50. Combined = 40%SEO+30%AEO+30%GEO. localSEO.applicable=true if local business.
-
-IMPORTANT: Return ONLY raw JSON. No code fences. No extra text.`
-
-        // ── Call 2: Strategy + Creative + Measure ──────────────────
-        const strategySystemPrompt = 'You are an elite SEO/AEO/GEO content strategist. Respond with ONLY valid JSON. No markdown. No code fences. Be concise - all string values under 15 words. This is critical to avoid truncation.'
-
-        const strategyUserPrompt = `Create strategy for ${url} (${siteData.title}). Market: ${targetMarket}. Competitors: ${competitorInfo.slice(0, 200) || 'None'}. AI Info: ${aiInfo.slice(0, 150) || 'None'}.
-
-Return JSON with this EXACT structure. All strings max 15 words:
-
-{
-  "structure": {
-    "topicClusters": [{ "cluster": "name", "pillarKeyword": "kw", "supportingKeywords": ["kw1"], "seoOpportunity": "short", "aeoOpportunity": "short", "geoOpportunity": "short" }],
-    "keywordGaps": [{ "keyword": "kw", "volume": "High|Med|Low", "difficulty": "Hard|Med|Easy", "type": "seo|aeo|geo", "opportunity": "short" }],
-    "contentArchitecture": { "recommended": [{ "section": "name", "purpose": "short", "pillar": "seo|aeo|geo|all" }], "internalLinkMap": [{ "from": "page", "to": "page", "anchor": "text" }] },
-    "schemaRecommendations": [{ "schemaType": "type", "purpose": "short", "pillar": "seo|aeo|geo", "implementation": "short", "status": "active|restricted|deprecated" }]
-  },
-  "creative": {
-    "contentBriefs": [{ "title": "title", "type": "blog|guide|faq|tool|comparison", "targetKeyword": "kw", "pillar": "seo|aeo|geo|all", "brief": "short", "estimatedImpact": "short", "wordCount": "1000-2000", "structure": ["H2"] }],
-    "onPageOptimizations": [{ "page": "url", "currentTitle": "old", "suggestedTitle": "new", "suggestedDescription": "desc", "aeoTweaks": ["tweak"], "geoTweaks": ["tweak"] }],
-    "answerBlocks": [{ "question": "Q?", "suggestedAnswer": "40-60 word answer", "format": "faq|featured-snippet|people-also-ask|knowledge-panel", "targetEngine": "Google|ChatGPT|Perplexity" }]
-  },
-  "measure": {
-    "kpiTracking": {
-      "seo": [{ "metric": "name", "current": "val", "target": "val", "timeline": "3mo" }],
-      "aeo": [{ "metric": "name", "current": "val", "target": "val", "timeline": "3mo" }],
-      "geo": [{ "metric": "name", "current": "val", "target": "val", "timeline": "3mo" }]
-    },
-    "competitorBenchmarks": [{ "competitor": "name", "url": "url", "seoScore": 1-100, "aeoScore": 1-100, "geoScore": 1-100, "citedBy": ["AI"] }],
-    "weeklyActions": [{ "week": "Week 1", "tasks": [{ "task": "short", "pillar": "seo|aeo|geo", "priority": "high|medium|low" }] }]
-  },
-  "algorithmUpdates": { "recentUpdates": [{ "name": "update name", "date": "2025-XX", "impact": "high|medium|low", "description": "short", "affectedPillar": "seo|aeo|geo|all" }] },
-  "roadmap": { "quarters": [{ "label": "Q1: Foundation", "seoGoal": "short goal", "aeoGoal": "short goal", "geoGoal": "short goal", "targetScores": { "seo": 50, "aeo": 40, "geo": 35 } }] },
-  "trafficInsights": { "winners": [{ "page": "page url", "change": "+X%", "pillar": "seo|aeo|geo" }], "losers": [{ "page": "page url", "change": "-X%", "pillar": "seo|aeo|geo" }] },
-  "deepStrategy": {
-    "technicalImplementations": [{ "type": "schema|robots|meta|headers", "description": "what to implement", "codeSnippet": "exact code", "priority": "critical|high|medium|low", "pillar": "seo|aeo|geo|all" }],
-    "backlinkOutreach": [{ "targetSite": "site name", "url": "approximate url", "strategy": "how to get link", "contentAngle": "pitch angle", "priority": "high|medium|low" }],
-    "aiCitationStrategy": [{ "technique": "technique name", "implementation": "how to do it", "targetEngine": "ChatGPT|Perplexity|Google SGE|Claude", "expectedResult": "expected outcome" }]
-  },
-  "summary": "2-3 sentence summary",
-  "executiveActions": ["action1", "action2", "action3", "action4", "action5"]
-}
-
-QUANTITY: 3 topicClusters (1-2 supportingKeywords each), 4-5 keywordGaps, 3-4 contentArchitecture recommended, 2 internalLinks, 2-3 schemaRecommendations, 3-4 contentBriefs (2 structure headings each), 2 onPageOptimizations (1-2 aeoTweaks + 1-2 geoTweaks each), 3-4 answerBlocks targeting different engines, 2 KPI per pillar, 2 competitorBenchmarks, 4 weeks of weeklyActions (2-3 tasks each), 5 executiveActions, 2-3 algorithmUpdates, 4 roadmap quarters, 2-3 trafficInsights winners, 2-3 losers, 3-4 technicalImplementations (with actual code snippets), 2-3 backlinkOutreach targets, 2-3 aiCitationStrategy techniques.
-
-IMPORTANT: Return ONLY raw JSON. No code fences. No extra text. Code snippets must be valid and copy-paste ready.`
-
-        // ── Run LLM calls SEQUENTIALLY with delays + retry ──
-        let auditResult: { choices?: Array<{ message?: { content?: string } }> } | null = null
-        let strategyResult: { choices?: Array<{ message?: { content?: string } }> } | null = null
-
-        // Call 1: Audit
-        yield sendProgress(42, 'Running AI audit engine...')
-        await flush()
-        try {
-          auditResult = await retryWithBackoff(
-            () => zai.chat.completions.create({
-              messages: [
-                { role: 'system', content: auditSystemPrompt },
-                { role: 'user', content: auditUserPrompt },
-              ],
-            }),
-            3,
-            4000,
-            'LLM_audit'
-          )
-        } catch (llmError) {
-          console.error('[analyze] Audit LLM call failed after retries:', llmError instanceof Error ? llmError.message : 'Unknown')
+        const agentContext = {
+          url,
+          domain,
+          siteName: siteData.title || url,
+          siteContent,
+          htmlStructure,
+          competitorInfo,
+          aiInfo,
+          localInfo,
+          targetMarket,
         }
 
-        // Call 2: Strategy (with delay between calls)
-        yield sendProgress(60, 'Building SEO/AEO/GEO strategy...')
+        // Progress allocation:
+        // Phase 1 used 5-35% → Phase 2 starts at 38%
+        // Batch 1: 4 agents → 38-60% (~5.5% each with overhead)
+        // Batch 2: 4 agents → 62-82% (~5% each with overhead)
+        // Phase 3: 82-100%
+
+        const allAgentResults: Record<string, unknown>[] = []
+
+        // ── Batch 1: Crawler, Schema Architect, Content Analyst, E-E-A-T Auditor ──
+        yield sendProgress(38, 'Launching Agent Batch 1: Technical analysis...')
         await flush()
-        await new Promise((resolve) => setTimeout(resolve, 3000))
-        try {
-          strategyResult = await retryWithBackoff(
-            () => zai.chat.completions.create({
-              messages: [
-                { role: 'system', content: strategySystemPrompt },
-                { role: 'user', content: strategyUserPrompt },
-              ],
-            }),
-            3,
-            4000,
-            'LLM_strategy'
-          )
-        } catch (llmError) {
-          console.error('[analyze] Strategy LLM call failed after retries:', llmError instanceof Error ? llmError.message : 'Unknown')
+
+        // Run batch 1 agents in parallel with staggered delays
+        const batch1Promises = batch1Agents.map((agent, index) => {
+          const startProgress = 40 + index * 5
+          return new Promise<{ data: Record<string, unknown> }>(async (resolve) => {
+            // Stagger each agent by 1800ms to avoid rate limits
+            await new Promise(r => setTimeout(r, index * 1800))
+            const result = await runAgent(zai, agent, agentContext, startProgress, (p, s) => {
+              // We yield progress directly from here
+            }, flush)
+            resolve(result)
+          })
+        })
+
+        // Yield progress for each agent as it starts
+        for (let i = 0; i < batch1Agents.length; i++) {
+          const progressVal = 40 + i * 5
+          yield sendProgress(progressVal, `Running ${batch1Agents[i].name}...`)
+          await flush()
+          // Wait a bit before the next agent starts (stagger is handled in the promise)
+          if (i < batch1Agents.length - 1) {
+            await new Promise(r => setTimeout(r, 1800))
+          }
         }
 
-        // Check if at least one call succeeded
-        if (!auditResult && !strategyResult) {
-          console.error('[analyze] All LLM calls failed after retries')
+        const batch1Results = await Promise.all(batch1Promises)
+        batch1Results.forEach(r => allAgentResults.push(r.data))
+
+        yield sendProgress(60, 'Agent Batch 1 complete. Launching Batch 2...')
+        await flush()
+
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        // ── Batch 2: GEO Specialist, Link Architect, Local Scout, SXO Strategist ──
+        yield sendProgress(62, 'Launching Agent Batch 2: Strategy & optimization...')
+        await flush()
+
+        const batch2Promises = batch2Agents.map((agent, index) => {
+          const startProgress = 64 + index * 5
+          return new Promise<{ data: Record<string, unknown> }>(async (resolve) => {
+            await new Promise(r => setTimeout(r, index * 1800))
+            const result = await runAgent(zai, agent, agentContext, startProgress, () => {}, flush)
+            resolve(result)
+          })
+        })
+
+        // Yield progress for each agent as it starts
+        for (let i = 0; i < batch2Agents.length; i++) {
+          const progressVal = 64 + i * 5
+          yield sendProgress(progressVal, `Running ${batch2Agents[i].name}...`)
+          await flush()
+          if (i < batch2Agents.length - 1) {
+            await new Promise(r => setTimeout(r, 1800))
+          }
+        }
+
+        const batch2Results = await Promise.all(batch2Promises)
+        batch2Results.forEach(r => allAgentResults.push(r.data))
+
+        // Check if we got any results at all
+        const hasAnyData = allAgentResults.some(r => Object.keys(r).length > 0)
+        if (!hasAnyData) {
+          console.error('[analyze] All agent LLM calls failed after retries')
           yield sendError('AI analysis service is currently busy. Please try again in 30 seconds.')
           return
         }
 
         // ════════════════════════════════════════════════════════════════
-        // Phase 3: Parse & Merge
+        // Phase 3: Merge all agent results into final analysis
         // ════════════════════════════════════════════════════════════════
 
-        yield sendProgress(75, 'Parsing analysis results...')
+        yield sendProgress(82, 'Merging agent results...')
         await flush()
 
-        const auditRaw = auditResult?.choices?.[0]?.message?.content || ''
-        const strategyRaw = strategyResult?.choices?.[0]?.message?.content || ''
-
-        console.log('[analyze] Audit response length:', auditRaw.length)
-        console.log('[analyze] Strategy response length:', strategyRaw.length)
-
-        if (!auditRaw && !strategyRaw) {
-          console.error('[analyze] Both LLM responses empty')
-          yield sendError('AI returned empty responses. Please try again.')
-          return
-        }
-
-        let auditData: Record<string, unknown>
-        let strategyData: Record<string, unknown>
-
-        try {
-          auditData = repairAndParseJSON(auditRaw)
-        } catch (e) {
-          console.error('[analyze] Audit JSON parse failed:', e instanceof Error ? e.message : 'Unknown error')
-          auditData = {
-            siteName: siteData.title || url,
-            market: targetMarket,
-            overallScores: { seo: 35, aeo: 25, geo: 20, combined: 27 },
-            audit: {
-              technicalSEO: { score: 35, issues: [{ issue: 'Analysis incomplete - retry recommended', severity: 'warning', fix: 'Try again later' }] },
-              crawlability: { score: 40, issues: [{ issue: 'Could not fully analyze', impact: 'Medium' }] },
-              pageSpeed: { score: 50, coreVitals: [{ metric: 'LCP', value: 'Unknown', status: 'needs-improvement' }, { metric: 'INP', value: 'Unknown', status: 'needs-improvement' }, { metric: 'CLS', value: 'Unknown', status: 'needs-improvement' }] },
-              indexation: { score: 40, indexedPages: 0, orphanPages: 0, issues: ['Could not determine'] },
-              aeoReadiness: { score: 25, hasFAQ: false, hasSchema: false, hasStructuredData: false, answerFormatScore: 20, issues: ['Could not fully analyze'] },
-              geoVisibility: { score: 20, citedByAI: [], entityRecognition: 15, knowledgeGraphPresence: false, issues: ['Could not fully analyze'] },
-            },
-            eeat: { overallScore: 30, experience: { score: 30, findings: ['Partial analysis'] }, expertise: { score: 25, findings: ['Partial analysis'] }, authoritativeness: { score: 20, findings: ['Partial analysis'] }, trustworthiness: { score: 35, findings: ['Partial analysis'] }, whoHowWhyTest: { who: 'N/A', how: 'N/A', why: 'N/A' } },
-            geoCitability: { overallScore: 25, citabilityScore: { score: 25, weight: 25, findings: ['Partial'] }, structuralReadability: { score: 30, weight: 20, findings: ['Partial'] }, multiModalContent: { score: 20, weight: 15, findings: ['Partial'] }, authorityBrandSignals: { score: 20, weight: 20, findings: ['Partial'] }, technicalAccessibility: { score: 30, weight: 20, findings: ['Partial'] } },
-            aiCrawler: { aiCrawlerAccess: [{ bot: 'GPTBot', allowed: true, recommendation: 'Verify access' }, { bot: 'ClaudeBot', allowed: true, recommendation: 'Verify access' }, { bot: 'PerplexityBot', allowed: true, recommendation: 'Verify access' }], robotsTxtAnalysis: ['Could not analyze'], llmsTxtPresence: false, jsRenderingDependency: 'medium', ssrVsCsr: 'Unknown' },
-            brandMentions: { brandMentionScore: 20, backlinkCorrelation: 'Could not determine', platformPresence: [{ platform: 'Wikipedia', detected: false, strength: 'none' }, { platform: 'Reddit', detected: false, strength: 'none' }, { platform: 'YouTube', detected: false, strength: 'none' }, { platform: 'LinkedIn', detected: false, strength: 'none' }], citationSources: [{ engine: 'ChatGPT', topSource: 'Unknown', percentage: 0 }] },
-            contentQuality: { overallScore: 35, contentDepth: 30, aiPatternRisk: 'medium', humanizationTips: ['Add original insights'], fillerDetected: ['Analysis incomplete'], originalityIndicators: ['Partial analysis'] },
-            parasiteRisk: { riskLevel: 'low', findings: ['Could not fully analyze'], recommendations: ['Monitor for changes'] },
-            localSEO: { applicable: targetMarket !== 'Global', gbpSignals: { score: 20, findings: ['Not analyzed'] }, napConsistency: { score: 20, findings: ['Not analyzed'] }, reviewSignals: { score: 20, findings: ['Not analyzed'] }, businessType: 'N/A' },
-            sxo: { pageTypeMatch: 'Unknown', serpIntentMatch: 'mixed', userPersonaScores: [{ persona: 'General', score: 40 }], recommendations: ['Full analysis recommended'] },
+        // Deep merge all agent results
+        let analysisResult: Record<string, unknown> = {}
+        for (const agentResult of allAgentResults) {
+          if (Object.keys(agentResult).length > 0) {
+            analysisResult = deepMerge(analysisResult, agentResult)
           }
         }
 
-        try {
-          strategyData = repairAndParseJSON(strategyRaw)
-        } catch (e) {
-          console.error('[analyze] Strategy JSON parse failed:', e instanceof Error ? e.message : 'Unknown error')
-          const auditScores = auditData.overallScores as Record<string, number>
-          strategyData = {
-            structure: {
-              topicClusters: [{ cluster: 'Core Topic', pillarKeyword: 'primary keyword', supportingKeywords: ['secondary'], seoOpportunity: 'Optimize existing pages', aeoOpportunity: 'Add FAQ section', geoOpportunity: 'Create cite-worthy content' }],
-              keywordGaps: [{ keyword: 'target keyword', volume: 'Med', difficulty: 'Med', type: 'seo', opportunity: 'Create content' }],
-              contentArchitecture: { recommended: [{ section: 'Main Content', purpose: 'Core topic coverage', pillar: 'all' }], internalLinkMap: [{ from: 'Home', to: 'Blog', anchor: 'Learn more' }] },
-              schemaRecommendations: [{ schemaType: 'Organization', purpose: 'Brand identity', pillar: 'geo', implementation: 'Add to homepage', status: 'active' }],
+        // Ensure required top-level fields
+        analysisResult.siteName = analysisResult.siteName || siteData.title || url
+        analysisResult.market = targetMarket
+        analysisResult.url = url
+
+        // Ensure overallScores exists and is realistic
+        if (!analysisResult.overallScores || typeof analysisResult.overallScores !== 'object') {
+          analysisResult.overallScores = { seo: 35, aeo: 25, geo: 20, combined: 27 }
+        }
+
+        // Ensure audit exists with all sub-sections
+        if (!analysisResult.audit || typeof analysisResult.audit !== 'object') {
+          analysisResult.audit = {}
+        }
+        const audit = analysisResult.audit as Record<string, unknown>
+
+        if (!audit.technicalSEO) {
+          audit.technicalSEO = { score: 35, issues: [{ issue: 'Analysis incomplete - retry recommended', severity: 'warning', fix: 'Try again later' }] }
+        }
+        if (!audit.crawlability) {
+          audit.crawlability = { score: 40, issues: [{ issue: 'Could not fully analyze', impact: 'Medium' }] }
+        }
+        if (!audit.pageSpeed) {
+          audit.pageSpeed = { score: 50, coreVitals: [{ metric: 'LCP', value: 'Unknown', status: 'needs-improvement' }, { metric: 'INP', value: 'Unknown', status: 'needs-improvement' }, { metric: 'CLS', value: 'Unknown', status: 'needs-improvement' }] }
+        }
+        if (!audit.indexation) {
+          audit.indexation = { score: 40, indexedPages: 0, orphanPages: 0, issues: ['Could not determine'] }
+        }
+        if (!audit.aeoReadiness) {
+          audit.aeoReadiness = { score: 25, hasFAQ: false, hasSchema: false, hasStructuredData: false, answerFormatScore: 20, issues: ['Could not fully analyze'] }
+        }
+        if (!audit.geoVisibility) {
+          audit.geoVisibility = { score: 20, citedByAI: [], entityRecognition: 15, knowledgeGraphPresence: false, issues: ['Could not fully analyze'] }
+        }
+
+        // Ensure other required sections with fallbacks
+        if (!analysisResult.eeat) {
+          analysisResult.eeat = { overallScore: 30, experience: { score: 30, findings: ['Partial analysis'] }, expertise: { score: 25, findings: ['Partial analysis'] }, authoritativeness: { score: 20, findings: ['Partial analysis'] }, trustworthiness: { score: 35, findings: ['Partial analysis'] }, whoHowWhyTest: { who: 'N/A', how: 'N/A', why: 'N/A' } }
+        }
+        if (!analysisResult.geoCitability) {
+          analysisResult.geoCitability = { overallScore: 25, citabilityScore: { score: 25, weight: 25, findings: ['Partial'] }, structuralReadability: { score: 30, weight: 20, findings: ['Partial'] }, multiModalContent: { score: 20, weight: 15, findings: ['Partial'] }, authorityBrandSignals: { score: 20, weight: 20, findings: ['Partial'] }, technicalAccessibility: { score: 30, weight: 20, findings: ['Partial'] } }
+        }
+        if (!analysisResult.aiCrawler) {
+          analysisResult.aiCrawler = { aiCrawlerAccess: [{ bot: 'GPTBot', allowed: true, recommendation: 'Verify access' }, { bot: 'ClaudeBot', allowed: true, recommendation: 'Verify access' }, { bot: 'PerplexityBot', allowed: true, recommendation: 'Verify access' }], robotsTxtAnalysis: ['Could not analyze'], llmsTxtPresence: false, jsRenderingDependency: 'medium', ssrVsCsr: 'Unknown' }
+        }
+        if (!analysisResult.brandMentions) {
+          analysisResult.brandMentions = { brandMentionScore: 20, backlinkCorrelation: 'Could not determine', platformPresence: [{ platform: 'Wikipedia', detected: false, strength: 'none' }, { platform: 'Reddit', detected: false, strength: 'none' }, { platform: 'YouTube', detected: false, strength: 'none' }, { platform: 'LinkedIn', detected: false, strength: 'none' }], citationSources: [{ engine: 'ChatGPT', topSource: 'Unknown', percentage: 0 }] }
+        }
+        if (!analysisResult.contentQuality) {
+          analysisResult.contentQuality = { overallScore: 35, contentDepth: 30, aiPatternRisk: 'medium', humanizationTips: ['Add original insights'], fillerDetected: ['Analysis incomplete'], originalityIndicators: ['Partial analysis'] }
+        }
+        if (!analysisResult.parasiteRisk) {
+          analysisResult.parasiteRisk = { riskLevel: 'low', findings: ['Could not fully analyze'], recommendations: ['Monitor for changes'] }
+        }
+        if (!analysisResult.localSEO) {
+          analysisResult.localSEO = { applicable: targetMarket !== 'Global', gbpSignals: { score: 20, findings: ['Not analyzed'] }, napConsistency: { score: 20, findings: ['Not analyzed'] }, reviewSignals: { score: 20, findings: ['Not analyzed'] }, businessType: 'N/A' }
+        }
+        if (!analysisResult.sxo) {
+          analysisResult.sxo = { pageTypeMatch: 'Unknown', serpIntentMatch: 'mixed', userPersonaScores: [{ persona: 'General', score: 40 }], recommendations: ['Full analysis recommended'] }
+        }
+        if (!analysisResult.structure) {
+          analysisResult.structure = {
+            topicClusters: [{ cluster: 'Core Topic', pillarKeyword: 'primary keyword', supportingKeywords: ['secondary'], seoOpportunity: 'Optimize existing pages', aeoOpportunity: 'Add FAQ section', geoOpportunity: 'Create cite-worthy content' }],
+            keywordGaps: [{ keyword: 'target keyword', volume: 'Med', difficulty: 'Med', type: 'seo', opportunity: 'Create content' }],
+            contentArchitecture: { recommended: [{ section: 'Main Content', purpose: 'Core topic coverage', pillar: 'all' }], internalLinkMap: [{ from: 'Home', to: 'Blog', anchor: 'Learn more' }] },
+            schemaRecommendations: [{ schemaType: 'Organization', purpose: 'Brand identity', pillar: 'geo', implementation: 'Add to homepage', status: 'active' }],
+          }
+        }
+        if (!analysisResult.creative) {
+          analysisResult.creative = {
+            contentBriefs: [{ title: 'Comprehensive Guide', type: 'guide', targetKeyword: 'main keyword', pillar: 'all', brief: 'Cover topic thoroughly', estimatedImpact: 'High', wordCount: '2000-3000', structure: ['Introduction', 'Main Content'] }],
+            onPageOptimizations: [{ page: '/', currentTitle: 'Current', suggestedTitle: 'Optimized Title', suggestedDescription: 'Optimized description', aeoTweaks: ['Add FAQ'], geoTweaks: ['Add structured data'] }],
+            answerBlocks: [{ question: 'What is...?', suggestedAnswer: 'A clear concise answer that AI can cite.', format: 'faq', targetEngine: 'Google' }],
+          }
+        }
+        if (!analysisResult.measure) {
+          analysisResult.measure = {
+            kpiTracking: {
+              seo: [{ metric: 'Organic Traffic', current: '0', target: '+50%', timeline: '3mo' }],
+              aeo: [{ metric: 'Featured Snippets', current: '0', target: '+3', timeline: '3mo' }],
+              geo: [{ metric: 'AI Citations', current: '0', target: '+2', timeline: '3mo' }],
             },
-            creative: {
-              contentBriefs: [{ title: 'Comprehensive Guide', type: 'guide', targetKeyword: 'main keyword', pillar: 'all', brief: 'Cover topic thoroughly', estimatedImpact: 'High', wordCount: '2000-3000', structure: ['Introduction', 'Main Content'] }],
-              onPageOptimizations: [{ page: '/', currentTitle: 'Current', suggestedTitle: 'Optimized Title', suggestedDescription: 'Optimized description', aeoTweaks: ['Add FAQ'], geoTweaks: ['Add structured data'] }],
-              answerBlocks: [{ question: 'What is...?', suggestedAnswer: 'A clear concise answer that AI can cite.', format: 'faq', targetEngine: 'Google' }],
-            },
-            measure: {
-              kpiTracking: {
-                seo: [{ metric: 'Organic Traffic', current: '0', target: '+50%', timeline: '3mo' }],
-                aeo: [{ metric: 'Featured Snippets', current: '0', target: '+3', timeline: '3mo' }],
-                geo: [{ metric: 'AI Citations', current: '0', target: '+2', timeline: '3mo' }],
-              },
-              competitorBenchmarks: [{ competitor: 'Top Competitor', url: 'https://example.com', seoScore: 70, aeoScore: 60, geoScore: 50, citedBy: ['ChatGPT'] }],
-              weeklyActions: [
-                { week: 'Week 1', tasks: [{ task: 'Fix critical SEO issues', pillar: 'seo', priority: 'high' }, { task: 'Add FAQ schema', pillar: 'aeo', priority: 'high' }] },
-                { week: 'Week 2', tasks: [{ task: 'Create pillar content', pillar: 'seo', priority: 'high' }, { task: 'Optimize for AI citation', pillar: 'geo', priority: 'medium' }] },
-                { week: 'Week 3', tasks: [{ task: 'Build backlinks', pillar: 'seo', priority: 'medium' }, { task: 'Add answer blocks', pillar: 'aeo', priority: 'medium' }] },
-                { week: 'Week 4', tasks: [{ task: 'Content refresh', pillar: 'seo', priority: 'low' }, { task: 'Monitor AI citations', pillar: 'geo', priority: 'medium' }] },
-              ],
-            },
-            algorithmUpdates: {
-              recentUpdates: [
-                { name: 'Google Core Update March 2025', date: '2025-03', impact: 'high', description: 'Content quality and E-E-A-T signals prioritized', affectedPillar: 'all' },
-                { name: 'AI Overview Expansion', date: '2025-02', impact: 'medium', description: 'AI Overviews shown for more query types', affectedPillar: 'aeo' },
-              ],
-            },
-            roadmap: {
-              quarters: [
-                { label: 'Q1: Foundation', seoGoal: 'Fix critical issues, optimize meta tags', aeoGoal: 'Add FAQ schema, structured data', geoGoal: 'Create cite-worthy content, add llms.txt', targetScores: { seo: Math.min(100, auditScores?.seo + 15 || 45), aeo: Math.min(100, auditScores?.aeo + 12 || 35), geo: Math.min(100, auditScores?.geo + 10 || 30) } },
-                { label: 'Q2: Growth', seoGoal: 'Build backlinks, expand topic clusters', aeoGoal: 'Optimize answer blocks, target snippets', geoGoal: 'Increase AI citation presence', targetScores: { seo: Math.min(100, auditScores?.seo + 25 || 55), aeo: Math.min(100, auditScores?.aeo + 22 || 45), geo: Math.min(100, auditScores?.geo + 20 || 40) } },
-                { label: 'Q3: Authority', seoGoal: 'Dominate niche keywords', aeoGoal: 'Voice search optimization', geoGoal: 'Multi-platform AI visibility', targetScores: { seo: Math.min(100, auditScores?.seo + 35 || 65), aeo: Math.min(100, auditScores?.aeo + 32 || 55), geo: Math.min(100, auditScores?.geo + 30 || 50) } },
-                { label: 'Q4: Scale', seoGoal: 'Scale content production', aeoGoal: 'Cross-platform AEO coverage', geoGoal: 'AI-first content strategy', targetScores: { seo: Math.min(100, auditScores?.seo + 45 || 75), aeo: Math.min(100, auditScores?.aeo + 40 || 65), geo: Math.min(100, auditScores?.geo + 38 || 60) } },
-              ],
-            },
-            trafficInsights: {
-              winners: [
-                { page: '/blog/guide', change: '+25%', pillar: 'seo' },
-                { page: '/faq', change: '+18%', pillar: 'aeo' },
-              ],
-              losers: [
-                { page: '/old-page', change: '-12%', pillar: 'seo' },
-                { page: '/about', change: '-8%', pillar: 'geo' },
-              ],
-            },
-            deepStrategy: {
-              technicalImplementations: [
-                { type: 'schema', description: 'Add Organization schema', codeSnippet: '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Your Brand","url":"https://yoursite.com"}</script>', priority: 'high', pillar: 'geo' },
-                { type: 'robots', description: 'Allow AI crawlers in robots.txt', codeSnippet: 'User-agent: GPTBot\nAllow: /\nUser-agent: ClaudeBot\nAllow: /\nUser-agent: PerplexityBot\nAllow: /', priority: 'high', pillar: 'geo' },
-              ],
-              backlinkOutreach: [
-                { targetSite: 'Industry publication', url: 'https://example.com', strategy: 'Guest post with data', contentAngle: 'Unique research angle', priority: 'high' },
-              ],
-              aiCitationStrategy: [
-                { technique: 'Source attribution', implementation: 'Include original data, statistics, and quotes from primary sources', targetEngine: 'ChatGPT', expectedResult: 'Higher citation probability' },
-                { technique: 'Structured answers', implementation: 'Use clear Q&A format with concise 40-60 word answers', targetEngine: 'Perplexity', expectedResult: 'Direct citation in AI responses' },
-              ],
-            },
-            summary: `Analysis of ${siteData.title || url} shows significant opportunities for improvement across SEO, AEO, and GEO pillars. Focus on building authority and creating cite-worthy content.`,
-            executiveActions: [
-              'Fix critical technical SEO issues identified in the audit',
-              'Add FAQ schema and structured data for AEO optimization',
-              'Create comprehensive, cite-worthy content for GEO visibility',
-              'Build high-quality backlinks from authoritative sources',
-              'Implement AI crawler access in robots.txt and add llms.txt',
+            competitorBenchmarks: [{ competitor: 'Top Competitor', url: 'https://example.com', seoScore: 70, aeoScore: 60, geoScore: 50, citedBy: ['ChatGPT'] }],
+            weeklyActions: [
+              { week: 'Week 1', tasks: [{ task: 'Fix critical SEO issues', pillar: 'seo', priority: 'high' }, { task: 'Add FAQ schema', pillar: 'aeo', priority: 'high' }] },
+              { week: 'Week 2', tasks: [{ task: 'Create pillar content', pillar: 'seo', priority: 'high' }, { task: 'Optimize for AI citation', pillar: 'geo', priority: 'medium' }] },
+              { week: 'Week 3', tasks: [{ task: 'Build backlinks', pillar: 'seo', priority: 'medium' }, { task: 'Add answer blocks', pillar: 'aeo', priority: 'medium' }] },
+              { week: 'Week 4', tasks: [{ task: 'Content refresh', pillar: 'seo', priority: 'low' }, { task: 'Monitor AI citations', pillar: 'geo', priority: 'medium' }] },
             ],
           }
         }
-
-        // Merge both results
-        const analysisResult = {
-          ...auditData,
-          ...strategyData,
-          siteName: auditData.siteName || strategyData.siteName || siteData.title || url,
-          market: targetMarket,
-          overallScores: auditData.overallScores || strategyData.overallScores,
-          audit: auditData.audit || strategyData.audit,
-          url,
+        if (!analysisResult.algorithmUpdates) {
+          analysisResult.algorithmUpdates = {
+            recentUpdates: [
+              { name: 'Google Core Update March 2025', date: '2025-03', impact: 'high', description: 'Content quality and E-E-A-T signals prioritized', affectedPillar: 'all' },
+              { name: 'AI Overview Expansion', date: '2025-02', impact: 'medium', description: 'AI Overviews shown for more query types', affectedPillar: 'aeo' },
+            ],
+          }
+        }
+        if (!analysisResult.roadmap) {
+          const scores = (analysisResult.overallScores as Record<string, number>) || { seo: 35, aeo: 25, geo: 20 }
+          analysisResult.roadmap = {
+            quarters: [
+              { label: 'Q1: Foundation', seoGoal: 'Fix critical issues, optimize meta tags', aeoGoal: 'Add FAQ schema, structured data', geoGoal: 'Create cite-worthy content, add llms.txt', targetScores: { seo: Math.min(100, (scores.seo || 35) + 15), aeo: Math.min(100, (scores.aeo || 25) + 12), geo: Math.min(100, (scores.geo || 20) + 10) } },
+              { label: 'Q2: Growth', seoGoal: 'Build backlinks, expand topic clusters', aeoGoal: 'Optimize answer blocks, target snippets', geoGoal: 'Increase AI citation presence', targetScores: { seo: Math.min(100, (scores.seo || 35) + 25), aeo: Math.min(100, (scores.aeo || 25) + 22), geo: Math.min(100, (scores.geo || 20) + 20) } },
+              { label: 'Q3: Authority', seoGoal: 'Dominate niche keywords', aeoGoal: 'Voice search optimization', geoGoal: 'Multi-platform AI visibility', targetScores: { seo: Math.min(100, (scores.seo || 35) + 35), aeo: Math.min(100, (scores.aeo || 25) + 32), geo: Math.min(100, (scores.geo || 20) + 30) } },
+              { label: 'Q4: Scale', seoGoal: 'Scale content production', aeoGoal: 'Cross-platform AEO coverage', geoGoal: 'AI-first content strategy', targetScores: { seo: Math.min(100, (scores.seo || 35) + 45), aeo: Math.min(100, (scores.aeo || 25) + 40), geo: Math.min(100, (scores.geo || 20) + 38) } },
+            ],
+          }
+        }
+        if (!analysisResult.trafficInsights) {
+          analysisResult.trafficInsights = {
+            winners: [{ page: '/blog/guide', change: '+25%', pillar: 'seo' }, { page: '/faq', change: '+18%', pillar: 'aeo' }],
+            losers: [{ page: '/old-page', change: '-12%', pillar: 'seo' }, { page: '/about', change: '-8%', pillar: 'geo' }],
+          }
+        }
+        if (!analysisResult.deepStrategy) {
+          analysisResult.deepStrategy = {
+            technicalImplementations: [
+              { type: 'schema', description: 'Add Organization schema', codeSnippet: '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Your Brand","url":"https://yoursite.com"}</script>', priority: 'high', pillar: 'geo' },
+              { type: 'robots', description: 'Allow AI crawlers in robots.txt', codeSnippet: 'User-agent: GPTBot\nAllow: /\nUser-agent: ClaudeBot\nAllow: /\nUser-agent: PerplexityBot\nAllow: /', priority: 'high', pillar: 'geo' },
+            ],
+            backlinkOutreach: [{ targetSite: 'Industry publication', url: 'https://example.com', strategy: 'Guest post with data', contentAngle: 'Unique research angle', priority: 'high' }],
+            aiCitationStrategy: [
+              { technique: 'Source attribution', implementation: 'Include original data and quotes from primary sources', targetEngine: 'ChatGPT', expectedResult: 'Higher citation probability' },
+              { technique: 'Structured answers', implementation: 'Use clear Q&A format with concise 40-60 word answers', targetEngine: 'Perplexity', expectedResult: 'Direct citation in AI responses' },
+            ],
+          }
+        } else {
+          // Ensure deepStrategy has all sub-sections
+          const ds = analysisResult.deepStrategy as Record<string, unknown>
+          if (!ds.backlinkOutreach) {
+            ds.backlinkOutreach = [{ targetSite: 'Industry publication', url: 'https://example.com', strategy: 'Guest post with data', contentAngle: 'Unique research angle', priority: 'high' }]
+          }
+          if (!ds.aiCitationStrategy) {
+            ds.aiCitationStrategy = [{ technique: 'Source attribution', implementation: 'Include original data from primary sources', targetEngine: 'ChatGPT', expectedResult: 'Higher citation probability' }]
+          }
+        }
+        if (!analysisResult.summary) {
+          analysisResult.summary = `Analysis of ${siteData.title || url} shows significant opportunities for improvement across SEO, AEO, and GEO pillars. Focus on building authority and creating cite-worthy content.`
+        }
+        if (!analysisResult.executiveActions || !Array.isArray(analysisResult.executiveActions) || (analysisResult.executiveActions as string[]).length === 0) {
+          analysisResult.executiveActions = [
+            'Fix critical technical SEO issues identified in the audit',
+            'Add FAQ schema and structured data for AEO optimization',
+            'Create comprehensive, cite-worthy content for GEO visibility',
+            'Build high-quality backlinks from authoritative sources',
+            'Implement AI crawler access in robots.txt and add llms.txt',
+          ]
         }
 
         yield sendProgress(90, 'Compiling results...')

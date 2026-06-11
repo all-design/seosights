@@ -19,8 +19,8 @@ const steps = [
   {
     number: '02',
     icon: Search,
-    title: 'AI Scans Everything',
-    description: 'Our AI crawls your site, analyzes competitors, checks AI citation signals, and audits technical SEO.',
+    title: '8 Agents Analyze',
+    description: '8 specialized AI agents work in parallel: Crawler, Schema Architect, Content Analyst, E-E-A-T Auditor, GEO Specialist, Link Architect, Local Scout, and SXO Strategist.',
     color: 'text-cyan-400',
     bg: 'bg-cyan-500/20',
     border: 'border-cyan-500/30',
@@ -29,8 +29,8 @@ const steps = [
   {
     number: '03',
     icon: Bot,
-    title: 'Get Your Strategy',
-    description: 'Receive a comprehensive SEO/AEO/GEO audit with actionable strategy, content briefs, and code snippets.',
+    title: 'Auto-Execute Strategy',
+    description: 'Get a complete SEO/AEO/GEO audit with auto-generated strategy, code snippets, content briefs, and weekly action plans ready to execute.',
     color: 'text-amber-400',
     bg: 'bg-amber-500/20',
     border: 'border-amber-500/30',

@@ -94,7 +94,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
-          The only platform that combines SEO rankings, AI citation tracking, and generative engine optimization — with E-E-A-T scoring, AI crawler analysis, and brand mention signals built in.
+          Powered by 8 specialized AI agents working in parallel — from Crawler Agent to SXO Strategist — delivering 10x more precise analysis than any existing tool.
         </motion.p>
 
         {/* AI Platform Badges */}

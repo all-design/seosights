@@ -291,6 +291,7 @@ interface AppState {
   analysisProgress: number
   analysisStep: string
   analysisError: string
+  activeAgent: string | null
   setView: (view: AppView) => void
   setTargetUrl: (url: string) => void
   setTargetMarket: (market: string) => void
@@ -298,6 +299,7 @@ interface AppState {
   setAnalysisProgress: (progress: number) => void
   setAnalysisStep: (step: string) => void
   setAnalysisError: (error: string) => void
+  setActiveAgent: (agent: string | null) => void
   reset: () => void
   startAnalysis: (url: string, market?: string) => void
 }
@@ -310,6 +312,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   analysisProgress: 0,
   analysisStep: '',
   analysisError: '',
+  activeAgent: null,
   setView: (view) => set({ view }),
   setTargetUrl: (url) => set({ targetUrl: url }),
   setTargetMarket: (market) => set({ targetMarket: market }),
@@ -317,8 +320,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAnalysisProgress: (progress) => set({ analysisProgress: progress }),
   setAnalysisStep: (step) => set({ analysisStep: step }),
   setAnalysisError: (error) => set({ analysisError: error }),
-  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '' }),
+  setActiveAgent: (agent) => set({ activeAgent: agent }),
+  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '', activeAgent: null }),
   startAnalysis: (url: string, market?: string) => {
-    set({ targetUrl: url, targetMarket: market || 'Global', view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null })
+    set({ targetUrl: url, targetMarket: market || 'Global', view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null, activeAgent: null })
   },
 }))
