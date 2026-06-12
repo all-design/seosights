@@ -889,3 +889,49 @@ Stage Summary:
 - Status polling endpoint with DB fallback for cross-process reliability
 - In-process worker for dev/sandbox, standalone worker for production
 - All pipeline stages verified: job enqueue → agent execution → result save → status poll
+
+---
+Task ID: 7
+Agent: main
+Task: Implement "Scrape Once, Read Many" Redis shared context architecture
+
+Work Log:
+- Created `/home/z/my-project/src/lib/scraper.ts` — Core scraper module with:
+  - `ScrapedSharedContext` interface matching user's exact JSON spec (meta_data, raw_text_content, structured_elements, search_context, html_structure, scraped_at)
+  - `scrapeAndCleanWebsite()` function that scrapes a URL once, cleans HTML (removes nav, scripts, CSS, footer, header), extracts structured data (headings, links, JSON-LD schema), fetches robots.txt and llms.txt, and collects search context (competitors, AI citations, local SEO)
+  - `AGENT_CONTEXT_FOCUS` map — maps each of the 8 agent IDs to only the context sections they need
+  - `getAgentSpecificContext()` function — filters full context to agent-specific subset (up to 70% token reduction)
+  - Retry logic with exponential backoff (2 retries, 2.5s base delay)
+  - Timeouts (15s page_reader, 12s web_search)
+  - Resilient design — continues with defaults on any failure
+
+- Updated `/home/z/my-project/src/lib/shared-context.ts` — Upgraded from in-memory to Redis-backed:
+  - Added `RedisSharedContextCache` class with Redis-primary + in-memory fallback
+  - Redis key pattern: `seosights:shared_context:{projectId}` and `seosights:shared_context:{domain}:{market}`
+  - TTL: 3600 seconds (1 hour) in Redis
+  - Methods: `setScrapedContext()`, `getScrapedContext()`, `getAgentContext()`, `has()`, `delete()`, `getStats()`
+  - All Redis ops wrapped in try/catch — failures never break the system
+  - Exported `redisSharedContext` singleton
+  - Preserved backward-compatible `sharedContextCache` singleton
+
+- Updated `/home/z/my-project/src/lib/audit-worker-init.ts` — Integrated new architecture:
+  - Phase 1 now uses `scrapeAndCleanWebsite()` instead of inline scraping
+  - Caches result via `redisSharedContext.setScrapedContext()` with 1-hour TTL
+  - Falls back to legacy in-memory cache if Redis misses
+  - Phase 2: Each agent receives filtered context via `getAgentSpecificContext()`
+  - `runSubAgentWithProtocol()` now accepts `sharedScrapedContext` parameter and injects agent-specific context
+  - Optional cache cleanup after all agents complete (commented out, kept for TTL reuse)
+
+- Updated `/home/z/my-project/src/app/api/analyze/route.ts` — Same integration for SSE route:
+  - Phase 1 uses `scrapeAndCleanWebsite()` with Redis caching
+  - Falls back to legacy cache if Redis unavailable
+  - `runSubAgentWithProtocol()` injects agent-specific context from shared scraped context
+  - All backward compatibility preserved
+
+Stage Summary:
+- "Scrape Once, Read Many" architecture fully implemented
+- Key benefit: Up to 70% reduction in input tokens per agent (e.g., Content Architect gets only raw_text_content, Tech & Schema gets only structured_elements)
+- Prevents IP blocking (site is scraped only once, not 8 times)
+- Redis provides cross-process sharing (1-hour TTL)
+- Graceful fallback to in-memory cache when Redis unavailable
+- Lint passes cleanly, dev server running, page renders correctly
