@@ -8,6 +8,7 @@ import FeaturesSection from '@/components/landing/FeaturesSection'
 import HowItWorksSection from '@/components/landing/HowItWorksSection'
 import PricingSection from '@/components/landing/PricingSection'
 import CTASection from '@/components/landing/CTASection'
+import AffiliateLandingSection from '@/components/landing/AffiliateLandingSection'
 import Footer from '@/components/landing/Footer'
 import URLInputModal from '@/components/landing/URLInputModal'
 import AnalyzingView from '@/components/landing/AnalyzingView'
@@ -103,7 +104,7 @@ export default function Home() {
         <SuperadminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
         <WebhooksPanel isOpen={isWebhooksOpen} onClose={() => setIsWebhooksOpen(false)} userId={webhookUserId} />
         <Dialog open={isAffiliateOpen} onOpenChange={setIsAffiliateOpen}>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-background border-white/10">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background border-white/10">
             <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
           </DialogContent>
         </Dialog>
@@ -119,7 +120,7 @@ export default function Home() {
         <SuperadminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
         <WebhooksPanel isOpen={isWebhooksOpen} onClose={() => setIsWebhooksOpen(false)} userId={webhookUserId} />
         <Dialog open={isAffiliateOpen} onOpenChange={setIsAffiliateOpen}>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-background border-white/10">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background border-white/10">
             <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
           </DialogContent>
         </Dialog>
@@ -135,6 +136,7 @@ export default function Home() {
       <FeaturesSection />
       <HowItWorksSection />
       <PricingSection onStartFree={() => setIsModalOpen(true)} />
+      <AffiliateLandingSection onBecomeReseller={() => setIsAffiliateOpen(true)} />
       <CTASection onStartFree={() => setIsModalOpen(true)} />
       <Footer onAdminClick={() => setIsAdminOpen(true)} />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />

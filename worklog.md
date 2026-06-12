@@ -1030,3 +1030,139 @@ Stage Summary:
 - Stripe webhook integration for automatic commission processing
 - 250+ Pro referrals = ~$9,875/mo passive income for top affiliates
 - All 8 core SaaS modules now complete
+
+---
+Task ID: 3
+Agent: HeroSection Rewrite Agent
+Task: Rewrite HeroSection with new purple/indigo design
+
+Work Log:
+- Read worklog.md to understand prior agent work (8-agent system, free scanner, dashboard features, etc.)
+- Read current HeroSection.tsx (599 lines) to understand existing quick scan functionality and all UI elements
+- Read quick-audit API route to confirm the POST /api/quick-audit endpoint contract
+- Completely rewrote HeroSection.tsx following user's HTML design specification:
+  - Removed: "seosights" big text logo, "Three Sights. One Platform." badge, AI Platform Badges section, "Your 24/7 AI SEO Team" section with agent pills, "Deploy Your AI Team"/"View Pricing" CTA buttons, Floating Stats section
+  - Added: Purple/indigo blur orbs background (replacing emerald/cyan/amber orbs)
+  - Added: "Not a Wrapper" badge with purple theme (slate-900 bg, purple-400 text)
+  - Added: Main heading "Get Customers from Google & AI" with from-purple-400 via-indigo-400 to-blue-400 gradient
+  - Added: Subheadline about 8 AI agents from user's spec
+  - Added: URL input form styled per user's HTML (slate-900/80 bg, rounded-2xl, backdrop-blur, Globe icon)
+  - Added: "Analyze All Three Sights" button with purple-to-indigo gradient and shadow
+  - Added: Three Sights indicators (purple/indigo/blue dots with labels)
+  - Preserved: QuickAuditResult interface, ScoreRing component, scan form handler (handleQuickScan), scan results panel with AnimatePresence
+  - Updated scan results colors: SEO=purple (#a855f7), AEO=indigo (#818cf8), GEO=blue (#60a5fa)
+  - Updated allowed bots section: purple theme (replacing emerald)
+  - Updated llms.txt found status: purple color (replacing emerald)
+  - Updated opportunities findings: purple color (replacing emerald)
+  - Updated top recommendation: indigo theme (replacing amber)
+  - Updated GSC card: purple/indigo gradient (replacing cyan/emerald)
+  - Updated full report CTA: purple-to-indigo gradient (replacing emerald)
+- Ran bun run lint — zero errors
+- Dev server compiles and serves successfully (GET / 200)
+
+Stage Summary:
+- HeroSection completely rewritten with new purple/indigo/blue brand direction
+- All old elements removed (logo, Three Sights badge, AI badges, agent pills, deploy button, stats)
+- Clean design matching user's HTML spec: badge → heading → subheadline → form → three sights indicators → scan results
+- Quick scan functionality fully preserved (URL input, /api/quick-audit POST, ScoreRings, blocked/allowed bots, llms.txt, findings, recommendation, GSC card, CTA)
+- Zero lint errors, dev server running cleanly
+
+---
+Task ID: 4
+Agent: Affiliate Landing Agent
+Task: Create AffiliateLandingSection component
+
+Work Log:
+- Read worklog.md to understand prior agent work (8-agent system, ESSHEO upgrade, Stripe billing, Superadmin, etc.)
+- Read existing landing components (HeroSection, PricingSection, HowItWorksSection) to match styling patterns
+- Read shadcn/ui components (Card, Badge, Slider) to understand API
+- Created /src/components/landing/AffiliateLandingSection.tsx with 4 subsections:
+  1. Hero Section: "Earn Up to 50% Recurring Commission with seosights" title, subtitle, "Become a Reseller (Start Free)" CTA button
+  2. Tier Cards: 5-tier commission scale with color-coded cards (gray/emerald/cyan/purple/amber), Level 5 VIP with gradient border, Crown badge, and special styling
+  3. Interactive Commission Calculator: Slider (1–500), real-time calculation of monthly revenue × tier %, animated numbers with framer-motion, annual projection, tier indicator
+  4. How It Works: 3 steps (Get Your Unique Link, Share Everywhere, Track & Earn) with numbered circles, icons, responsive grid
+- Added "Ready to Start?" CTA card at bottom with gradient purple-to-amber button calling onBecomeReseller
+- Integrated AffiliateLandingSection into page.tsx between PricingSection and CTASection
+- Lint passes with zero errors
+- Dev server compiles and serves pages successfully (GET / 200)
+
+Stage Summary:
+- AffiliateLandingSection.tsx created with full 4-subsection landing page spec
+- 5-tier commission cards with distinct color schemes per level, VIP Level 5 with amber/gold gradient + Crown badge
+- Interactive calculator with shadcn Slider, real-time commission computation, animated currency display
+- Component accepts onBecomeReseller prop for both CTAs (hero + bottom)
+- Section has id="affiliate" for navigation
+- Purple/indigo glow accents match the affiliate theme
+- Integrated into main page between pricing and CTA sections
+
+---
+Task ID: 5
+Agent: Affiliate Dashboard Agent
+Task: Enhance AffiliatePortal with KPI cards, chart, and referral table
+
+Work Log:
+- Read worklog.md to understand prior work across 10+ tasks
+- Read existing AffiliatePortal.tsx (463 lines) to understand current structure: registration flow, active affiliate dashboard with stats, referral link, tier progress, commission scale, payouts, referrals
+- Read shadcn/ui chart.tsx and table.tsx component APIs for proper integration
+- Verified recharts (v2.15.4) is installed in package.json
+- Rewrote AffiliatePortal.tsx with comprehensive enhanced dashboard:
+  - Full-width Copy Link Box at top with purple gradient border, prominent referral link display, copy-to-clipboard button with visual feedback (Copied! state with emerald color), affiliate code display, 60-day cookie badge
+  - 5 KPI Widget Cards in responsive grid (2 cols mobile, 4 cols desktop):
+    1. Current Tier Card — shows tier number and commission %, progress bar to next tier, "X more for next tier" text
+    2. Active Referrals Card — active count + total registered
+    3. Monthly Earnings (MRR) Card — monthly earnings from subscriptions
+    4. Total Paid Out Card — lifetime payouts
+  - Full-width Tier Progress Card with animated progress bar (purple/violet/indigo gradient), "You need X more active users for next tier (Y%)" text
+  - Click & Registration Line Chart using shadcn/ui ChartContainer + recharts:
+    - 30 days of mock data generated with useMemo (clicks 20-100 range, registrations 1-9 range)
+    - Two lines: clicks (purple) and registrations (violet)
+    - ChartTooltip and ChartLegend from shadcn/ui chart component
+    - Card wrapper with "Link Performance (30 days)" title and MousePointerClick icon
+  - Anonymized Referral Table using shadcn/ui Table:
+    - 12 rows of mock data generated with useMemo
+    - Columns: User ID (anonymized like "user_***41"), Package, Your Earning, Status
+    - Status badges with color coding: Active (purple), Trial (amber), Churned (rose)
+    - GDPR-safe badge in header, max-h-96 overflow-y-auto for scrolling
+  - Kept existing sections at bottom: Commission Scale, Recent Commissions, How It Works
+- Updated AffiliateData interface with new optional fields: totalPaidOutUsd, monthlyEarningsUsd
+- Updated TIERS color scheme from emerald/cyan/amber to purple/indigo theme:
+  - Starter: gray, Rising Star: indigo, Pro: violet, Superstar: purple, Legend: amber
+- Changed all registration flow colors from emerald to purple (bg, border, button, icon colors)
+- Updated commission payouts badge colors from emerald to purple
+- Updated How It Works step circles from emerald to purple
+- Ran lint — zero errors
+- Dev server compiles and serves pages successfully
+
+Stage Summary:
+- AffiliatePortal.tsx fully rewritten with enhanced affiliate dashboard
+- 5 KPI widgets in responsive grid with purple/indigo/violet/fuchsia color scheme
+- Full-width copy link box with visual copy feedback at the top
+- 30-day line chart for link performance using shadcn/ui ChartContainer + recharts
+- 12-row anonymized referral table with GDPR-safe badges and status colors
+- Tier progress bar with animated gradient and "X more for next tier" messaging
+- All existing functionality preserved (registration flow, API calls, commission scale, payouts, how-it-works)
+- Zero lint errors, dev server running cleanly
+---
+Task ID: 6
+Agent: Main Orchestrator
+Task: Update page.tsx and Navbar, integrate Affiliate Landing, browser verification
+
+Work Log:
+- Updated page.tsx: Changed onBecomeReseller to setIsAffiliateOpen(true) instead of setIsModalOpen(true)
+- Updated page.tsx: Changed Affiliate dialog from max-w-2xl to max-w-4xl and max-h-[85vh] to max-h-[90vh] for enhanced dashboard
+- Updated Navbar.tsx: Added "Affiliates" link to navLinks array pointing to #affiliate
+- Updated Navbar.tsx: Changed logo gradient from emerald/cyan/amber to purple/indigo/blue
+- Updated Navbar.tsx: Changed CTA button from emerald to purple-to-indigo gradient
+- Updated Navbar.tsx: Changed mobile CTA button to match purple/indigo theme
+- Browser verification: All sections render correctly (Hero, Stats, Features, How It Works, Pricing, Affiliate, CTA, Footer)
+- Browser verification: DOM snapshot confirms all content is present including "Earn Up to 50% Recurring Commission" heading and "Become a Reseller (Start Free)" button
+- Browser verification: Affiliate section has id="affiliate" for navigation
+- Lint check: Clean (zero errors)
+- Dev server: Running cleanly on port 3000
+
+Stage Summary:
+- All 3 major frontend components implemented: HeroSection, AffiliateLandingSection, AffiliatePortal
+- page.tsx properly integrates new AffiliateLandingSection between Pricing and CTA sections
+- Navbar updated with "Affiliates" link and purple/indigo color scheme
+- "Become a Reseller" buttons correctly open the Affiliate Portal dialog
+- Full page renders correctly with all sections

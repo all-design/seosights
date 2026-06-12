@@ -9,6 +9,7 @@ const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'How It Works', href: '#how-it-works' },
+  { label: 'Affiliates', href: '#affiliate' },
   { label: 'Get Started', href: '#cta' },
 ]
 
@@ -61,10 +62,10 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
               className="flex flex-col items-start cursor-pointer select-none"
               onClick={handleLogoClick}
             >
-              <span className="font-bold text-xl tracking-tight leading-none bg-gradient-to-r from-emerald-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent">
+              <span className="font-bold text-xl tracking-tight leading-none bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400 bg-clip-text text-transparent">
                 seosights
               </span>
-              <span className="text-[8px] tracking-[0.2em] text-emerald-400/60 uppercase leading-none mt-0.5">
+              <span className="text-[8px] tracking-[0.2em] text-purple-400/60 uppercase leading-none mt-0.5">
                 LOVE AT FIRST SIGHT
               </span>
             </div>
@@ -86,7 +87,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
             <div className="hidden md:flex items-center gap-3">
               <Button
                 size="sm"
-                className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300"
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold shadow-[0_0_20px_rgba(139,92,246,0.2)] hover:shadow-[0_0_30px_rgba(139,92,246,0.4)] transition-all duration-300"
                 onClick={onStartFree}
               >
                 Analyze Site
@@ -143,7 +144,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                 <div className="pt-2">
                   <Button
                     onClick={onStartFree}
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold"
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold"
                   >
                     Analyze Site
                   </Button>
