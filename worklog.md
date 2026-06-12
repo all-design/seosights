@@ -935,3 +935,45 @@ Stage Summary:
 - Redis provides cross-process sharing (1-hour TTL)
 - Graceful fallback to in-memory cache when Redis unavailable
 - Lint passes cleanly, dev server running, page renders correctly
+
+---
+Task ID: 7
+Agent: Main Agent
+Task: Implement White-Label PDF Export with Puppeteer
+
+Work Log:
+- Added agency branding fields to User model in Prisma schema: agencyName, agencyLogoUrl, agencyPrimaryColor (#10b981 default), agencySecondaryColor (#6B7280 default)
+- Pushed schema to SQLite database successfully
+- Installed puppeteer + Chrome binary (v149.0.7827.22)
+- Created /src/lib/pdf-generator.ts — Puppeteer-based premium PDF generator with:
+  - Agency branding lookup from DB (Pro/Managed get white-label, others get seosights branding)
+  - Dynamic HTML template with inline CSS (no external dependencies)
+  - A4 format, print backgrounds enabled
+  - Cover page with agency logo, name, primary color accent
+  - Executive Summary with score cards (SEO/AEO/GEO)
+  - 90-Day Roadmap with per-agent task assignments
+  - Technical Audit (SEO, Crawlability, Core Web Vitals)
+  - AEO Readiness + GEO Visibility sections
+  - E-E-A-T analysis with 4 dimension cards
+  - AI Crawler access analysis (blocked/allowed bots, llms.txt status)
+  - GEO Citability score with visual progress bars
+  - Back page with branding and session metadata
+- Created /src/app/api/analysis/[id]/download-pdf/route.ts — GET endpoint for PDF download
+- Created /src/app/api/agency/route.ts — GET/POST for agency branding settings
+- Created /src/components/dashboard/AgencySettingsPanel.tsx — UI for agency branding:
+  - Agency name, logo URL, primary/secondary color pickers
+  - Live preview of cover page with custom branding
+  - Pro upgrade notice for free/starter users
+- Updated AnalysisDashboard Export PDF button:
+  - Tries white-label Puppeteer PDF first (if analysisId exists)
+  - Falls back to jsPDF export
+  - Button renamed to "Premium PDF" with tooltip
+- Lint passes cleanly
+
+Stage Summary:
+- White-Label PDF system fully implemented: DB → API → UI
+- Pro/Managed users get branded PDFs with their logo, name, and colors
+- Free/Starter users see upgrade prompt in Agency Settings panel
+- Puppeteer generates premium A4 PDFs from HTML templates
+- jsPDF fallback still works for client-side export
+- All 7 core SaaS modules now implemented: Domain, DB, Protocol, Billing, Queue, Cache, PDF Export

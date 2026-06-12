@@ -20,6 +20,13 @@ model User {
   stripeSubscriptionId  String?
   subscriptionStatus    String    @default("trial") // trial | active | past_due | canceled
   tier                  String    @default("trial") // trial | starter | pro | managed
+
+  // ─── Agency White-Label Branding (Pro+ feature) ──────────────────────
+  agencyName            String?   // e.g. "Apex Digital Agency"
+  agencyLogoUrl         String?   // e.g. "https://cdn.apex.com/logo.png"
+  agencyPrimaryColor    String    @default("#10b981") // HEX code for CSS — default emerald
+  agencySecondaryColor  String    @default("#6B7280") // HEX code for CSS — default gray
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

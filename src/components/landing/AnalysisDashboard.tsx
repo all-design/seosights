@@ -752,6 +752,28 @@ export default function AnalysisDashboard({ onStartFree, onOpenWebhooks }: { onS
   const handleExportPDF = async () => {
     setExporting(true)
     try {
+      // Try the white-label Puppeteer PDF first (if we have an analysisId saved in DB)
+      if (currentAnalysisId) {
+        try {
+          const wlResponse = await fetch(`/api/analysis/${currentAnalysisId}/download-pdf?userId=default`)
+          if (wlResponse.ok) {
+            const blob = await wlResponse.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${(data.siteName || 'site').replace(/[^a-zA-Z0-9]/g, '-')}-SEO-AEO-GEO-Report.pdf`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            return
+          }
+        } catch {
+          // Fall through to jsPDF export
+        }
+      }
+
+      // Fallback: jsPDF-based export (works client-side, no DB needed)
       const response = await fetch('/api/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -898,9 +920,10 @@ export default function AnalysisDashboard({ onStartFree, onOpenWebhooks }: { onS
               onClick={handleExportPDF}
               disabled={exporting}
               className="flex items-center gap-2 text-sm bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-4 py-2 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Generate premium branded PDF report with agency logo and colors"
             >
               {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              {exporting ? 'Exporting...' : 'Export PDF'}
+              {exporting ? 'Generating...' : 'Premium PDF'}
             </button>
             <button
               onClick={reset}
