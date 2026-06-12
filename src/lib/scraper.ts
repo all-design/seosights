@@ -608,26 +608,35 @@ export async function scrapeAndCleanWebsite(
   let rawHtml = ''
   let pageTitle = ''
 
-  try {
-    const pageResult = await invokeWithRetry(
-      zai,
-      'page_reader',
-      { url },
-      PAGE_READER_TIMEOUT_MS
-    )
+  // On Vercel, SDK functions (page_reader, web_search) are unreachable
+  // (internal-api.z.ai is only accessible from Z.ai sandbox).
+  // Skip SDK and go straight to direct fetch.
+  const isVercel = !!process.env.VERCEL
 
-    if (pageResult) {
-      const rawData = (pageResult as Record<string, unknown>)?.data || pageResult
-      const data = rawData as Record<string, unknown>
-      rawHtml = typeof data.html === 'string' ? data.html : ''
-      pageTitle =
-        typeof data.title === 'string'
-          ? data.title
-          : extractTitle(rawHtml)
+  if (!isVercel) {
+    try {
+      const pageResult = await invokeWithRetry(
+        zai,
+        'page_reader',
+        { url },
+        PAGE_READER_TIMEOUT_MS
+      )
+
+      if (pageResult) {
+        const rawData = (pageResult as Record<string, unknown>)?.data || pageResult
+        const data = rawData as Record<string, unknown>
+        rawHtml = typeof data.html === 'string' ? data.html : ''
+        pageTitle =
+          typeof data.title === 'string'
+            ? data.title
+            : extractTitle(rawHtml)
+      }
+    } catch {
+      // Continue with empty data
+      console.warn(`[scraper] page_reader failed for ${url}`)
     }
-  } catch {
-    // Continue with empty data
-    console.warn(`[scraper] page_reader failed for ${url}`)
+  } else {
+    console.log('[scraper] Vercel detected — skipping SDK page_reader, using direct fetch')
   }
 
   // Fallback: Direct fetch if SDK page_reader failed (e.g., on Vercel where internal-api.z.ai is unreachable)
@@ -681,22 +690,24 @@ export async function scrapeAndCleanWebsite(
 
   // ── Step 8: Fetch robots.txt ─────────────────────────────────────────────
   let robotsTxt = ''
-  try {
-    const robotsResult = await invokeWithRetry(
-      zai,
-      'page_reader',
-      { url: `${origin}/robots.txt` },
-      PAGE_READER_TIMEOUT_MS
-    )
+  if (!isVercel) {
+    try {
+      const robotsResult = await invokeWithRetry(
+        zai,
+        'page_reader',
+        { url: `${origin}/robots.txt` },
+        PAGE_READER_TIMEOUT_MS
+      )
 
-    if (robotsResult) {
-      const rd = (robotsResult as Record<string, unknown>)?.data || robotsResult
-      const data = rd as Record<string, unknown>
-      const content = typeof data.html === 'string' ? data.html : typeof data.text === 'string' ? data.text : ''
-      robotsTxt = stripHtmlTags(content).slice(0, 2000)
+      if (robotsResult) {
+        const rd = (robotsResult as Record<string, unknown>)?.data || robotsResult
+        const data = rd as Record<string, unknown>
+        const content = typeof data.html === 'string' ? data.html : typeof data.text === 'string' ? data.text : ''
+        robotsTxt = stripHtmlTags(content).slice(0, 2000)
+      }
+    } catch {
+      robotsTxt = ''
     }
-  } catch {
-    robotsTxt = ''
   }
 
   // Fallback: Direct fetch robots.txt
@@ -714,28 +725,30 @@ export async function scrapeAndCleanWebsite(
 
   // ── Step 9: Check for llms.txt ───────────────────────────────────────────
   let llmsTxtExists = false
-  try {
-    const llmsResult = await invokeWithRetry(
-      zai,
-      'page_reader',
-      { url: `${origin}/llms.txt` },
-      PAGE_READER_TIMEOUT_MS
-    )
+  if (!isVercel) {
+    try {
+      const llmsResult = await invokeWithRetry(
+        zai,
+        'page_reader',
+        { url: `${origin}/llms.txt` },
+        PAGE_READER_TIMEOUT_MS
+      )
 
-    if (llmsResult) {
-      const ld = (llmsResult as Record<string, unknown>)?.data || llmsResult
-      const data = ld as Record<string, unknown>
-      const content =
-        typeof data.html === 'string'
-          ? data.html
-          : typeof data.text === 'string'
-            ? data.text
-            : ''
-      const cleaned = stripHtmlTags(content).trim()
-      llmsTxtExists = cleaned.length > 10
+      if (llmsResult) {
+        const ld = (llmsResult as Record<string, unknown>)?.data || llmsResult
+        const data = ld as Record<string, unknown>
+        const content =
+          typeof data.html === 'string'
+            ? data.html
+            : typeof data.text === 'string'
+              ? data.text
+              : ''
+        const cleaned = stripHtmlTags(content).trim()
+        llmsTxtExists = cleaned.length > 10
+      }
+    } catch {
+      llmsTxtExists = false
     }
-  } catch {
-    llmsTxtExists = false
   }
 
   // Fallback: Direct fetch llms.txt
@@ -759,7 +772,8 @@ export async function scrapeAndCleanWebsite(
     local_seo_results: [],
   }
 
-  if (includeSearchData) {
+  if (includeSearchData && !isVercel) {
+    // web_search SDK is unreachable on Vercel — skip search context there
     try {
       searchContext = await fetchSearchContext(zai, domain, url, targetMarket)
     } catch {
