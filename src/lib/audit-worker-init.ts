@@ -414,9 +414,9 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
 
     emitWS(sessionId, 'analysis:start', { sessionId, url: targetUrl, market: targetMarket })
 
-    // Initialize z-ai-web-dev-sdk
-    const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const zai = await ZAI.create()
+    // Initialize z-ai-web-dev-sdk (uses getZAI which supports env var config on Vercel)
+    const { getZAI } = await import('./zai')
+    const zai = await getZAI()
 
     const tokenTracker = new TokenTracker(sessionId, { userId, analysisId })
 

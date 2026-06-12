@@ -513,8 +513,8 @@ export async function POST(request: NextRequest) {
 
     async function* generateEvents(): AsyncGenerator<string> {
       try {
-        const ZAI = (await import('z-ai-web-dev-sdk')).default
-        const zai = await ZAI.create()
+        const { getZAI } = await import('@/lib/zai')
+        const zai = await getZAI()
 
         // Create the token tracker for this analysis session
         const tokenTracker = new TokenTracker(analysisSessionId, {

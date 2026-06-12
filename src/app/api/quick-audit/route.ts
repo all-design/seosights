@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
     const sessionId = randomUUID()
     const tokenTracker = new TokenTracker(sessionId)
 
-    const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const zai = await ZAI.create()
+    const { getZAI } = await import('@/lib/zai')
+    const zai = await getZAI()
 
     // ── Step 1: Fetch the page ──
     let siteData: { title?: string; html?: string; text?: string } = { title: url, text: '' }

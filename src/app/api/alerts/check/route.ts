@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
     const alertUserId = userId || 'default-user'
     const createdAlerts: Record<string, unknown>[] = []
 
-    const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const zai = await ZAI.create()
+    const { getZAI } = await import('@/lib/zai')
+    const zai = await getZAI()
 
     // ── Step 1: Search for AI citations of the domain ──
     let citationCount = 0

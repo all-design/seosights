@@ -128,10 +128,11 @@ export function getAgentSpecificContext(
 // Retry + Timeout Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MAX_RETRIES = 2
+const MAX_RETRIES = process.env.VERCEL ? 1 : 2 // Fewer retries on Vercel (SDK functions may be unreachable)
 const BASE_DELAY_MS = 2500 // 2.5s base, jittered up to ~3s
-const PAGE_READER_TIMEOUT_MS = 15_000
-const WEB_SEARCH_TIMEOUT_MS = 12_000
+const PAGE_READER_TIMEOUT_MS = process.env.VERCEL ? 8_000 : 15_000 // Shorter timeout on Vercel
+const WEB_SEARCH_TIMEOUT_MS = process.env.VERCEL ? 8_000 : 12_000
+const DIRECT_FETCH_TIMEOUT_MS = 10_000
 
 /**
  * Sleep for a given number of milliseconds.
@@ -629,6 +630,26 @@ export async function scrapeAndCleanWebsite(
     console.warn(`[scraper] page_reader failed for ${url}`)
   }
 
+  // Fallback: Direct fetch if SDK page_reader failed (e.g., on Vercel where internal-api.z.ai is unreachable)
+  if (!rawHtml) {
+    try {
+      console.log(`[scraper] Trying direct fetch fallback for ${url}`)
+      const fetchResponse = await fetch(url, {
+        signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; SEOSightsBot/1.0; +https://seosights.com)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      })
+      if (fetchResponse.ok) {
+        rawHtml = await fetchResponse.text()
+        console.log(`[scraper] Direct fetch succeeded for ${url} (${rawHtml.length} chars)`)
+      }
+    } catch (fetchErr) {
+      console.warn(`[scraper] Direct fetch also failed for ${url}:`, fetchErr instanceof Error ? fetchErr.message : 'Unknown')
+    }
+  }
+
   // If page_reader gave no HTML but we have a title, still proceed
   if (!rawHtml) {
     rawHtml = ''
@@ -678,6 +699,19 @@ export async function scrapeAndCleanWebsite(
     robotsTxt = ''
   }
 
+  // Fallback: Direct fetch robots.txt
+  if (!robotsTxt) {
+    try {
+      const robotsFetch = await fetch(`${origin}/robots.txt`, {
+        signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SEOSightsBot/1.0)' },
+      })
+      if (robotsFetch.ok) {
+        robotsTxt = (await robotsFetch.text()).slice(0, 2000)
+      }
+    } catch { /* ignore */ }
+  }
+
   // ── Step 9: Check for llms.txt ───────────────────────────────────────────
   let llmsTxtExists = false
   try {
@@ -702,6 +736,20 @@ export async function scrapeAndCleanWebsite(
     }
   } catch {
     llmsTxtExists = false
+  }
+
+  // Fallback: Direct fetch llms.txt
+  if (!llmsTxtExists) {
+    try {
+      const llmsFetch = await fetch(`${origin}/llms.txt`, {
+        signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS),
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SEOSightsBot/1.0)' },
+      })
+      if (llmsFetch.ok) {
+        const text = (await llmsFetch.text()).trim()
+        llmsTxtExists = text.length > 10
+      }
+    } catch { /* ignore */ }
   }
 
   // ── Step 10: Fetch search context (competitors, AI citations, local SEO) ─
