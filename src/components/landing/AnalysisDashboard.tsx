@@ -613,7 +613,7 @@ function deriveGEOStrategy(data: SEOAnalysis): StrategyAction[] {
 // ══════════════════════════════════════════════════════════════
 // MAIN DASHBOARD
 // ══════════════════════════════════════════════════════════════
-export default function AnalysisDashboard({ onStartFree, onOpenWebhooks }: { onStartFree?: () => void; onOpenWebhooks?: () => void }) {
+export default function AnalysisDashboard({ onStartFree, onOpenWebhooks, onOpenAffiliate }: { onStartFree?: () => void; onOpenWebhooks?: () => void; onOpenAffiliate?: () => void }) {
   const { analysis, reset, mode, setMode, pendingApprovals, currentAnalysisId, setPendingApprovals, setCurrentAnalysisId } = useAppStore()
   const data = analysis as SEOAnalysis | null
   const [exporting, setExporting] = useState(false)
@@ -914,6 +914,17 @@ export default function AnalysisDashboard({ onStartFree, onOpenWebhooks }: { onS
               >
                 <Webhook className="w-4 h-4" />
                 <span className="hidden sm:inline">Webhooks</span>
+              </button>
+            )}
+            {/* Affiliate Portal Button */}
+            {onOpenAffiliate && (
+              <button
+                onClick={onOpenAffiliate}
+                className="flex items-center gap-2 text-sm text-amber-400 hover:text-amber-300 transition-colors px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20"
+                title="Affiliate Portal — Earn up to 50% commission (Ctrl+Shift+F)"
+              >
+                <Link2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Affiliate</span>
               </button>
             )}
             <button

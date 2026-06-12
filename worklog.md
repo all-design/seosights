@@ -977,3 +977,56 @@ Stage Summary:
 - Puppeteer generates premium A4 PDFs from HTML templates
 - jsPDF fallback still works for client-side export
 - All 7 core SaaS modules now implemented: Domain, DB, Protocol, Billing, Queue, Cache, PDF Export
+
+---
+Task ID: 8
+Agent: Main Agent
+Task: Implement Affiliate / Reseller System with Graduated Commission
+
+Work Log:
+- Added 3 new models to Prisma schema:
+  - Affiliate (userId, affiliateCode, totalReferredActive, totalEarningsUsd, pendingPayoutUsd, status)
+  - AffiliateReferral (affiliateId, referredUserId, status, firstPaymentAt)
+  - AffiliatePayout (affiliateId, referredUserId, amountUsd, percentageApplied, sourceAmountUsd, status, stripeTransferId)
+- Added referredByAffiliateId field to User model
+- Pushed schema to SQLite DB successfully
+- Created /src/lib/affiliate.ts — Complete affiliate engine:
+  - COMMISSION_TIERS config (10%/20%/30%/40%/50% graduated scale)
+  - getAffiliateCommissionPercentage() — dynamic % based on active referrals
+  - getAffiliateTierInfo() — current tier + next tier + referrals needed
+  - generateAffiliateCode() — unique code generation from user input
+  - processAffiliateCommission() — core commission processor (called from Stripe webhook)
+  - registerAffiliate() — creates affiliate record with unique code
+  - linkReferralToAffiliate() — links new user to referring affiliate
+  - getAffiliateStats() — comprehensive stats for affiliate dashboard
+- Created API routes:
+  - POST /api/affiliate/register — Register as affiliate with optional preferred code
+  - GET /api/affiliate/stats?userId=... — Get full affiliate dashboard data
+  - GET /api/affiliate/validate?code=... — Validate an affiliate code
+- Updated Stripe webhook (/api/webhooks/stripe/route.ts):
+  - checkout.session.completed → processAffiliateCommission() on new payment
+  - invoice.payment_succeeded → processAffiliateCommission() on renewals
+  - Both wrapped in try/catch to not fail the webhook if affiliate processing fails
+- Created /src/components/dashboard/AffiliatePortal.tsx — Full affiliate portal UI:
+  - Registration form with custom affiliate code picker
+  - Commission scale visualization (5 tiers with icons and colors)
+  - Active referrals count, total earnings, pending payout, commission rate
+  - Referral link with one-click copy
+  - Next tier progress bar
+  - Recent commissions and referrals lists
+  - "How It Works" 4-step guide
+- Added referral cookie handler in page.tsx:
+  - Reads ?ref=CODE from URL → stores in cookie (60-day expiry)
+  - Cleans URL (removes ?ref= parameter) for professional appearance
+- Added Affiliate button to AnalysisDashboard header
+- Integrated AffiliatePortal via Dialog in page.tsx
+- Keyboard shortcut: Ctrl+Shift+F opens affiliate portal
+- Lint passes cleanly, dev server running, page renders correctly
+
+Stage Summary:
+- Complete affiliate/reseller system implemented: DB → API → UI
+- Graduated commission scale: 10% (1-9) → 20% (10-49) → 30% (50-99) → 40% (100-249) → 50% (250+)
+- Referral tracking via ?ref=CODE → 60-day cookie → linked on registration
+- Stripe webhook integration for automatic commission processing
+- 250+ Pro referrals = ~$9,875/mo passive income for top affiliates
+- All 8 core SaaS modules now complete

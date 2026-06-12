@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { stripe, PLAN_PRICES, mapSubscriptionStatus } from '@/lib/stripe'
 import { db } from '@/lib/db'
+import { processAffiliateCommission } from '@/lib/affiliate'
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -48,6 +49,18 @@ export async function POST(req: Request) {
             },
           })
           console.log(`[stripe:checkout] User ${userId} → tier: ${tier}`)
+
+          // ── Process affiliate commission ──────────────────────────────
+          // Calculate the actual payment amount in USD and pay the referrer
+          const amountUsd = (session.amount_total || 0) / 100
+          if (amountUsd > 0) {
+            try {
+              await processAffiliateCommission(userId, amountUsd)
+            } catch (affError) {
+              // Don't fail the checkout if affiliate processing fails
+              console.error('[stripe:checkout] Affiliate commission error:', affError)
+            }
+          }
         }
         break
       }
@@ -123,6 +136,24 @@ export async function POST(req: Request) {
             },
           })
           console.log(`[stripe:sub.deleted] User ${user.id} → tier: free_trial, status: canceled`)
+        }
+        break
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoiceSucceeded = event.data.object
+        const payingUser = await db.user.findFirst({
+          where: { stripeCustomerId: invoiceSucceeded.customer as string },
+        })
+        if (payingUser && invoiceSucceeded.amount_paid) {
+          const renewalAmountUsd = invoiceSucceeded.amount_paid / 100
+          if (renewalAmountUsd > 0) {
+            try {
+              await processAffiliateCommission(payingUser.id, renewalAmountUsd)
+            } catch (affError) {
+              console.error('[stripe:invoice.paid] Affiliate commission error:', affError)
+            }
+          }
         }
         break
       }

@@ -30,11 +30,15 @@ model User {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  // ─── Affiliate System ────────────────────────────────────────────────
+  referredByAffiliateId String?  // ID of the affiliate who referred this user
+
   analyses        Analysis[]
   projects        Project[]
   webhooks        WebhookConfig[]
   alerts          VisibilityAlert[]
   tokenUsageLogs  TokenUsageLog[]
+  affiliate       Affiliate?
 }
 
 model Post {
@@ -219,6 +223,62 @@ model Project {
 
   @@index([userId])
   @@index([domain])
+}
+
+// ─── Affiliate / Reseller System ──────────────────────────────────────
+
+model Affiliate {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  affiliateCode         String    @unique  // e.g. "marko10", "seomaster"
+  totalReferredActive   Int       @default(0) // count of currently active paid subscribers
+  totalEarningsUsd      Float     @default(0) // lifetime earnings
+  pendingPayoutUsd      Float     @default(0) // earnings not yet paid out
+  status                String    @default("active") // active | suspended | paid_out
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payouts      AffiliatePayout[]
+  referrals    AffiliateReferral[]
+
+  @@index([affiliateCode])
+  @@index([status])
+}
+
+model AffiliateReferral {
+  id                String    @id @default(cuid())
+  affiliateId       String
+  referredUserId    String    @unique  // the user who was referred
+  status            String    @default("registered") // registered | active | churned
+  firstPaymentAt    DateTime? // when the referred user first paid
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  affiliate         Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([status])
+  @@index([referredUserId])
+}
+
+model AffiliatePayout {
+  id                String    @id @default(cuid())
+  affiliateId       String
+  referredUserId    String    // the user whose payment generated this commission
+  amountUsd         Float     // commission amount in USD
+  percentageApplied Float     // e.g. 10.0, 20.0, 30.0, 40.0, 50.0
+  sourceAmountUsd   Float     // the original payment amount that generated this commission
+  status            String    @default("pending") // pending | paid | cancelled
+  stripeTransferId  String?   // Stripe transfer ID once paid out
+  paidAt            DateTime?
+  createdAt         DateTime  @default(now())
+
+  affiliate         Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model TokenUsageLog {
