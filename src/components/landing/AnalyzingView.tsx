@@ -20,7 +20,7 @@ const phases = [
   { label: 'Finalizing your strategy', icon: '✨', phase: '' },
 ]
 
-const ANALYSIS_TIMEOUT = 240_000 // 4 minutes
+const ANALYSIS_TIMEOUT = 360_000 // 6 minutes
 
 // Simulated progress steps — used as visual fallback when SSE events lag
 const SIMULATED_STEPS = [
@@ -455,6 +455,11 @@ export default function AnalyzingView() {
                 if (parsed.sessionId && !sessionId) {
                   setSessionId(parsed.sessionId)
                 }
+
+                // Set analysisId from SSE for DB fallback
+                if (parsed.analysisId) {
+                  setCurrentAnalysisId(parsed.analysisId)
+                }
               } else if (parsed.type === 'complete') {
                 clearTimeout(timeoutId)
                 clearSimulationTimers()
@@ -477,9 +482,45 @@ export default function AnalyzingView() {
         }
 
         // If we received SSE events but no 'complete' event, that's a problem
-        // But if we got some progress events, the analysis might still be running
-        // The timeout will handle this case
-        if (!receivedSSE && !signal.aborted) {
+        // The stream closed before completion — likely a Vercel function timeout.
+        // Try to fetch the analysis from DB as a fallback.
+        if (receivedSSE && !signal.aborted) {
+          console.warn('[AnalyzingView] Stream ended without complete event — trying DB fallback')
+          // The analysisId should be available from the first SSE progress event
+          // or from the store's currentAnalysisId
+          const fallbackAnalysisId = useAppStore.getState().currentAnalysisId
+          if (fallbackAnalysisId) {
+            // Try fetching from DB every 5s for up to 60s
+            let attempts = 0
+            const maxAttempts = 12
+            const tryFetchAnalysis = async () => {
+              if (attempts >= maxAttempts) {
+                setAnalysisError('Analysis timed out. The server took too long. Please try again.')
+                return
+              }
+              attempts++
+              try {
+                const dbResponse = await fetch(`/api/analysis/${fallbackAnalysisId}`)
+                if (dbResponse.ok) {
+                  const dbData = await dbResponse.json()
+                  if (dbData.analysis) {
+                    clearSimulationTimers()
+                    sseProgressRef.current = 100
+                    setAnalysisProgress(100)
+                    setAnalysisStep('Analysis complete!')
+                    setAnalysis(dbData.analysis as SEOAnalysis)
+                    setTimeout(() => setView('dashboard'), 600)
+                    return
+                  }
+                }
+              } catch { /* ignore */ }
+              setTimeout(tryFetchAnalysis, 5000)
+            }
+            tryFetchAnalysis()
+          } else {
+            setAnalysisError('Analysis stream ended unexpectedly. Please try again.')
+          }
+        } else if (!receivedSSE && !signal.aborted) {
           // We got a 200 response but no SSE events at all — unusual
           console.warn('[AnalyzingView] No SSE events received from stream')
         }
@@ -587,10 +628,16 @@ export default function AnalyzingView() {
             setJobStatus(statusData.status as 'idle' | 'queued' | 'active' | 'completed' | 'failed' | 'unknown')
 
             if (statusData.status === 'active' && statusData.progress > 0) {
-              // Worker is processing — update progress
-              sseProgressRef.current = statusData.progress
-              setAnalysisProgress(statusData.progress)
-              setAnalysisStep('Agents are analyzing your site...')
+              // Worker is processing — only update progress if polling progress
+              // is HIGHER than current real-time progress. Polling calculates
+              // progress from DB agent logs which can lag behind WS/simulated progress.
+              // Never let polling regress progress backwards.
+              const currentProgress = sseProgressRef.current
+              if (statusData.progress > currentProgress) {
+                sseProgressRef.current = statusData.progress
+                setAnalysisProgress(statusData.progress)
+                setAnalysisStep('Agents are analyzing your site...')
+              }
             }
 
             if (statusData.status === 'completed') {

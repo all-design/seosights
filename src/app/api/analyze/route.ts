@@ -19,12 +19,13 @@ import {
 import { checkAllLimits, checkAgentAccess, getEnabledAgents, getPlanLimits } from '@/lib/plan-limits'
 import { randomUUID } from 'crypto'
 
-export const maxDuration = 180
+export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-function sendProgress(progress: number, step: string, sessionId?: string): string {
+function sendProgress(progress: number, step: string, sessionId?: string, analysisId?: string): string {
   const payload: Record<string, unknown> = { type: 'progress', progress, step }
   if (sessionId) payload.sessionId = sessionId
+  if (analysisId) payload.analysisId = analysisId
   return `data: ${JSON.stringify(payload)}\n\n`
 }
 
@@ -563,7 +564,7 @@ export async function POST(request: NextRequest) {
         if (scrapedContext) {
           // ── Cache HIT: Skip scraping entirely ──
           console.log(`[analyze] Cache HIT for ${cacheProjectId} — skipping scrape (age: ${Math.round((Date.now() - scrapedContext.scraped_at) / 1000)}s)`)
-          yield sendProgress(5, 'Using cached scan data (Redis shared context)...', analysisSessionId)
+          yield sendProgress(5, 'Using cached scan data (Redis shared context)...', analysisSessionId, analysisId)
           await flush()
 
           siteData = { title: scrapedContext.meta_data.title, html: '', url: scrapedContext.meta_data.url, text: scrapedContext.raw_text_content }
@@ -572,12 +573,12 @@ export async function POST(request: NextRequest) {
           localSearchResults = scrapedContext.search_context.local_seo_results
           htmlStructure = scrapedContext.html_structure
 
-          yield sendProgress(35, 'Cached data loaded. Proceeding to agent analysis...', analysisSessionId)
+          yield sendProgress(35, 'Cached data loaded. Proceeding to agent analysis...', analysisSessionId, analysisId)
           await flush()
         } else {
           // ── Cache MISS: Scrape Once using the new scraper ──
           console.log(`[analyze] Cache MISS for ${cacheProjectId} — running scrapeAndCleanWebsite()`)
-          yield sendProgress(5, 'Scanning website (Scrape Once, Read Many)...', analysisSessionId)
+          yield sendProgress(5, 'Scanning website (Scrape Once, Read Many)...', analysisSessionId, analysisId)
           await flush()
 
           scrapedContext = await scrapeAndCleanWebsite(url, zai, {
@@ -1170,8 +1171,8 @@ export async function POST(request: NextRequest) {
         yield sendProgress(100, 'Analysis complete!')
 
         // ═══ Emit completion signals FIRST (before slow DB writes) ═══
-        // This ensures the frontend receives the complete event even if
-        // the DB write is slow or the serverless function times out.
+        // This ensures the frontend receives the complete event immediately.
+        // The DB write follows as a blocking call to ensure data is persisted.
         yield sendComplete(analysisResult)
 
         // Emit analysis:complete via WebSocket
@@ -1196,16 +1197,19 @@ export async function POST(request: NextRequest) {
           console.error('[analyze] Failed to save token tracking:', err instanceof Error ? err.message : 'Unknown')
         })
 
-        // Update Analysis record with completed status and result (fire-and-forget)
-        db.analysis.update({
-          where: { id: analysisId },
-          data: {
-            status: 'completed',
-            result: JSON.stringify(analysisResult).slice(0, 500000), // Limit to prevent DB issues
-          }
-        }).catch((dbError) => {
+        // Update Analysis record with completed status and result (blocking — must persist)
+        try {
+          await db.analysis.update({
+            where: { id: analysisId },
+            data: {
+              status: 'completed',
+              result: JSON.stringify(analysisResult).slice(0, 500000), // Limit to prevent DB issues
+            }
+          })
+          console.log('[analyze] Result saved to database ✅')
+        } catch (dbError) {
           console.error('[analyze] Failed to update Analysis record:', dbError instanceof Error ? dbError.message : 'Unknown')
-        })
+        }
 
         // Fire and forget webhook dispatch
         try {

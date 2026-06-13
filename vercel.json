@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "src/app/api/analyze/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/audit/run/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/audit/[jobId]/route.ts": {
+      "maxDuration": 10
+    },
+    "src/app/api/analysis/[id]/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

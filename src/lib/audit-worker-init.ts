@@ -643,20 +643,24 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
     if (!finalResult.executiveActions) finalResult.executiveActions = ['Review audit findings', 'Fix critical issues first']
 
     // ═══ Emit completion signals FIRST (before slow DB writes) ═══
-    // This ensures the frontend receives the completion event even if
-    // the DB write is slow or the Vercel function is killed by timeout.
+    // This ensures the frontend receives the completion event immediately.
+    // The DB write follows as a blocking call to ensure data is persisted
+    // before the Vercel function exits.
     emitProgress(100, 'Analysis complete!')
     emitWS(sessionId, 'analysis:complete', { sessionId })
 
-    // Save result to database (fire-and-forget — don't block the response)
-    db.analysis.update({
-      where: { id: analysisId },
-      data: { status: 'completed', result: JSON.stringify(finalResult).slice(0, 500000) },
-    }).catch((dbError) => {
+    // Save result to database (blocking — must complete before function exits)
+    try {
+      await db.analysis.update({
+        where: { id: analysisId },
+        data: { status: 'completed', result: JSON.stringify(finalResult).slice(0, 500000) },
+      })
+      console.log('[audit-worker] Result saved to database ✅')
+    } catch (dbError) {
       console.error('[audit-worker] Failed to save result:', dbError instanceof Error ? dbError.message : 'Unknown')
-    })
+    }
 
-    // Save token usage (fire-and-forget)
+    // Save token usage (best-effort, non-blocking)
     tokenTracker.saveToDatabase().catch(() => {})
 
     console.log(`[audit-worker] Job completed for ${targetUrl}`)

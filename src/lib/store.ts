@@ -352,7 +352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mode: 'auto-pilot',
   pendingApprovals: [],
   currentAnalysisId: null,
-  analysisEngine: 'queue',
+  analysisEngine: 'sse',
   jobId: null,
   jobStatus: 'idle',
   setView: (view) => set({ view }),
@@ -377,7 +377,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAnalysisEngine: (engine) => set({ analysisEngine: engine }),
   setJobId: (jobId) => set({ jobId }),
   setJobStatus: (status) => set({ jobStatus: status }),
-  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '', activeAgent: null, sessionId: '', mode: 'auto-pilot', pendingApprovals: [], currentAnalysisId: null, analysisEngine: 'queue', jobId: null, jobStatus: 'idle' }),
+  reset: () => set({ view: 'landing', targetUrl: '', targetMarket: 'Global', analysis: null, analysisProgress: 0, analysisStep: '', analysisError: '', activeAgent: null, sessionId: '', mode: 'auto-pilot', pendingApprovals: [], currentAnalysisId: null, analysisEngine: 'sse', jobId: null, jobStatus: 'idle' }),
   startAnalysis: (url: string, market?: string, mode?: AnalysisMode, engine?: AnalysisEngine) => {
     const selectedEngine = engine || get().analysisEngine
     set({ targetUrl: url, targetMarket: market || 'Global', mode: mode || get().mode, view: 'analyzing', analysisProgress: 5, analysisStep: 'Initializing analysis...', analysisError: '', analysis: null, activeAgent: null, sessionId: '', pendingApprovals: [], currentAnalysisId: null, analysisEngine: selectedEngine, jobId: null, jobStatus: 'idle' })
