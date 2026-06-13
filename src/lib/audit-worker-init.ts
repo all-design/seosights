@@ -628,10 +628,23 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
     // but you can uncomment the line below for immediate cleanup:
     // await redisSharedContext.delete(projectId)
 
-    // Merge all results
+    // Merge all results — extract "findings" to top level
+    // Each agent returns { agent_name, status, findings: {...}, recommended_actions }
+    // We extract findings so that e.g. findings.audit.technicalSEO becomes
+    // audit.technicalSEO at the top level, which is what the dashboard expects.
     let finalResult: Record<string, unknown> = {}
     for (const agentResult of allAgentResults) {
-      finalResult = deepMerge(finalResult, agentResult)
+      const mergeData = { ...agentResult }
+      if (mergeData.findings && typeof mergeData.findings === 'object' && !Array.isArray(mergeData.findings)) {
+        const findings = mergeData.findings as Record<string, unknown>
+        for (const [key, value] of Object.entries(findings)) {
+          if (value !== null && value !== undefined) {
+            mergeData[key] = value
+          }
+        }
+        delete mergeData.findings
+      }
+      finalResult = deepMerge(finalResult, mergeData)
     }
 
     // Ensure required sections

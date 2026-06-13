@@ -998,10 +998,28 @@ export async function POST(request: NextRequest) {
         console.log(`[analyze] ${finalReport.all_recommended_actions.length} total recommended actions, ${finalReport.meta.agents_completed} agents completed`)
 
         // Deep merge all agent results (legacy compatibility)
+        // IMPORTANT: Each agent returns { agent_name, status, findings: {...}, recommended_actions }
+        // We need to EXTRACT the "findings" object before merging, so that
+        // e.g. findings.audit.technicalSEO becomes audit.technicalSEO at the top level.
+        // Otherwise, the ensureRequiredSections() checks fail because they look for
+        // analysisResult.audit.technicalSEO, not analysisResult.findings.audit.technicalSEO.
         let analysisResult: Record<string, unknown> = {}
         for (const agentResult of allAgentResults) {
           if (Object.keys(agentResult).length > 0) {
-            analysisResult = deepMerge(analysisResult, agentResult)
+            // Extract findings to the top level for proper deep merge
+            const mergeData = { ...agentResult }
+            if (mergeData.findings && typeof mergeData.findings === 'object' && !Array.isArray(mergeData.findings)) {
+              const findings = mergeData.findings as Record<string, unknown>
+              // Merge findings contents to top level
+              for (const [key, value] of Object.entries(findings)) {
+                if (value !== null && value !== undefined) {
+                  mergeData[key] = value
+                }
+              }
+              // Keep the original findings for reference but don't let it override
+              delete mergeData.findings
+            }
+            analysisResult = deepMerge(analysisResult, mergeData)
           }
         }
 
