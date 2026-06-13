@@ -143,7 +143,17 @@ export async function GET(
         where: { analysisId: analysisRecord.id, status: 'completed' },
       })
       // 8 agents total + data gathering = ~9 steps
-      progress = Math.min(95, 35 + (agentLogCount * 8))
+      // Allow progress to reach up to 98% (100% is reserved for 'completed' status)
+      // Previously capped at 95% which caused the UI to appear stuck
+      if (agentLogCount >= 8) {
+        progress = 92  // All agents done, merging/finalizing
+      } else {
+        progress = Math.min(90, 35 + (agentLogCount * 7))
+      }
+      // If the analysis has been running for >60s, nudge progress higher
+      const runningDuration = Date.now() - analysisRecord.createdAt.getTime()
+      if (runningDuration > 90_000 && progress < 95) progress = 95
+      if (runningDuration > 120_000) progress = 98
     }
     else if (analysisRecord.status === 'completed') progress = 100
     else if (analysisRecord.status === 'failed') progress = 0

@@ -1169,6 +1169,11 @@ export async function POST(request: NextRequest) {
 
         yield sendProgress(100, 'Analysis complete!')
 
+        // ═══ Emit completion signals FIRST (before slow DB writes) ═══
+        // This ensures the frontend receives the complete event even if
+        // the DB write is slow or the serverless function times out.
+        yield sendComplete(analysisResult)
+
         // Emit analysis:complete via WebSocket
         emitWS(analysisSessionId, 'analysis:complete', { sessionId: analysisSessionId })
 
@@ -1191,20 +1196,16 @@ export async function POST(request: NextRequest) {
           console.error('[analyze] Failed to save token tracking:', err instanceof Error ? err.message : 'Unknown')
         })
 
-        // Update Analysis record with completed status and result
-        try {
-          await db.analysis.update({
-            where: { id: analysisId },
-            data: {
-              status: 'completed',
-              result: JSON.stringify(analysisResult).slice(0, 500000), // Limit to prevent DB issues
-            }
-          })
-        } catch (dbError) {
+        // Update Analysis record with completed status and result (fire-and-forget)
+        db.analysis.update({
+          where: { id: analysisId },
+          data: {
+            status: 'completed',
+            result: JSON.stringify(analysisResult).slice(0, 500000), // Limit to prevent DB issues
+          }
+        }).catch((dbError) => {
           console.error('[analyze] Failed to update Analysis record:', dbError instanceof Error ? dbError.message : 'Unknown')
-        }
-
-        yield sendComplete(analysisResult)
+        })
 
         // Fire and forget webhook dispatch
         try {

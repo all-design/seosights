@@ -185,8 +185,25 @@ export default function AnalyzingView() {
       handleSocketEvent('analysis:start', data, Date.now())
     })
 
-    socket.on('analysis:complete', () => {
-      // Analysis complete — WebSocket side
+    socket.on('analysis:complete', (data: Record<string, unknown>) => {
+      console.log('[AnalyzingView] Analysis complete via WebSocket')
+      // Transition to dashboard — fetch analysis from DB
+      const analysisId = useAppStore.getState().currentAnalysisId
+      if (analysisId) {
+        fetch(`/api/analysis/${analysisId}`)
+          .then(r => r.json())
+          .then(dbData => {
+            if (dbData.analysis) {
+              clearSimulationTimers()
+              sseProgressRef.current = 100
+              setAnalysisProgress(100)
+              setAnalysisStep('Analysis complete!')
+              setAnalysis(dbData.analysis as SEOAnalysis)
+              setTimeout(() => setView('dashboard'), 600)
+            }
+          })
+          .catch(() => { /* ignore */ })
+      }
     })
 
     socket.on('analysis:error', (data: Record<string, unknown>) => {
@@ -499,6 +516,7 @@ export default function AnalyzingView() {
 
     let cancelled = false
     let pollInterval: ReturnType<typeof setInterval> | null = null
+    let stuckCheckIntervalRef: ReturnType<typeof setInterval> | null = null
 
     const timeoutId = setTimeout(() => {
       cancelled = true
@@ -637,6 +655,59 @@ export default function AnalyzingView() {
               .catch(() => { /* ignore */ })
           }
         }, 2000)
+
+        // ═══ FALLBACK: If stuck at high progress, try fetching analysis directly ═══
+        // On Vercel, the worker function might be killed before the DB write completes,
+        // leaving the analysis stuck at 'running' status. This fallback checks the DB
+        // directly after a delay and transitions if the analysis data exists.
+        let highProgressStartedAt: number | null = null
+        const stuckCheckInterval = setInterval(async () => {
+          if (cancelled) { clearInterval(stuckCheckInterval); return }
+
+          const currentProgress = sseProgressRef.current
+          if (currentProgress >= 90) {
+            if (!highProgressStartedAt) highProgressStartedAt = Date.now()
+            const stuckDuration = Date.now() - highProgressStartedAt
+
+            // After 20 seconds stuck at 90%+, try fetching analysis directly
+            if (stuckDuration > 20_000) {
+              console.log('[AnalyzingView] Stuck at high progress, trying direct DB fetch...')
+              try {
+                const dbResponse = await fetch(`/api/analysis/${analysisId}`)
+                if (dbResponse.ok) {
+                  const dbData = await dbResponse.json()
+                  if (dbData.analysis) {
+                    // Analysis exists in DB — transition to dashboard
+                    clearInterval(stuckCheckInterval)
+                    clearTimeout(timeoutId)
+                    if (pollInterval) clearInterval(pollInterval)
+                    clearSimulationTimers()
+                    sseProgressRef.current = 100
+                    setAnalysisProgress(100)
+                    setAnalysisStep('Analysis complete!')
+                    setJobStatus('completed')
+                    setAnalysis(dbData.analysis as SEOAnalysis)
+                    setTimeout(() => setView('dashboard'), 600)
+                  }
+                }
+              } catch {
+                // DB fetch failed — keep waiting
+              }
+            }
+
+            // After 60 seconds stuck, show timeout error
+            if (stuckDuration > 60_000) {
+              clearInterval(stuckCheckInterval)
+              clearTimeout(timeoutId)
+              if (pollInterval) clearInterval(pollInterval)
+              clearSimulationTimers()
+              setAnalysisError('Analysis appears stuck. The server may be under load. Please try again.')
+            }
+          } else {
+            highProgressStartedAt = null
+          }
+        }, 10_000)
+        stuckCheckIntervalRef = stuckCheckInterval
 
       } catch (err) {
         if (cancelled) return

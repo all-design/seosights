@@ -6,6 +6,7 @@ import { ensureProcessorRegistered } from '@/lib/audit-worker-init'
 import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 180 // Keep function alive for up to 3 minutes (Pro/Enterprise)
 
 /**
  * POST /api/audit/run
