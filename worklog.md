@@ -1196,3 +1196,30 @@ Stage Summary:
 - Fallback: frontend now auto-recovers if stuck at high progress by directly fetching analysis from DB
 - WebSocket handler now properly transitions to dashboard on completion
 - Pushed as commit 786b5d3 to main (triggers Vercel deploy)
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix full scan regressing to 35% and stuck at 98% on production
+
+Work Log:
+- Analyzed the polling endpoint: when agentLogCount=0, progress returns 35%,
+  which REGRESSED the simulated/WS progress that was already at 60%+
+- Fixed frontend polling: only accept progress from polling if HIGHER than current
+- Switched default analysisEngine from 'queue' to 'sse' — SSE keeps the Vercel
+  function alive via open HTTP connection, unlike queue which relies on background
+  processing that gets killed by serverless timeouts
+- Fixed DB write strategy: emit completion signal FIRST, then await DB write
+  (blocking) to ensure data is persisted before function exits
+- Added analysisId to SSE progress events so frontend can use it for DB fallback
+- Added SSE stream-end fallback: if stream closes without 'complete' event,
+  tries fetching analysis from DB every 5s for up to 60s
+- Added vercel.json with maxDuration 300s for analyze/audit routes
+- Increased client-side timeout from 4min to 6min
+- Increased maxDuration from 180s to 300s for analyze route
+
+Stage Summary:
+- Pushed as commit 100ec7b to main (triggers Vercel deploy)
+- Key architectural change: SSE engine is now default for production
+  because it maintains the HTTP connection, keeping the Vercel function alive
+- Queue engine still available as fallback (set analysisEngine: 'queue')
