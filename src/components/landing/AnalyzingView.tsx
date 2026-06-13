@@ -725,6 +725,7 @@ export default function AnalyzingView() {
       cancelled = true
       clearTimeout(timeoutId)
       if (pollInterval) clearInterval(pollInterval)
+      if (stuckCheckIntervalRef) clearInterval(stuckCheckIntervalRef)
       clearSimulationTimers()
       analyzedUrlRef.current = null
     }
