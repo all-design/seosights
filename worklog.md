@@ -1166,3 +1166,33 @@ Stage Summary:
 - Navbar updated with "Affiliates" link and purple/indigo color scheme
 - "Become a Reseller" buttons correctly open the Affiliate Portal dialog
 - Full page renders correctly with all sections
+
+---
+Task ID: 5
+Agent: Main Agent
+Task: Fix full scan getting stuck at 95% on production (seosights.com)
+
+Work Log:
+- Investigated the full scan flow: queue-based (BullMQ) + SSE-based paths
+- Identified root cause: DB write of ~500KB JSON result blocks completion signal
+- Worker emitted `emitProgress(100)` and `emitWS('analysis:complete')` AFTER the slow DB write
+- Polling endpoint (`audit/[jobId]`) capped progress at `Math.min(95, ...)` — never reached 100% until DB said 'completed'
+- SSE path (`analyze/route.ts`) emitted `sendComplete()` AFTER the blocking DB write
+- WebSocket `analysis:complete` handler in frontend was a no-op (empty function)
+
+Fixes applied:
+1. **audit-worker-init.ts**: Moved `emitProgress(100)` + `emitWS('analysis:complete')` BEFORE the DB write. DB write now fire-and-forget.
+2. **audit/[jobId]/route.ts**: Fixed progress calculation — removed 95% cap, added time-based nudging for long-running analyses.
+3. **analyze/route.ts**: Moved `yield sendComplete()` BEFORE the DB write. DB write now fire-and-forget.
+4. **audit/run/route.ts**: Added `maxDuration = 180` to keep the Vercel function alive longer.
+5. **AnalyzingView.tsx**: 
+   - Added proper `analysis:complete` WebSocket handler that fetches analysis from DB and transitions to dashboard
+   - Added stuck-progress fallback: if stuck at 90%+ for 20s, tries direct DB fetch; after 60s shows timeout error
+   - Added `stuckCheckIntervalRef` cleanup
+6. **api/analysis/[id]/route.ts**: Simplified for fallback fetch (removed include agentLogs which could be slow)
+
+Stage Summary:
+- Core fix: emit completion signals before slow DB writes (fire-and-forget DB writes)
+- Fallback: frontend now auto-recovers if stuck at high progress by directly fetching analysis from DB
+- WebSocket handler now properly transitions to dashboard on completion
+- Pushed as commit 786b5d3 to main (triggers Vercel deploy)
