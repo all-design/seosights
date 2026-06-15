@@ -134,11 +134,11 @@ const plans = [
   {
     name: 'Managed',
     subtitle: 'Done-For-You service',
-    price: '$299',
-    period: '/month',
+    price: 'Custom',
+    period: '',
     freeTrial: null,
     description:
-      'Complete dominance in your niche. Our team + 8 AI agents handle everything while you focus on your business.',
+      'Complete dominance in your niche. Our team + 8 AI agents handle everything while you focus on your business. Pricing tailored to your needs.',
     features: [
       {
         icon: Check,
@@ -176,9 +176,9 @@ const plans = [
           'Content tailored for AI engines (AEO) while maintaining natural tone that converts.',
       },
     ],
-    cta: 'Subscribe Now',
+    cta: 'Contact Us',
     planKey: 'managed' as const,
-    ctaAction: 'managed' as const,
+    ctaAction: 'contact' as const,
     highlighted: false,
     borderColor: 'border-cyan-500/30',
     iconColor: 'text-cyan-400',

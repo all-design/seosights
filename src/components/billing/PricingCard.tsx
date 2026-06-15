@@ -73,13 +73,15 @@ export default function PricingCard({
     }
 
     if (ctaAction === 'free') {
+      // Opens the registration/login modal
       onStartFree?.()
       return
     }
 
-    // For 'pro' and 'managed' actions, use Stripe checkout
+    // For 'pro' and 'managed' actions — if user is not logged in,
+    // open the registration modal first. After login, they'll be
+    // redirected to Stripe checkout.
     if (!userId) {
-      // If no userId, trigger the free trial flow instead
       onStartFree?.()
       return
     }

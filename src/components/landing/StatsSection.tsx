@@ -1,13 +1,11 @@
 'use client'
 
 import { motion, useInView } from 'framer-motion'
-import { useRef, useEffect, useState } from 'react'
+import { useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 
 interface StatItem {
   value: string
-  numericValue: number
-  suffix: string
   label: string
   source: string
 }
@@ -15,77 +13,30 @@ interface StatItem {
 const stats: StatItem[] = [
   {
     value: '8X',
-    numericValue: 8,
-    suffix: 'X',
     label: 'More AI citations across all Three Sights',
     source: 'Ahrefs',
   },
   {
     value: '94+',
-    numericValue: 94,
-    suffix: '+',
     label: 'Technical checkpoints auto-audited',
     source: '',
   },
   {
     value: '86%',
-    numericValue: 86,
-    suffix: '%',
     label: "AI Overviews pull from Google's top 10",
     source: '',
   },
   {
     value: '17+',
-    numericValue: 17,
-    suffix: '+',
     label: 'AI engines tracked across all Sights',
     source: '',
   },
   {
     value: '9X',
-    numericValue: 9,
-    suffix: 'X',
     label: 'LLM traffic converts better than Google',
     source: 'Forbes',
   },
 ]
-
-function AnimatedCounter({
-  value,
-  suffix,
-  inView,
-}: {
-  value: number
-  suffix: string
-  inView: boolean
-}) {
-  const [count, setCount] = useState(0)
-
-  useEffect(() => {
-    if (!inView) return
-    const duration = 2000
-    const steps = 60
-    const increment = value / steps
-    let current = 0
-    const timer = setInterval(() => {
-      current += increment
-      if (current >= value) {
-        setCount(value)
-        clearInterval(timer)
-      } else {
-        setCount(Math.floor(current))
-      }
-    }, duration / steps)
-    return () => clearInterval(timer)
-  }, [inView, value])
-
-  return (
-    <span>
-      {count}
-      {suffix}
-    </span>
-  )
-}
 
 export default function StatsSection() {
   const ref = useRef(null)
@@ -118,11 +69,7 @@ export default function StatsSection() {
               <Card className="bg-white/5 backdrop-blur-sm border-white/10 hover:border-emerald-500/40 hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] transition-all duration-300 h-full">
                 <CardContent className="p-6 text-center">
                   <div className="text-3xl sm:text-4xl font-bold text-emerald-400 mb-2">
-                    <AnimatedCounter
-                      value={stat.numericValue}
-                      suffix={stat.suffix}
-                      inView={isInView}
-                    />
+                    {stat.value}
                   </div>
                   <p className="text-sm text-muted-foreground leading-snug">
                     {stat.label}

@@ -11,6 +11,7 @@ import CTASection from '@/components/landing/CTASection'
 import AffiliateLandingSection from '@/components/landing/AffiliateLandingSection'
 import Footer from '@/components/landing/Footer'
 import URLInputModal from '@/components/landing/URLInputModal'
+import LoginModal from '@/components/landing/LoginModal'
 import AnalyzingView from '@/components/landing/AnalyzingView'
 import AnalysisDashboard from '@/components/landing/AnalysisDashboard'
 import SuperadminPanel from '@/components/superadmin/SuperadminPanel'
@@ -24,6 +25,8 @@ export default function Home() {
   const [isAdminOpen, setIsAdminOpen] = useState(false)
   const [isWebhooksOpen, setIsWebhooksOpen] = useState(false)
   const [isAffiliateOpen, setIsAffiliateOpen] = useState(false)
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
+  const [loginDefaultTab, setLoginDefaultTab] = useState<'login' | 'register'>('register')
   const { view } = useAppStore()
   const logoClickCount = useRef(0)
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -135,11 +138,12 @@ export default function Home() {
       <StatsSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <PricingSection onStartFree={() => setIsModalOpen(true)} />
+      <PricingSection onStartFree={() => { setLoginDefaultTab('register'); setIsLoginOpen(true) }} />
       <AffiliateLandingSection onBecomeReseller={() => setIsAffiliateOpen(true)} />
       <CTASection onStartFree={() => setIsModalOpen(true)} />
       <Footer onAdminClick={() => setIsAdminOpen(true)} />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} defaultTab={loginDefaultTab} />
       <SuperadminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
       <WebhooksPanel isOpen={isWebhooksOpen} onClose={() => setIsWebhooksOpen(false)} userId={webhookUserId} />
       <Dialog open={isAffiliateOpen} onOpenChange={setIsAffiliateOpen}>
