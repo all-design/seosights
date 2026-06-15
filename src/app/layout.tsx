@@ -37,7 +37,10 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "seosights" }],
   icons: {
-    icon: "/logo-transparent.png",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/logo-transparent.png", type: "image/png" },
+    ],
   },
   openGraph: {
     title: "seosights — Three Sights. One Unified AI Engine.",
