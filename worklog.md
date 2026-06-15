@@ -1505,3 +1505,24 @@ Stage Summary:
 - Superadmin auth works correctly (wrong key rejected, correct key accepted)
 - Rate limiting active with tier-based limits + IP-based daily audit limit
 - Ollama fallback integrated gracefully (skips if unavailable)
+
+---
+Task ID: Vercel Deploy + Webhook Setup
+Agent: Main Orchestrator
+
+Work Log:
+- Linked correct Vercel project (seosights, not my-project)
+- Deployed latest code to Vercel production via CLI
+- Created deploy hook URL via Vercel API
+- Created GitHub webhook (ID: 642127071) for auto-deploy on push
+- Added SUPERADMIN_SECRET env var to Vercel
+- Verified auto-deploy works (push → automatic Vercel build)
+- Verified all features live on seosights.com
+
+Stage Summary:
+- ✅ seosights.com is now LIVE with all new features
+- ✅ Auto-deploy webhook active (push to main → Vercel builds automatically)
+- ✅ Superadmin portal accessible at /superadmin-portal (password: seosights-superadmin-2024)
+- ✅ 3X, 500K+, 86% stats visible on live site
+- ✅ Custom pricing for Managed tier
+- ✅ Start Free Trial, Start Pro Agency, Contact Us buttons all working
