@@ -4,6 +4,7 @@ import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import PricingCard from '@/components/billing/PricingCard'
+import type { RegistrationTier } from '@/components/auth/RegistrationDialog'
 import {
   Check,
   Bot,
@@ -28,6 +29,8 @@ import {
 
 interface PricingSectionProps {
   onStartFree?: () => void
+  onAgencyRegister?: () => void
+  onTierSelect?: (tier: RegistrationTier) => void
   userId?: string
 }
 
@@ -178,7 +181,7 @@ const plans = [
     ],
     cta: 'Contact Us',
     planKey: 'managed' as const,
-    ctaAction: 'contact' as const,
+    ctaAction: 'managed' as const,
     highlighted: false,
     borderColor: 'border-cyan-500/30',
     iconColor: 'text-cyan-400',
@@ -187,7 +190,7 @@ const plans = [
   },
 ]
 
-export default function PricingSection({ onStartFree, userId }: PricingSectionProps) {
+export default function PricingSection({ onStartFree, onAgencyRegister, onTierSelect, userId }: PricingSectionProps) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
 
@@ -248,6 +251,7 @@ export default function PricingSection({ onStartFree, userId }: PricingSectionPr
                 glowColor={plan.glowColor}
                 userId={userId}
                 onStartFree={onStartFree}
+                onTierSelect={onTierSelect}
               />
             </motion.div>
           ))}

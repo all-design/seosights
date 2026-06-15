@@ -12,6 +12,8 @@ import AffiliateLandingSection from '@/components/landing/AffiliateLandingSectio
 import Footer from '@/components/landing/Footer'
 import URLInputModal from '@/components/landing/URLInputModal'
 import LoginModal from '@/components/landing/LoginModal'
+import RegistrationDialog, { type RegistrationTier } from '@/components/auth/RegistrationDialog'
+import AgencyRegistrationDialog from '@/components/auth/AgencyRegistrationDialog'
 import AnalyzingView from '@/components/landing/AnalyzingView'
 import AnalysisDashboard from '@/components/landing/AnalysisDashboard'
 import SuperadminPanel from '@/components/superadmin/SuperadminPanel'
@@ -27,11 +29,27 @@ export default function Home() {
   const [isAffiliateOpen, setIsAffiliateOpen] = useState(false)
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [loginDefaultTab, setLoginDefaultTab] = useState<'login' | 'register'>('register')
+
+  // Registration dialog state with tier
+  const [isRegDialogOpen, setIsRegDialogOpen] = useState(false)
+  const [selectedTier, setSelectedTier] = useState<RegistrationTier>('starter')
+  const [isAgencyRegisterOpen, setIsAgencyRegisterOpen] = useState(false)
+
   const { view } = useAppStore()
   const logoClickCount = useRef(0)
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const openModal = () => setIsModalOpen(true)
+
+  // Open registration dialog with a specific tier
+  const openRegistration = (tier: RegistrationTier = 'starter') => {
+    if (tier === 'managed') {
+      setIsAgencyRegisterOpen(true)
+      return
+    }
+    setSelectedTier(tier)
+    setIsRegDialogOpen(true)
+  }
 
   // Keyboard shortcut: Ctrl+Shift+A for admin, Ctrl+Shift+W for webhooks
   useEffect(() => {
@@ -134,16 +152,28 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Navbar onStartFree={() => setIsModalOpen(true)} />
-      <HeroSection onStartFree={() => setIsModalOpen(true)} />
+      <HeroSection onStartFree={() => openRegistration('starter')} />
       <StatsSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <PricingSection onStartFree={() => { setLoginDefaultTab('register'); setIsLoginOpen(true) }} />
+      <PricingSection
+        onStartFree={() => openRegistration('starter')}
+        onTierSelect={openRegistration}
+      />
       <AffiliateLandingSection onBecomeReseller={() => setIsAffiliateOpen(true)} />
-      <CTASection onStartFree={() => setIsModalOpen(true)} />
+      <CTASection onStartFree={() => openRegistration('starter')} />
       <Footer onAdminClick={() => setIsAdminOpen(true)} />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} defaultTab={loginDefaultTab} />
+      <RegistrationDialog
+        isOpen={isRegDialogOpen}
+        onClose={() => setIsRegDialogOpen(false)}
+        tier={selectedTier}
+      />
+      <AgencyRegistrationDialog
+        isOpen={isAgencyRegisterOpen}
+        onClose={() => setIsAgencyRegisterOpen(false)}
+      />
       <SuperadminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
       <WebhooksPanel isOpen={isWebhooksOpen} onClose={() => setIsWebhooksOpen(false)} userId={webhookUserId} />
       <Dialog open={isAffiliateOpen} onOpenChange={setIsAffiliateOpen}>

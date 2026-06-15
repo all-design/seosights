@@ -5,6 +5,7 @@
  *
  * Creates a new user account. Roles user/agency/affiliate can self-register.
  * Superadmin cannot be created via registration (set directly in DB).
+ * Accepts optional `tier` parameter for CTA-based registration flow.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -16,6 +17,7 @@ interface RegisterBody {
   password: string
   name?: string
   role?: UserRole
+  tier?: string
   referralCode?: string
 }
 
@@ -41,11 +43,16 @@ export async function POST(request: NextRequest) {
     const validRoles: UserRole[] = ['user', 'agency', 'affiliate']
     const role = body.role && validRoles.includes(body.role) ? body.role : 'user'
 
+    // Validate tier if provided
+    const validTiers = ['starter', 'pro', 'managed']
+    const tier = body.tier && validTiers.includes(body.tier) ? body.tier : undefined
+
     const result = await registerUser({
       email: body.email,
       password: body.password,
       name: body.name,
       role,
+      tier,
       referralCode: body.referralCode,
     })
 
@@ -65,6 +72,15 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set('seosights_session', result.token!, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: '/',
+    })
+
+    // Set readable tier cookie for middleware rate limiting
+    response.cookies.set('seosights_tier', result.user!.tier, {
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days

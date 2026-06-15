@@ -6,6 +6,8 @@
  *
  * Configurable per agent via the AgentPrompt table (fallbackModel field).
  *
+ * The fallback chain: default → gpt-4o-mini → deepseek-v3 → ollama
+ *
  * Since z-ai-web-dev-sdk handles model routing internally, the fallback system
  * currently:
  *   1. Tracks which agents are failing and which models were attempted
@@ -19,14 +21,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Model Chain Configuration
 // Each primary model maps to an ordered list of fallbacks to try.
+// Ollama is always the last fallback (local, self-hosted).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MODEL_CHAIN: Record<string, string[]> = {
-  'default': ['gpt-4o-mini', 'deepseek-v3'],
-  'gpt-4o': ['gpt-4o-mini', 'deepseek-v3'],
-  'gpt-4o-mini': ['deepseek-v3'],
-  'claude-3.5-sonnet': ['gpt-4o-mini', 'deepseek-v3'],
-  'deepseek-v3': ['gpt-4o-mini'],
+  'default': ['gpt-4o-mini', 'deepseek-v3', 'ollama'],
+  'gpt-4o': ['gpt-4o-mini', 'deepseek-v3', 'ollama'],
+  'gpt-4o-mini': ['deepseek-v3', 'ollama'],
+  'claude-3.5-sonnet': ['gpt-4o-mini', 'deepseek-v3', 'ollama'],
+  'deepseek-v3': ['gpt-4o-mini', 'ollama'],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,6 +116,102 @@ export function isRetryableError(error: unknown): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Ollama Integration
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3'
+
+interface OllamaChatMessage {
+  role: string
+  content: string
+}
+
+interface OllamaChatResponse {
+  message?: { content?: string }
+  error?: string
+}
+
+/**
+ * Create a chat completion using a local Ollama instance.
+ * If Ollama is not available (connection refused), it throws a retryable error
+ * so the fallback system can skip it gracefully.
+ */
+export async function createOllamaCompletion(
+  messages: OllamaChatMessage[],
+  options?: { model?: string; temperature?: number },
+): Promise<Record<string, unknown>> {
+  const model = options?.model || OLLAMA_MODEL
+  const baseUrl = OLLAMA_BASE_URL
+
+  console.log(`[ollama] Attempting completion with model "${model}" at ${baseUrl}`)
+
+  try {
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: {
+          temperature: options?.temperature ?? 0.7,
+        },
+      }),
+      signal: AbortSignal.timeout(30_000), // 30s timeout
+    })
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '')
+      throw new Error(`Ollama API error: ${response.status} ${response.statusText} - ${body}`)
+    }
+
+    const data = (await response.json()) as OllamaChatResponse
+
+    if (data.error) {
+      throw new Error(`Ollama model error: ${data.error}`)
+    }
+
+    const content = data.message?.content || ''
+
+    return {
+      choices: [
+        {
+          message: { content, role: 'assistant' },
+          finish_reason: 'stop',
+          index: 0,
+        },
+      ],
+      model: `ollama/${model}`,
+      provider: 'ollama',
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Unknown error'
+
+    // If it's a connection error, mark it clearly so the fallback system can skip
+    if (
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('fetch failed') ||
+      msg.includes('Connection refused') ||
+      msg.includes('network error')
+    ) {
+      console.warn(`[ollama] Not available at ${baseUrl}: ${msg}`)
+      throw new Error(`Ollama unavailable (${baseUrl}): ${msg}`)
+    }
+
+    // Re-throw as-is for other errors
+    throw error
+  }
+}
+
+/**
+ * Check if a model name is the Ollama provider.
+ */
+export function isOllamaModel(model: string): boolean {
+  return model === 'ollama' || model.startsWith('ollama/')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // AgentFallback class
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -125,7 +224,7 @@ export class AgentFallback {
     this.primaryModel = primaryModel
     this.fallbackModels = customFallback
       ? [customFallback, ...(MODEL_CHAIN[primaryModel] || [])]
-      : MODEL_CHAIN[primaryModel] || MODEL_CHAIN['default'] || ['gpt-4o-mini']
+      : MODEL_CHAIN[primaryModel] || MODEL_CHAIN['default'] || ['gpt-4o-mini', 'ollama']
   }
 
   /**
@@ -133,14 +232,14 @@ export class AgentFallback {
    *
    * @param primaryFn   - Function that calls the primary LLM model
    * @param fallbackFn  - Function that calls a fallback model (receives the model name)
-   * @param maxAttempts - Total attempts across primary + fallbacks (default 3)
+   * @param maxAttempts - Total attempts across primary + fallbacks (default 4, includes Ollama)
    * @param retryDelay  - Base delay between fallback attempts in ms (default 2000)
    * @returns FallbackResult with data and detailed logs
    */
   async executeWithFallback(
     primaryFn: () => Promise<Record<string, unknown>>,
     fallbackFn: (model: string) => Promise<Record<string, unknown>>,
-    maxAttempts: number = 3,
+    maxAttempts: number = 4,
     retryDelay: number = 2000,
   ): Promise<FallbackResult> {
     this.logs = []
@@ -201,6 +300,24 @@ export class AgentFallback {
         console.warn(
           `[agent-fallback] Model "${model}" failed on attempt ${attempt + 1}: ${errorMessage} (${latencyMs}ms)`
         )
+
+        // If Ollama is unavailable, skip it gracefully (don't abort the whole chain)
+        const isOllamaUnavailable =
+          isOllamaModel(model) &&
+          (errorMessage.includes('Ollama unavailable') || errorMessage.includes('ECONNREFUSED'))
+
+        if (isOllamaUnavailable) {
+          console.warn(`[agent-fallback] Ollama is not available, skipping gracefully`)
+          // If this was the last model in the chain, don't keep retrying
+          if (attempt >= totalAttempts - 1) {
+            // Fall through to all-attempts-exhausted below
+          } else {
+            // Continue to next fallback (though Ollama is typically last)
+            const delay = retryDelay * Math.pow(1.5, attempt) + Math.random() * 500
+            await new Promise((resolve) => setTimeout(resolve, delay))
+            continue
+          }
+        }
 
         // If the error is not retryable, don't try fallbacks — it's a logic error
         if (!isRetryableError(error)) {

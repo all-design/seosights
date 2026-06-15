@@ -30,6 +30,24 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
+    // Clear tier cookie
+    response.cookies.set('seosights_tier', '', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0,
+      path: '/',
+    })
+
+    // Clear referral cookie
+    response.cookies.set('seosights_ref', '', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0,
+      path: '/',
+    })
+
     return response
   } catch (error) {
     console.error('[Auth Logout] Error:', error)

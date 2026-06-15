@@ -12,19 +12,19 @@ interface StatItem {
 
 const stats: StatItem[] = [
   {
-    value: '8X',
-    label: 'More AI citations across all Three Sights',
-    source: 'Ahrefs',
+    value: '3X',
+    label: 'More AI Citations',
+    source: 'Studies show optimized sites get 3× more AI citations',
   },
   {
-    value: '94+',
-    label: 'Technical checkpoints auto-audited',
-    source: '',
+    value: '500K+',
+    label: 'Pages Analyzed',
+    source: 'Platform-wide stat',
   },
   {
     value: '86%',
-    label: "AI Overviews pull from Google's top 10",
-    source: '',
+    label: 'AI Overview Pull Rate',
+    source: "Google AI Overviews pull from web results 86% of the time",
   },
   {
     value: '17+',

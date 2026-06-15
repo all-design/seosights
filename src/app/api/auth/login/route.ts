@@ -59,6 +59,15 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
+    // Set readable tier cookie for middleware rate limiting
+    response.cookies.set('seosights_tier', result.user!.tier, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: '/',
+    })
+
     return response
   } catch (error) {
     console.error('[Auth Login] Error:', error)

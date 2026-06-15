@@ -25,6 +25,7 @@ interface AuthContextType {
     password: string
     name?: string
     role?: UserRole
+    tier?: string
     referralCode?: string
   }) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string
     name?: string
     role?: UserRole
+    tier?: string
     referralCode?: string
   }) => {
     try {

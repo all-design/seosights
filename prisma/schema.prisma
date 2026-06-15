@@ -17,16 +17,21 @@ model User {
   id                    String    @id @default(cuid())
   email                 String    @unique
   name                  String?
+  passwordHash          String?   // bcrypt hashed password (null for OAuth-only users)
+  role                  String    @default("user") // user | agency | affiliate | superadmin
+  avatarUrl             String?
   stripeCustomerId      String?   @unique
   stripeSubscriptionId  String?
-  subscriptionStatus    String    @default("trial") // trial | active | past_due | canceled
-  tier                  String    @default("trial") // trial | starter | pro | managed
+  subscriptionStatus    String    @default("free_trial") // free_trial | active | past_due | canceled
+  tier                  String    @default("free_trial") // free_trial | starter | pro | managed
+  lastLoginAt           DateTime?
 
   // ─── Agency White-Label Branding (Pro+ feature) ──────────────────────
   agencyName            String?   // e.g. "Apex Digital Agency"
   agencyLogoUrl         String?   // e.g. "https://cdn.apex.com/logo.png"
   agencyPrimaryColor    String    @default("#10b981") // HEX code for CSS — default emerald
   agencySecondaryColor  String    @default("#6B7280") // HEX code for CSS — default gray
+  agencyAccentColor     String    @default("#f59e0b") // HEX code for CSS — default amber
 
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -34,12 +39,29 @@ model User {
   // ─── Affiliate System ────────────────────────────────────────────────
   referredByAffiliateId String?  // ID of the affiliate who referred this user
 
+  sessions        Session[]
   analyses        Analysis[]
   projects        Project[]
   webhooks        WebhookConfig[]
   alerts          VisibilityAlert[]
   tokenUsageLogs  TokenUsageLog[]
   affiliate       Affiliate?
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  token       String    @unique
+  userAgent   String?
+  ipAddress   String?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
 }
 
 model Post {

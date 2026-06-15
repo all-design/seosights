@@ -87,9 +87,10 @@ export async function registerUser(params: {
   password: string
   name?: string
   role?: UserRole
+  tier?: string
   referralCode?: string
 }): Promise<AuthResult> {
-  const { email, password, name, role = 'user', referralCode } = params
+  const { email, password, name, role = 'user', tier, referralCode } = params
 
   // Validate role — superadmin cannot self-register
   if (role === 'superadmin') {
@@ -116,6 +117,18 @@ export async function registerUser(params: {
     }
   }
 
+  // Determine tier: explicit tier param > role-based default > free_trial
+  let resolvedTier = 'free_trial'
+  let resolvedSubStatus = 'free_trial'
+  if (tier && ['starter', 'pro', 'managed'].includes(tier)) {
+    resolvedTier = tier
+    // Starter gets a free trial period; pro/managed will be confirmed by Stripe webhook
+    resolvedSubStatus = 'free_trial'
+  } else if (role === 'agency') {
+    resolvedTier = 'pro'
+    resolvedSubStatus = 'active'
+  }
+
   // Create user with appropriate role
   const user = await db.user.create({
     data: {
@@ -124,9 +137,8 @@ export async function registerUser(params: {
       name: name || null,
       role,
       referredByAffiliateId,
-      // If registering as agency, set tier to pro
-      tier: role === 'agency' ? 'pro' : 'trial',
-      subscriptionStatus: role === 'agency' ? 'active' : 'trial',
+      tier: resolvedTier,
+      subscriptionStatus: resolvedSubStatus,
     },
   })
 

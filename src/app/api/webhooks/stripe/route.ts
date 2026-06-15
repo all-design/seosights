@@ -126,6 +126,11 @@ export async function POST(req: Request) {
         const deletedSub = event.data.object
         const user = await db.user.findFirst({
           where: { stripeCustomerId: deletedSub.customer as string },
+          select: {
+            id: true,
+            stripeCustomerId: true,
+            referredByAffiliateId: true,
+          },
         })
         if (user) {
           await db.user.update({
@@ -136,6 +141,33 @@ export async function POST(req: Request) {
             },
           })
           console.log(`[stripe:sub.deleted] User ${user.id} → tier: free_trial, status: canceled`)
+
+          // ── Update affiliate referral status to 'churned' ──────────────
+          // When a referred user cancels, mark their referral as churned
+          // and decrement the affiliate's active count
+          if (user.referredByAffiliateId) {
+            try {
+              const referral = await db.affiliateReferral.findUnique({
+                where: { referredUserId: user.id },
+              })
+              if (referral && referral.status === 'active') {
+                await db.affiliateReferral.update({
+                  where: { id: referral.id },
+                  data: { status: 'churned' },
+                })
+                // Decrement affiliate's active count
+                await db.affiliate.update({
+                  where: { id: user.referredByAffiliateId },
+                  data: {
+                    totalReferredActive: { decrement: 1 },
+                  },
+                })
+                console.log(`[stripe:sub.deleted] Referral churned: user ${user.id}, affiliate ${user.referredByAffiliateId}`)
+              }
+            } catch (affError) {
+              console.error('[stripe:sub.deleted] Affiliate churn update error:', affError)
+            }
+          }
         }
         break
       }

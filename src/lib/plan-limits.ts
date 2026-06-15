@@ -90,6 +90,10 @@ export const PLAN_LIMITS: Record<string, PlanLimitConfig> = {
   },
 }
 
+// Add backward-compatible alias: "trial" maps to the same limits as "free_trial"
+// This handles any legacy data that might still use "trial" as the tier value
+PLAN_LIMITS['trial'] = PLAN_LIMITS['free_trial']
+
 // Default to free_trial limits if tier is unknown
 const DEFAULT_LIMITS = PLAN_LIMITS.free_trial
 
@@ -138,7 +142,7 @@ export async function checkDomainLimit(userId: string): Promise<LimitCheckResult
   }
 
   // If subscription is not active/trial, block
-  if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trial') {
+  if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trial' && user.subscriptionStatus !== 'free_trial') {
     return {
       allowed: false,
       reason: 'Subscription is not active. Please update your payment details.',
@@ -188,7 +192,7 @@ export async function checkAuditLimit(userId: string): Promise<LimitCheckResult>
     return { allowed: false, reason: 'User not found', planLimits: DEFAULT_LIMITS, tier: 'unknown' }
   }
 
-  if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trial') {
+  if (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'trial' && user.subscriptionStatus !== 'free_trial') {
     return {
       allowed: false,
       reason: 'Subscription is not active. Please update your payment details.',

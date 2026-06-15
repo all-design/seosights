@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import type { RegistrationTier } from '@/components/auth/RegistrationDialog'
 
 interface PlanFeature {
   icon: LucideIcon
@@ -32,7 +33,7 @@ interface PricingCardProps {
   description: string
   features: PlanFeature[]
   cta: string
-  planKey: 'starter' | 'pro' | 'managed'
+  planKey: RegistrationTier
   ctaAction: 'free' | 'pro' | 'managed' | 'contact'
   highlighted: boolean
   borderColor: string
@@ -41,6 +42,7 @@ interface PricingCardProps {
   glowColor: string
   userId?: string
   onStartFree?: () => void
+  onTierSelect?: (tier: RegistrationTier) => void
 }
 
 export default function PricingCard({
@@ -61,31 +63,44 @@ export default function PricingCard({
   glowColor,
   userId,
   onStartFree,
+  onTierSelect,
 }: PricingCardProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubscribe = async () => {
-    if (ctaAction === 'contact') {
+    // "Contact Us" / Managed tier → open agency registration
+    if (ctaAction === 'contact' || ctaAction === 'managed') {
+      if (onTierSelect) {
+        onTierSelect('managed')
+        return
+      }
       const el = document.getElementById('cta')
       if (el) el.scrollIntoView({ behavior: 'smooth' })
       return
     }
 
-    if (ctaAction === 'free') {
-      // Opens the registration/login modal
-      onStartFree?.()
-      return
-    }
-
-    // For 'pro' and 'managed' actions — if user is not logged in,
-    // open the registration modal first. After login, they'll be
-    // redirected to Stripe checkout.
+    // If user is not logged in, open registration dialog with the correct tier
     if (!userId) {
+      if (onTierSelect) {
+        onTierSelect(planKey)
+        return
+      }
       onStartFree?.()
       return
     }
 
+    // Free trial action for logged-in users without tier
+    if (ctaAction === 'free') {
+      if (onTierSelect) {
+        onTierSelect('starter')
+        return
+      }
+      onStartFree?.()
+      return
+    }
+
+    // Logged-in user: proceed directly to Stripe checkout
     setLoading(true)
     setError(null)
 
