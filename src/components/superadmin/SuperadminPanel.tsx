@@ -54,8 +54,15 @@ import {
   Zap,
   TrendingDown,
   Eye,
+  CreditCard,
   ArrowRight,
   TestTube,
+  Settings,
+  Key,
+  EyeOff,
+  Check,
+  RotateCcw,
+  Loader2,
 } from 'lucide-react'
 import {
   BarChart,
@@ -233,6 +240,10 @@ export default function SuperadminPanel({ isOpen, onClose }: SuperadminPanelProp
                   <Users className="w-3.5 h-3.5" />
                   Users
                 </TabsTrigger>
+                <TabsTrigger value="settings" className="gap-1.5 text-xs">
+                  <Settings className="w-3.5 h-3.5" />
+                  Settings
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -251,6 +262,9 @@ export default function SuperadminPanel({ isOpen, onClose }: SuperadminPanelProp
               </TabsContent>
               <TabsContent value="users" className="h-full m-0">
                 <UserManagementTab />
+              </TabsContent>
+              <TabsContent value="settings" className="h-full m-0">
+                <SettingsTab />
               </TabsContent>
             </div>
           </Tabs>
@@ -1521,6 +1535,337 @@ function UserManagementTab() {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+    </ScrollArea>
+  )
+}
+
+// ─── Tab 6: Settings / Payment Config ─────────────────────────────────
+
+interface SettingItem {
+  key: string
+  label: string
+  description: string
+  category: string
+  isSecret: boolean
+  placeholder: string
+  envVar: string
+  currentValue: string | null
+  source: 'database' | 'env' | 'unset'
+}
+
+function SettingsTab() {
+  const [settings, setSettings] = useState<SettingItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [revealSecrets, setRevealSecrets] = useState(false)
+  const [editedValues, setEditedValues] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const loadSettings = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/superadmin/settings?reveal=${revealSecrets}`)
+      if (!res.ok) throw new Error('Failed to load settings')
+      const data = await res.json()
+      const allSettings: SettingItem[] = []
+      // Flatten grouped settings
+      if (data.settings) {
+        for (const category of Object.values(data.settings) as SettingItem[][]) {
+          allSettings.push(...category)
+        }
+      }
+      setSettings(allSettings)
+      // Initialize edited values as empty
+      const initial: Record<string, string> = {}
+      for (const s of allSettings) {
+        initial[s.key] = ''
+      }
+      setEditedValues(initial)
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to load settings' })
+    } finally {
+      setLoading(false)
+    }
+  }, [revealSecrets])
+
+  useEffect(() => {
+    loadSettings()
+  }, [loadSettings])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setMessage(null)
+
+    try {
+      const changes: Array<{ key: string; value: string }> = []
+      for (const [key, value] of Object.entries(editedValues)) {
+        if (value.trim() !== '') {
+          changes.push({ key, value: value.trim() })
+        }
+      }
+
+      if (changes.length === 0) {
+        setMessage({ type: 'error', text: 'No changes to save' })
+        setSaving(false)
+        return
+      }
+
+      const res = await fetch('/api/superadmin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: changes, revealSecrets }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save settings')
+      }
+
+      setMessage({ type: 'success', text: data.message || 'Settings saved successfully' })
+      setEditedValues({})
+      setTimeout(() => loadSettings(), 500)
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save settings' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (key: string) => {
+    if (!confirm(`Revert "${key}" to environment variable? This will delete the database override.`)) return
+
+    try {
+      const res = await fetch('/api/superadmin/settings', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete')
+
+      setMessage({ type: 'success', text: data.message })
+      setTimeout(() => loadSettings(), 500)
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to delete' })
+    }
+  }
+
+  // Group settings by category
+  const categories: Record<string, SettingItem[]> = {}
+  for (const s of settings) {
+    if (!categories[s.category]) categories[s.category] = []
+    categories[s.category].push(s)
+  }
+
+  const categoryLabels: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+    payment: { label: 'Payment / Stripe', icon: CreditCard, color: 'text-amber-400' },
+    ai: { label: 'AI / LLM Configuration', icon: Cpu, color: 'text-purple-400' },
+    auth: { label: 'Authentication', icon: Shield, color: 'text-red-400' },
+    general: { label: 'General', icon: Settings, color: 'text-cyan-400' },
+  }
+
+  const sourceBadge = (source: string) => {
+    switch (source) {
+      case 'database':
+        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px]">DB</Badge>
+      case 'env':
+        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[9px]">ENV</Badge>
+      default:
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[9px]">UNSET</Badge>
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+        <span className="ml-2 text-muted-foreground text-sm">Loading settings...</span>
+      </div>
+    )
+  }
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="p-6 space-y-6 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Settings className="w-5 h-5 text-emerald-400" />
+              System Settings
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Configure API keys, payment processor, and secrets. DB overrides take priority over env vars.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRevealSecrets(!revealSecrets)}
+              className="border-white/10 text-xs"
+            >
+              {revealSecrets ? <EyeOff className="w-3.5 h-3.5 mr-1.5" /> : <Eye className="w-3.5 h-3.5 mr-1.5" />}
+              {revealSecrets ? 'Hide' : 'Reveal'} Secrets
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadSettings}
+              className="border-white/10 text-xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {/* Status Summary */}
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="border-white/10 bg-card/50">
+            <CardContent className="p-3 text-center">
+              <p className="text-xl font-bold text-foreground">{settings.length}</p>
+              <p className="text-[10px] text-muted-foreground">Total Settings</p>
+            </CardContent>
+          </Card>
+          <Card className="border-white/10 bg-card/50">
+            <CardContent className="p-3 text-center">
+              <p className="text-xl font-bold text-emerald-400">{settings.filter(s => s.source === 'database').length}</p>
+              <p className="text-[10px] text-muted-foreground">DB Overrides</p>
+            </CardContent>
+          </Card>
+          <Card className="border-white/10 bg-card/50">
+            <CardContent className="p-3 text-center">
+              <p className="text-xl font-bold text-red-400">{settings.filter(s => s.source === 'unset').length}</p>
+              <p className="text-[10px] text-muted-foreground">Unconfigured</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Message */}
+        <AnimatePresence>
+          {message && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className={`p-3 rounded-lg border text-sm ${
+                message.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                  : 'bg-red-500/10 border-red-500/20 text-red-400'
+              }`}
+            >
+              {message.type === 'success' ? <CheckCircle className="w-4 h-4 inline mr-2" /> : <AlertTriangle className="w-4 h-4 inline mr-2" />}
+              {message.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Categories */}
+        {Object.entries(categories).map(([category, items]) => {
+          const catInfo = categoryLabels[category] || categoryLabels.general
+          const CatIcon = catInfo.icon
+
+          return (
+            <Card key={category} className="border-white/10 bg-card/80 backdrop-blur-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <CatIcon className={`w-4 h-4 ${catInfo.color}`} />
+                  {catInfo.label}
+                  <Badge variant="outline" className="text-[9px] ml-auto text-muted-foreground border-white/10">
+                    {items.length} keys
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-4">
+                {items.map((setting) => (
+                  <div key={setting.key} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Key className={`w-3.5 h-3.5 ${setting.isSecret ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                        <label className="text-sm font-medium text-foreground">{setting.label}</label>
+                        {setting.isSecret && (
+                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[8px]">
+                            SECRET
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {sourceBadge(setting.source)}
+                        {setting.source === 'database' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(setting.key)}
+                            className="text-[10px] text-muted-foreground hover:text-red-400 h-5 px-1.5"
+                            title="Revert to env var"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{setting.description}</p>
+                    <div className="flex gap-2">
+                      <Input
+                        type={setting.isSecret && !revealSecrets ? 'password' : 'text'}
+                        placeholder={setting.currentValue || setting.placeholder}
+                        value={editedValues[setting.key] || ''}
+                        onChange={(e) => setEditedValues(prev => ({ ...prev, [setting.key]: e.target.value }))}
+                        className="bg-background/50 border-white/10 focus:border-emerald-500/50 text-sm font-mono"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/60">
+                      Env var: <code className="text-muted-foreground/80">{setting.envVar}</code>
+                      {setting.currentValue && setting.source === 'env' && ' ✓'}
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )
+        })}
+
+        {/* Save Button */}
+        <div className="flex items-center gap-3 pt-4 border-t border-white/10">
+          <Button
+            onClick={handleSave}
+            disabled={saving || Object.values(editedValues).every(v => !v.trim())}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Save Changes
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Changes take effect immediately. DB overrides replace env vars at runtime.
+          </p>
+        </div>
+
+        {/* Quick Guide */}
+        <Card className="border-white/5 bg-muted/20">
+          <CardContent className="p-4">
+            <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              Quick Setup Guide — Stripe
+            </h4>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal ml-4">
+              <li>Create a Stripe account at <span className="text-foreground">stripe.com</span></li>
+              <li>Get your <span className="text-foreground">Secret Key</span> from Dashboard → Developers → API keys</li>
+              <li>Create Products &amp; Prices in Stripe Dashboard for each plan (Starter $5/mo, Pro $79/mo)</li>
+              <li>Copy each <span className="text-foreground">Price ID</span> (price_...) into the fields above</li>
+              <li>Set up a <span className="text-foreground">Webhook endpoint</span> pointing to <code className="text-foreground">https://seosights.com/api/webhooks/stripe</code></li>
+              <li>Copy the <span className="text-foreground">Webhook Secret</span> (whsec_...) into the field above</li>
+              <li>Save changes — payments are now live!</li>
+            </ol>
+          </CardContent>
+        </Card>
       </div>
     </ScrollArea>
   )

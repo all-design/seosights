@@ -1,10 +1,48 @@
 import Stripe from 'stripe'
+import { getSetting } from '@/lib/settings'
 
+// ── Lazy Stripe client (reads from DB first, then env var) ────────────────
+
+let _stripe: Stripe | null = null
+
+/**
+ * Get the Stripe client instance.
+ * Uses the secret key from DB settings if available, otherwise falls back to env var.
+ */
+export async function getStripe(): Promise<Stripe> {
+  if (_stripe) return _stripe
+
+  const secretKey = await getSetting('stripe_secret_key', process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder')
+  _stripe = new Stripe(secretKey!, {
+    apiVersion: '2024-12-18.acacia',
+  })
+  return _stripe
+}
+
+/**
+ * Synchronous Stripe instance (uses env var only).
+ * Use this for top-level module code. For runtime, prefer getStripe().
+ */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
   apiVersion: '2024-12-18.acacia',
 })
 
-// Price IDs for each plan (configure in Stripe Dashboard)
+// ── Price IDs (lazy — reads from DB at runtime) ──────────────────────────
+
+/**
+ * Get plan price IDs, checking DB settings first, then env vars.
+ */
+export async function getPlanPrices() {
+  const [starter, pro, managed] = await Promise.all([
+    getSetting('stripe_starter_price_id', process.env.STRIPE_STARTER_PRICE_ID || 'price_starter_placeholder'),
+    getSetting('stripe_pro_price_id', process.env.STRIPE_PRO_PRICE_ID || 'price_pro_placeholder'),
+    getSetting('stripe_managed_price_id', process.env.STRIPE_MANAGED_PRICE_ID || 'price_managed_placeholder'),
+  ])
+
+  return { starter: starter!, pro: pro!, managed: managed! }
+}
+
+// Price IDs for each plan (env var defaults — use getPlanPrices() for DB overrides)
 export const PLAN_PRICES = {
   starter: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter_placeholder',
   pro: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_placeholder',
