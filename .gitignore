@@ -55,3 +55,27 @@ server.log
 # Tool results and temp files
 tool-results/
 upload/
+
+# Local databases
+/db/
+db/*.db
+db/*.db-journal
+
+# Agent context (local dev notes)
+/agent-ctx/
+
+# Local scripts state
+/.zscripts/
+
+# QA screenshots (local verification only)
+qa-*.png
+screenshot-*.png
+verification-*.png
+pricing-*.png
+landing-*.png
+dashboard-*.png
+scan-*.png
+analyzing-*.png
+mobile-*.png
+footer.png
+superadmin*.png

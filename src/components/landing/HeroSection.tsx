@@ -127,7 +127,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          Get Customers from{' '}
+          Get Customers from&nbsp;
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400">
             Google &amp; AI
           </span>
@@ -150,7 +150,10 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           transition={{ duration: 0.7, delay: 0.3 }}
         >
           <form
+            action="/api/quick-audit"
+            method="POST"
             onSubmit={(e) => { e.preventDefault(); handleQuickScan() }}
+            aria-label="Quick website SEO scan"
             className="max-w-2xl mx-auto mt-10 p-2 bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur flex flex-col md:flex-row gap-2"
           >
             <div className="flex-1 flex items-center gap-3 px-3">

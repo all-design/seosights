@@ -1,0 +1,45 @@
+{
+  "name": "seosights — Three Sights. One Unified AI Engine.",
+  "short_name": "seosights",
+  "description": "Unified SEO, AEO, and GEO platform powered by 8 AI agents that audit, strategize, and auto-execute your search strategy.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "categories": ["business", "productivity", "developer"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-transparent.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-transparent.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Analyze My Site",
+      "short_name": "Analyze",
+      "description": "Run a full SEO · AEO · GEO analysis",
+      "url": "/?action=analyze"
+    },
+    {
+      "name": "Pricing",
+      "short_name": "Pricing",
+      "description": "View plans and start free trial",
+      "url": "/#pricing"
+    }
+  ]
+}

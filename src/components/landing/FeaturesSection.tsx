@@ -229,7 +229,7 @@ export default function FeaturesSection() {
             Three Sights. One Unified AI Engine.
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Three Sights.{' '}
+            Three Sights.&nbsp;
             <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">
               One Platform.
             </span>

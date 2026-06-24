@@ -136,7 +136,13 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
               </p>
 
               {/* Input Fields */}
-              <div className="space-y-4">
+              <form
+                action="/api/analyze"
+                method="POST"
+                aria-label="Full website analysis form"
+                onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
+                className="space-y-4"
+              >
                 {/* URL Input */}
                 <div className="relative">
                   <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/50" />
@@ -232,13 +238,13 @@ export default function URLInputModal({ isOpen, onClose }: URLInputModalProps) {
                 )}
 
                 <Button
-                  onClick={handleSubmit}
+                  type="submit"
                   className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg h-14 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
                 >
                   {mode === 'auto-pilot' ? 'Analyze My Site' : 'Analyze & Review Actions'}
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-              </div>
+              </form>
 
               {/* Trust signals */}
               <div className="flex items-center justify-center gap-4 mt-6 text-xs text-muted-foreground/50">

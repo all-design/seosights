@@ -162,7 +162,7 @@ export default function Home() {
       />
       <AffiliateLandingSection onBecomeReseller={() => setIsAffiliateOpen(true)} />
       <CTASection onStartFree={() => openRegistration('starter')} />
-      <Footer onAdminClick={() => setIsAdminOpen(true)} />
+      <Footer />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} defaultTab={loginDefaultTab} />
       <RegistrationDialog

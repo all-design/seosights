@@ -76,7 +76,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                 <button
                   key={link.label}
                   onClick={() => scrollToSection(link.href)}
-                  className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                  className="px-4 py-2.5 min-h-[44px] inline-flex items-center text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
                 >
                   {link.label}
                 </button>
@@ -96,7 +96,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
 
             {/* Mobile Menu Button */}
             <button
-              className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
+              className="md:hidden p-3 min-w-[44px] min-h-[44px] inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle menu"
             >
@@ -136,7 +136,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                   <button
                     key={link.label}
                     onClick={() => scrollToSection(link.href)}
-                    className="block w-full text-left px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                    className="block w-full text-left px-4 py-3.5 min-h-[48px] text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
                   >
                     {link.label}
                   </button>

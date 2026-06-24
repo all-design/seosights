@@ -1,13 +1,9 @@
 'use client'
 
 import { Separator } from '@/components/ui/separator'
-import { Shield } from 'lucide-react'
 
-interface FooterProps {
-  onAdminClick?: () => void
-}
-
-export default function Footer({ onAdminClick }: FooterProps) {
+export default function Footer() {
+  const year = new Date().getFullYear()
   return (
     <footer className="mt-auto">
       <Separator className="bg-white/10" />
@@ -16,44 +12,33 @@ export default function Footer({ onAdminClick }: FooterProps) {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-start">
-                <span className="font-bold text-lg tracking-tight leading-none bg-gradient-to-r from-emerald-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent">
+                <span className="font-bold text-lg tracking-tight leading-none bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400 bg-clip-text text-transparent">
                   seosights
                 </span>
-                <span className="text-[7px] tracking-[0.15em] text-emerald-400/60 uppercase leading-none mt-0.5">
+                <span className="text-[7px] tracking-[0.15em] text-purple-400/60 uppercase leading-none mt-0.5">
                   Multiple pillars, one unified AI engine
                 </span>
               </div>
               <span className="text-sm text-muted-foreground">
-                © {new Date().getFullYear()} seosights
+                © {year} seosights
               </span>
             </div>
             <div className="flex items-center gap-6">
               <a
                 href="#"
-                className="text-sm text-muted-foreground hover:text-emerald-400 transition-colors"
+                className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
               >
                 Privacy Policy
               </a>
               <a
                 href="#"
-                className="text-sm text-muted-foreground hover:text-emerald-400 transition-colors"
+                className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
               >
                 Terms of Service
               </a>
               <span className="text-sm text-muted-foreground/50 flex items-center gap-1.5">
-                Built with <span className="text-emerald-400 font-medium">seosights</span>
+                Built with <span className="text-purple-400 font-medium">seosights</span>
               </span>
-              {/* Hidden admin trigger - small shield icon */}
-              {onAdminClick && (
-                <button
-                  onClick={onAdminClick}
-                  className="text-muted-foreground/20 hover:text-emerald-400/40 transition-colors"
-                  aria-label="Admin"
-                  title="Admin Panel"
-                >
-                  <Shield className="w-3 h-3" />
-                </button>
-              )}
             </div>
           </div>
         </div>

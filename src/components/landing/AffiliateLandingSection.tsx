@@ -219,7 +219,7 @@ export default function AffiliateLandingSection({
           </Badge>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-5 leading-tight">
-            Earn Up to{' '}
+            Earn Up to&nbsp;
             <span className="bg-gradient-to-r from-purple-400 via-amber-400 to-amber-300 bg-clip-text text-transparent">
               50% Recurring Commission
             </span>
@@ -476,7 +476,7 @@ export default function AffiliateLandingSection({
         >
           <div className="text-center mb-10">
             <h3 className="text-2xl sm:text-3xl font-bold mb-3">
-              How It Works
+              How the Affiliate Program Works
             </h3>
             <p className="text-muted-foreground text-base sm:text-lg">
               Three simple steps to start earning recurring commission.

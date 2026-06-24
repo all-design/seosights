@@ -72,7 +72,7 @@ export default function HowItWorksSection() {
             From URL to All Three Sights in Under 2 Minutes
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            How It{' '}
+            How It&nbsp;
             <span className="text-emerald-400">Works</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
