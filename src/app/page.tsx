@@ -14,7 +14,7 @@ import FreeToolsSection from '@/components/landing/FreeToolsSection'
 import IntegrationsSection from '@/components/landing/IntegrationsSection'
 import PricingSection from '@/components/landing/PricingSection'
 import CTASection from '@/components/landing/CTASection'
-import AffiliateLandingSection from '@/components/landing/AffiliateLandingSection'
+import AffiliateCTASection from '@/components/landing/AffiliateCTASection'
 import Footer from '@/components/landing/Footer'
 import URLInputModal from '@/components/landing/URLInputModal'
 import LoginModal from '@/components/landing/LoginModal'
@@ -173,7 +173,7 @@ export default function Home() {
         onTierSelect={openRegistration}
       />
       <CTASection onStartFree={() => openRegistration('starter')} />
-      <AffiliateLandingSection onBecomeReseller={() => setIsAffiliateOpen(true)} />
+      <AffiliateCTASection />
       <Footer />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} defaultTab={loginDefaultTab} />

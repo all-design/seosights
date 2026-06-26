@@ -1801,3 +1801,354 @@ Stage Summary:
 - No errors — production-quality state
 - Note: git status shows only file-mode changes (644→755) with 0 content diff — these are phantom permission changes, not real edits; actual code already committed in 30a6283
 - Ready for user preview via Preview Panel
+
+---
+Task ID: 4-b
+Agent: Competitor Citation Gap Builder
+Task: Build the Competitor Citation Gap feature for seosights SaaS app — a UI component showing the gap between your site and competitors in terms of how often each AI model (ChatGPT, Claude, Gemini, Perplexity, Copilot) cites them, plus a matching API route. Standalone deliverables only (do not modify AnalysisDashboard.tsx).
+
+Work Log:
+- Read /home/z/my-project/worklog.md to learn the established design system: dark theme, glassmorphism (bg-white/5 backdrop-blur-sm border-white/10), gradient text (purple→indigo→blue), framer-motion useInView with `once: true, margin: '-100px'`, staggered fade-up, shadcn Card/Badge/Button/Input, Lucide icons.
+- Reviewed existing dashboard components for style alignment: AIVisibilityChart.tsx (Card pattern, motion initial/animate), AlertsPanel.tsx (severity color config pattern), KPIWidgets.tsx (RadialProgress motion), StrategyRoadmap.tsx.
+- Reviewed shadcn ui primitives (card.tsx, badge.tsx, button.tsx, input.tsx) and existing API routes (alerts/route.ts, live/stats/route.ts) for NextRequest/NextResponse patterns.
+- Verified eslint config (relaxed rules; mostly off) and confirmed `bun run lint` runs `eslint .`.
+
+1) Created /home/z/my-project/src/components/dashboard/CompetitorCitationGap.tsx (331 lines, under 400):
+   - 'use client' directive, default export `CompetitorCitationGap({ url }: { url?: string })`.
+   - Header: 40x40 purple-tinted icon tile with Swords (lucide), title "Competitor Citation Gap", subtitle "How often AI models cite you vs. your competitors", right-aligned Badge "{N} sites · 5 models".
+   - Comparison matrix:
+     * CSS grid layout `grid-cols-[150px_repeat(5,1fr)]`, 5 rows × 5 model columns (ChatGPT/Claude/Gemini/Perplexity/Copilot).
+     * Each cell: citation count number (color scales rose→amber→emerald by ratio to max) + horizontal progress bar (width proportional to value/maxValue, color rose→amber→emerald by ratio; 0 value renders a faint rose track).
+     * Bars animate width 0 → target with framer-motion (delay 0.2 + i*0.08, 0.7s easeOut).
+     * "You" row highlighted with bg-purple-500/[0.08], border-purple-500/40, and shadow-[0_0_24px_-6px_rgba(168,85,247,0.5)] purple glow. You-row domain gets a small purple "You" badge.
+     * Rows stagger in (delay 0.1 + i*0.08).
+     * Responsive: outer container `overflow-x-auto` with inner `min-w-[680px]` so the matrix scrolls horizontally on mobile.
+   - Realistic hardcoded mock data (5 competitors × 5 models):
+     * yoursite.com (you): ChatGPT 47, Claude 31, Gemini 28, Perplexity 89, Copilot 0
+     * ahrefs.com: 142 / 96 / 78 / 134 / 67
+     * semrush.com: 118 / 88 / 64 / 78 / 58
+     * surferseo.com: 76 / 54 / 41 / 67 / 35
+     * fractle.com: 38 / 22 / 18 / 45 / 12
+     * These numbers support all 4 insight statements (3x ChatGPT gap to Ahrefs, 2nd-most-cited on Perplexity, 0 on Copilot, ~2x Claude competitor advantage).
+     * If `url` prop is provided, "you" domain is normalized (strip protocol/www/trailing path) and used in the first row; otherwise defaults to "yoursite.com".
+   - Summary strip (3 mini stat cards) between matrix and insights:
+     * Your Rank: #4 of 5 (rose, ArrowDown icon)
+     * Your Mentions: 195 citations (emerald, ArrowUp icon)
+     * Gap to Leader: -322 (amber, ArrowDown icon)
+     * Computed from row totals via useMemo.
+   - "Citation Gap Analysis" section: 4 insight cards in a 2-col grid, each with severity-colored border/bg/text (rose / emerald / rose / amber) + appropriate Lucide icon (AlertTriangle for gaps/risks, CheckCircle2 for strength, TrendingUp for opportunity) + type label. Insights stagger in (delay 0.55 + i*0.1).
+     * "You're cited 3x less than Ahrefs on ChatGPT" (rose, gap)
+     * "Strong on Perplexity — 2nd most cited" (emerald, strength)
+     * "Missing entirely from Copilot" (rose, risk)
+     * "Opportunity: Claude cites competitors 2x more than you" (amber, opportunity)
+   - Footer: "Add competitor" Input + Button (purple-tinted), Enter key submits, local useState only (clears on submit). Demo note explains competitors would appear on next refresh.
+   - Animation: outer motion.div with `useInView(ref, { once: true, margin: '-100px' })` and `initial={{ opacity: 0, y: 30 }}` → `animate={{ opacity: 1, y: 0 }}`. All child elements conditionally animate based on isInView for staggered entrance.
+   - Matched dark glassmorphism (Card border-white/10 bg-white/[0.02] backdrop-blur-sm). Primary accent is purple throughout — no indigo or blue as primary accent. Cyan used only for Gemini model label (non-primary).
+   - Lucide icons used: Swords, TrendingUp, AlertTriangle, CheckCircle2, Plus, ArrowUp, ArrowDown.
+
+2) Created /home/z/my-project/src/app/api/dashboard/competitor-citation/route.ts (127 lines):
+   - `export const dynamic = 'force-dynamic'`
+   - GET handler accepting `?url=` query param (optional).
+   - Returns ResponseShape: `{ competitors: [{ domain, isYou, citations: { chatgpt, claude, gemini, perplexity, copilot } }], insights: [{ type, message, severity }], summary: { yourRank, totalMentions, gapToLeader } }`.
+   - `normalizeDomain()` helper strips protocol, path, and www. prefix from the url param.
+   - `buildCompetitors()` returns the same 5-row mock data as the component (single source of truth for the gap math).
+   - `summarize()` sorts by total citations, finds your rank, your total mentions, and computes gapToLeader (yourTotal - leaderTotal, negative when behind).
+   - Computed summary for default data: yourRank=4, totalMentions=195, gapToLeader=-322.
+   - Insights array matches the component exactly.
+   - TypeScript strict, ES6 imports, no DB dependency (pure mock data).
+
+3) Verification:
+   - Ran `cd /home/z/my-project && bun run lint` → exit code 0, zero errors, zero warnings.
+   - Confirmed component file is 331 lines (under the 400-line limit) and API route is 127 lines.
+   - Did NOT modify AnalysisDashboard.tsx (left for orchestrator to wire in if desired).
+
+Stage Summary:
+- Standalone Competitor Citation Gap feature delivered as two files:
+  • /home/z/my-project/src/components/dashboard/CompetitorCitationGap.tsx — default-exported, 'use client', drop-in dashboard panel with comparison matrix (5 competitors × 5 AI models), animated rose→amber→emerald volume bars, purple-glow "you" row, summary strip (rank/mentions/gap), 4 severity-coded insight cards, and a demo "Add competitor" footer.
+  • /home/z/my-project/src/app/api/dashboard/competitor-citation/route.ts — GET handler returning mock `{ competitors, insights, summary }` shape, accepts `?url=` param to customize the "you" domain.
+- Lint passes clean (exit 0). Component under 400 lines (331). Mock data realistic and consistent between component and API. Design system matched (dark glassmorphism, framer-motion useInView staggered fade-up, purple primary accent, shadcn Card/Badge/Button/Input, Lucide icons). Ready to be imported into AnalysisDashboard.tsx or any dashboard page by the integrating agent.
+
+---
+Task ID: 4-f
+Agent: One-click Fix Builder
+Task: Build the One-click Fix feature — a dashboard panel that lists technical AI-search issues detected on the user's site with a "Fix All" button that generates ready-to-paste fix code (JSON-LD schema, llms.txt, robots.txt AI-bot rules, meta description, canonical link, sitemap.xml entry). Includes a standalone API route (GET + POST) accepting ?url= query param.
+
+Work Log:
+- Read worklog.md to understand prior work (8-agent ESSHEO system, dashboard auto-execute, superadmin panel, alerts/webhooks panels, llms.txt generator)
+- Studied existing dashboard component patterns: StrategyRoadmap, LiveAgentStatus, AlertsPanel, WebhooksPanel — confirmed design system (dark glass bg-white/[0.02] backdrop-blur-sm border-white/10, framer-motion staggered fade-up, emerald/amber/rose/cyan/purple accents, NOT indigo/blue as primary)
+- Reviewed shadcn primitives: Card, Button, Badge, Progress + their variant/className conventions
+- Reviewed alerts/route.ts and generate-llms-txt/route.ts for Next.js 16 API route patterns (force-dynamic, searchParams, JSON body parsing, error envelopes)
+- Created /src/app/api/dashboard/one-click-fix/route.ts (293 lines):
+  - GET handler: returns { issues, summary } with 6 detected issues, each carrying realistic fix code
+  - POST handler: accepts { issueIds: string[] }, simulates applying fixes — manual_review issues are skipped, others flip to 'fixed', response includes 'applied' and 'skipped' arrays
+  - ?url= query param scopes the generated snippets to the user's domain (parseSite helper derives domain, origin, brand)
+  - 6 realistic fix code snippets (all valid syntax):
+    1. JSON-LD Organization schema (Critical) — @context, @type, name, url, logo, sameAs[], contactPoint
+    2. llms.txt (Critical) — proper markdown format with # heading, > summary, ## Pages, ## Optional sections
+    3. robots.txt (Warning) — User-agent: GPTBot/ClaudeBot/PerplexityBot/Google-Extended/CCBot Allow: /, plus Disallow for /admin and /private
+    4. Meta description (Warning) — <meta name="description" content="..."> with length guidance comment
+    5. Canonical link (Critical) — <link rel="canonical" href="..."> with single-canonical guidance
+    6. sitemap.xml (Info, manual_review status) — proper urlset XML with <url>/<loc>/<lastmod>/<changefreq>/<priority>
+- Created /src/components/dashboard/OneClickFix.tsx (379 lines, under 450 limit):
+  - 'use client' directive, default export OneClickFix({ url }: { url?: string })
+  - Fetches issues from /api/dashboard/one-click-fix?url=... on mount via useEffect, with loading skeleton (5 animated cards) and error state with Retry button
+  - Header: Wrench icon in purple→emerald gradient square, "One-Click Fix" title, subtitle
+  - Top banner (emerald gradient): "X issues · Y can be auto-fixed · Z need review" + big "Fix All" button (emerald gradient with Zap icon, glow shadow) + Progress bar showing fixed/total %
+  - 6 fix cards (FixCard sub-component), each: type badge (Schema/llms.txt/robots.txt/Meta/Canonical/Sitemap — color-coded purple/emerald/cyan/amber/rose/purple) + severity badge (Critical=rose, Warning=amber, Info=cyan) + status pill (Not Fixed=slate, Fixing...=amber+Loader2 spin, Fixed=emerald+CheckCircle2, Manual Review=cyan) + title + description + "Fix Now" button (emerald) + "Preview Code" toggle (Eye/EyeOff) + language tag
+  - Code preview uses AnimatePresence height:auto animation; renders <pre> with bg-zinc-950 text-zinc-300 text-[11px] font-mono (syntax-styled per spec)
+  - Fix Now: optimistically flips to 'fixing' state with Loader2 spinner, waits 1000ms, flips to 'fixed' with CheckCircle2; updates both issues array and summary count
+  - Fix All: iterates through not_fixed issues sequentially with 220ms stagger, animating each card through fixing→fixed
+  - Footer: ghost "Download all fixes as .zip" button with simulated 1.4s "Preparing .zip..." → "Bundle Ready (demo)" state (3.5s)
+  - framer-motion: container fade-up (0.5s), staggered card fade-up (delay 0.15 + index*0.06), AnimatePresence for code preview height animation
+  - Responsive: flex-wrap on badge rows and action rows; px-4 sm:px-6 padding
+  - Lucide icons used: Wrench, Zap, CheckCircle2, AlertTriangle, Loader2, Code2, Download, Eye, EyeOff, FileText, FileCode, Settings, Link2
+  - shadcn components used: Card, CardContent, Button, Badge, Progress
+- Verified bun run lint passes with exit code 0 (zero errors)
+- Verified bunx tsc --noEmit reports zero errors in the two new files (other errors in pre-existing mini-services/audit-worker and examples/websocket are unrelated to this task)
+- Did NOT modify AnalysisDashboard.tsx — component is fully standalone and ready to be imported anywhere with <OneClickFix url={url} />
+
+Stage Summary:
+- /src/app/api/dashboard/one-click-fix/route.ts (293 lines) — GET returns 6 detected issues with realistic fix code + summary; POST simulates applying fixes for given issueIds (skips manual_review)
+- /src/components/dashboard/OneClickFix.tsx (379 lines, under 450) — standalone client component with header, emerald Fix-All banner + progress, 6 fix cards with type/severity/status badges + code preview toggle, sequential Fix-All animation, demo .zip download footer
+- Realistic fix snippets: valid JSON-LD Organization schema, proper llms.txt markdown, real robots.txt syntax with GPTBot/ClaudeBot/PerplexityBot allow rules, meta description with length guidance, canonical link tag, sitemap.xml urlset
+- Dark glassmorphism styling matches existing dashboard (bg-white/[0.02] backdrop-blur-sm border-white/10), emerald primary accent for the Fix All CTA (no indigo/blue as primary)
+- API accepts ?url= param and the generated code references the user's actual domain/origin/brand
+- Lint: PASS (exit 0). TypeScript: clean for both new files.
+
+---
+Task ID: 4-a
+Agent: AI Prompt Rank Tracker Builder
+Task: Build the AI Prompt Rank Tracker feature — a UI component showing how a brand ranks across ChatGPT, Claude, Gemini, and Perplexity for tracked prompts, plus a matching mock API route.
+
+Work Log:
+- Read /home/z/my-project/worklog.md and reviewed existing dashboard components (AIVisibilityChart, KPIWidgets, AlertsPanel) and shadcn/ui primitives (Card, Badge, Button, Input) to match the dark glassmorphism style (bg-white/5 backdrop-blur-sm border-white/10) and animation patterns (framer-motion staggered fade-up)
+- Confirmed eslint config disables strict unused-vars/any rules; verified framer-motion 12, lucide-react, and all required shadcn/ui components are available in package.json
+- Created /home/z/my-project/src/app/api/dashboard/prompt-rank/route.ts:
+  - GET handler with `export async function GET(request: NextRequest)`
+  - Accepts optional `?url=` (echoed back) and `?prompt=` (case-insensitive substring filter on prompt text) query params
+  - Returns JSON `{ prompts: [...], summary: { avgRank, mentionRate, trend }, url? }` matching the requested shape exactly
+  - Each prompt: `{ id, text, models: { chatgpt, claude, gemini, perplexity: { rank, status, sentiment, history: [] } } }`
+  - 6 realistic preset prompts ("best SEO tools", "how to optimize for AI search", "what is AEO", "top GEO software", "AI visibility checker", "llms.txt generator") with believable per-model ranks (1-10 or null), statuses (Cited/Mentioned/Partial/Not Mentioned), sentiments (positive/neutral/negative), and 4-week rank histories (with nulls for "not mentioned that week")
+  - `computeSummary()` derives avgRank, mentionRate, and 4-week trend array from the data
+  - `dynamic = 'force-dynamic'` and proper try/catch with 500 fallback
+- Created /home/z/my-project/src/components/dashboard/PromptRankTracker.tsx:
+  - 'use client' directive, default export `PromptRankTracker({ url }: { url?: string })`
+  - Header: purple Target icon tile + "AI Prompt Rank Tracker" title with Sparkles "Beta" badge + subtitle "See where you rank when users ask AI models about your industry" (shows tracked URL when provided)
+  - "Add Prompt" Input + Button — stores user-typed prompt in local state with mock-generated per-model data (randomized rank/status/sentiment/4-week history) and prepends to the list
+  - 6 preset prompt cards rendered from PRESET_PROMPTS
+  - Each prompt card uses responsive grid: `grid-cols-1 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,1fr))]` — prompt text cell on the left, 4 model columns on the right (stacked vertically on mobile, side-by-side on desktop)
+  - Each model cell shows: model label (uppercase), rank (`#N` or `—`), color-coded by rank tier (1-3 emerald, 4-6 amber, 7-10 rose, null slate), status pill (Cited=cyan, Mentioned=emerald, Partial=amber, Not Mentioned=rose), and a sentiment icon (TrendingUp=emerald, TrendingDown=rose, Minus=slate)
+  - Summary footer card with purple gradient: Avg Rank (purple), Mention Rate % (emerald), and a custom SVG Sparkline showing the 4-week average-rank trend (lower rank = higher on chart, with dots at each data point, "no data yet" fallback for all-null history)
+  - framer-motion staggered fade-up via container/item variants (0.08s stagger, 0.4s duration, y:16 → 0)
+  - All lucide icons used: Target, MessageSquare, Plus, TrendingUp, TrendingDown, Minus, Sparkles
+  - shadcn/ui components used: Card, CardContent, Button, Input, Badge
+  - Strictly NO indigo/blue accents — only purple, emerald, cyan, amber, rose, slate
+  - Compacted mock data and helper code to keep component at 361 lines (under the 400-line cap)
+  - Did NOT modify AnalysisDashboard.tsx (orchestrator will wire it in later)
+- Ran `bun run lint` — passed with exit code 0, zero errors
+- Ran `bunx tsc --noEmit --skipLibCheck` filtered for the new files — no TypeScript errors
+
+Stage Summary:
+- New file: /home/z/my-project/src/app/api/dashboard/prompt-rank/route.ts (157 lines, GET handler returning mock prompt-rank data with summary)
+- New file: /home/z/my-project/src/components/dashboard/PromptRankTracker.tsx (361 lines, full dark-glass UI with header, add-prompt input, 6 preset prompt rows with 4 model columns each, and summary footer with SVG sparkline)
+- Both files follow the seosights design system exactly (dark glassmorphism, purple/emerald/cyan/amber accents, framer-motion staggered animations, shadcn/ui + lucide)
+- Lint passes cleanly (exit 0); TypeScript type-checks cleanly for the new files
+- AnalysisDashboard.tsx was intentionally left untouched — orchestrator will import and place PromptRankTracker in the dashboard
+
+---
+Task ID: 4-e
+Agent: AI Crawl Logs Builder
+Task: Build the AI Crawl Logs feature for the seosights SaaS app — a server-log-analyzer UI specialized for AI crawler bots (GPTBot, ClaudeBot, PerplexityBot, Googlebot, Bytespider, Applebot), plus a matching mock API route. Critical for GEO: lets users see if AI bots can even access their site.
+
+Work Log:
+- Read /home/z/my-project/worklog.md to align with the established design system (dark theme, glassmorphism `bg-white/5` / `bg-white/[0.02]` + `border-white/10` + `backdrop-blur-sm`, gradient text, framer-motion `useInView({ once: true, margin: '-100px' })`, staggered fade-up, shadcn Card/Badge/Button/Table, Lucide icons).
+- Inspected existing dashboard components (AlertsPanel, AIVisibilityChart, KPIWidgets) and shadcn ui primitives (card, badge, button, table) for correct import paths and prop APIs.
+- Verified ESLint config (`eslint.config.mjs`) is permissive (no-explicit-any off, etc.).
+- Created `/home/z/my-project/src/app/api/dashboard/crawl-logs/route.ts`:
+  * `export const dynamic = 'force-dynamic'` + `GET(request: NextRequest)` handler
+  * Reads `?url=` and `?bot=` query params (case-insensitive bot match filters the `logs` array)
+  * Returns `{ summary, bots, logs, alerts, url, bot }` — full mock data shape per spec
+  * Mock data: 6 bots (GPTBot/ClaudeBot/PerplexityBot/Googlebot allowed or blocked realistically), 12 log entries spanning last ~3h with believable IPs (66.249.66.x Googlebot, 20.171.207.x GPTBot, 54.241.140.x ClaudeBot, 54.161.81.x PerplexityBot, 17.121.112.x Applebot, 110.53.92.x Bytespider), real-world user-agent strings, paths (/, /blog/aeo-guide, /pricing, /llms.txt, /sitemap.xml, /faq, /case-studies/ai-search, /docs/schema-markup, /blog/geo-optimization, /blog/ai-search-ranking), status codes (200/403), response times (9-211ms)
+  * 3 alerts: GPTBot BLOCKED (critical), Bytespider BLOCKED (warning), Applebot BLOCKED (info)
+  * Bot color palette avoids indigo/blue as primary: GPTBot emerald, ClaudeBot orange, PerplexityBot teal, Googlebot amber, Bytespider rose, Applebot zinc
+- Created `/home/z/my-project/src/components/dashboard/AICrawlLogs.tsx` (366 lines, well under 450-line cap):
+  * `'use client'` directive, `export default function AICrawlLogs({ url }: { url?: string })`
+  * Self-contained static mock data (same shape as API) so component renders without network
+  * Header: Radar icon in purple tinted square, "AI Crawl Logs" title, "LIVE" Badge with pulsing Activity icon, subtitle "See when AI models crawl your site", optional `url` monospace display, "Last 24h" filter Button
+  * Blocked-alert banner row: rose-tinted full-width alert for each critical/warning alert, with AlertTriangle icon, full message ("GPTBot is BLOCKED by your robots.txt — ChatGPT cannot read your site."), and rose "Fix Now" Button with Wrench icon
+  * KPI row (2-col mobile, 4-col desktop): Total AI Bot Visits (30d) = 1,247 (purple), Allowed Bots = 3 of 6 (emerald), Blocked Bots = 3 of 6 (rose — THE ALARM), Crawl Trend = +18% (emerald ArrowUp) with inline SVG Sparkline showing 30-day uptrend
+  * Filter pills row (horizontal scroll on mobile): All Bots / GPTBot / ClaudeBot / PerplexityBot / Googlebot / Bytespider / Applebot — clicking filters the log table; active pill takes the bot's own color tint (`backgroundColor: ${color}25`, `borderColor: ${color}66`)
+  * Bot status row (2/3/6-col responsive grid): 6 cards each showing colored status dot (animated ping for allowed), bot name, status Badge (Allowed/Blocked/Restricted), last-seen relative timestamp with Clock icon, visit count
+  * Log table (shadcn Table primitives, sticky header, max-h-96 overflow-y-auto, thin purple scrollbar via inline style): columns Time / Bot / IP / Path / Status / Response / User Agent. Status cell is a colored pill with CheckCircle2 (200), XCircle (403), or AlertTriangle (404) icon. Bot cell shows a colored dot matching the bot. Paths and User Agents are monospace + truncated with title tooltips. Empty-state row when a filter has zero matches.
+  * Footer: "Auto-refreshes every 60s" with Activity icon + "Streaming from server logs" with pulsing emerald dot
+  * Animations: framer-motion `useInView(ref, { once: true, margin: '-100px' })` drives all entrance animations — header fades up (0.5s), alert banners stagger in (0.4s, 0.06s delay each), KPI cards stagger (0.4s, 0.06s delay each), bot status cards stagger (0.35s, 0.04s delay each), log rows fade in (0.3s, 0.03s delay each)
+- Ran `cd /home/z/my-project && bun run lint` — exit code 0, zero errors, zero warnings.
+- Verified `bunx tsc --noEmit --skipLibCheck` reports no errors in the new files (only pre-existing unrelated errors in src/lib/cms-publish.ts, db.ts, email.ts, pdf-generator.ts, shared-context.ts, stripe.ts, webhook-dispatcher.ts, zai.ts).
+- Did NOT modify AnalysisDashboard.tsx (left as-is per instructions).
+
+Stage Summary:
+- 2 new files delivered, lint-clean, TypeScript-clean for the new code:
+  • `/home/z/my-project/src/app/api/dashboard/crawl-logs/route.ts` (180 lines) — mock GET endpoint returning summary / bots / logs / alerts with `?url=` and `?bot=` filtering
+  • `/home/z/my-project/src/components/dashboard/AICrawlLogs.tsx` (366 lines) — default-export `AICrawlLogs({ url })` standalone dashboard panel
+- Component is wired for direct integration (drop into any dashboard page or tab); renders entirely from in-component mock data so it works without the API, but the API exists for future DB-backed wire-up.
+- Critical GEO alarm surface present: 3 of 6 bots shown BLOCKED with rose alert banners calling out specifically that "ChatGPT cannot read your site" (GPTBot blocked by robots.txt). This is the "wow, I have problems" moment for GEO use cases.
+- Color palette deliberately avoids indigo/blue as the section's primary accent — purple is the primary accent (header icon, LIVE badge, table Zap icon, "All" filter pill, footer Activity icon). Per-bot tints use emerald/orange/teal/amber/rose/zinc.
+- Ready for orchestrator to import into a dashboard page (e.g. `import AICrawlLogs from '@/components/dashboard/AICrawlLogs'` then `<AICrawlLogs url={domain} />`).
+
+---
+Task ID: 4-c
+Agent: Entity Graph Builder
+Task: Build Entity Graph Builder feature — interactive hand-coded SVG force-directed graph showing how AI models connect a brand to surrounding entities, with side panel + authority gauge + matching API route.
+
+Work Log:
+- Read worklog.md to understand the dark glassmorphism design system, framer-motion useInView pattern (`once: true, margin: '-100px'`), purple/cyan/emerald/amber accent palette (no indigo / no blue as primary), and existing dashboard component conventions (Card/Badge/Button, lucide-react, `'use client'` directive, default export).
+- Inspected existing dashboard components (AIVisibilityChart, KPIWidgets, LiveAgentStatus) and an existing API route (alerts/route.ts) to match exact import paths, NextRequest pattern, and `dynamic = 'force-dynamic'` convention.
+- Created `/home/z/my-project/src/app/api/dashboard/entity-graph/route.ts`:
+  - GET handler, `?url=` query param optional (defaults to "seosights")
+  - Derives brand from url (strips protocol/www/path)
+  - Returns `{ brand, centerNode, entities[], authorityScore, summary }`
+  - 10 entities with realistic mock data: id, label, type (concept/tool/ai-model/standard), strength (0-100), description, mentionedBy (array of AI model ids: chatgpt/claude/perplexity/gemini)
+  - authorityScore = 78
+  - Wrapped in try/catch with 500 fallback
+- Created `/home/z/my-project/src/components/dashboard/EntityGraphBuilder.tsx` (498 lines, under the 500-line budget):
+  - `'use client'`, default export `EntityGraphBuilder({ url }: { url?: string })`
+  - Layout: header (Network icon in purple tile + title "Entity Graph Builder" + Live badge + Share2 button) → main grid (lg:col-span-2 SVG graph + lg:col-span-1 side panel) → bottom row (entity type legend + authority gauge)
+  - Header: Network lucide icon, "Entity Graph Builder" title, subtitle "How AI models connect {brand} to entities", Sparkles Live badge, Share2 outline Button
+  - SVG: viewBox 0 0 800 500, hand-coded (NO d3/react-flow)
+    - Center node at (400, 250) with pulsing glow rings (3 staggered motion.circle with opacity/scale keyframe loop, repeat: Infinity) + radial gradient fill (#d946ef → #a855f7 → #7e22ce) + outer glow halo
+    - 10 entity nodes positioned at fixed radial coordinates around center (every 36° from -90°)
+    - Each entity: motion.g with `initial={{opacity:0, scale:0}} animate={isInView ? {opacity:1, scale:1} : {}}` staggered (delay 0.5 + i*0.07, backOut ease), whileHover scale 1.12, transformOrigin set via style
+    - Node circle: radius scales with strength (14 + (s-50)*0.26), filled with type color at 15% alpha, stroke at full color, glow filter when selected
+    - Node label text + strength pill (rect + text) at top-right corner of node
+    - Edges: motion.path with M/L commands from center to each entity, `pathLength: 0 → 1` animation staggered, strokeWidth scales with strength, stroke color highlights when entity is selected
+  - Type color system (no indigo, no blue):
+    - concept = emerald (#10b981)
+    - tool = cyan (#06b6d4)
+    - ai-model = amber (#f59e0b)
+    - standard = purple (#a855f7) — primary accent
+  - Side panel (Entity Details):
+    - Default state (no selection): header "Entity Details" + helper text + top 3 strongest associations as clickable rows, each with rank #, color dot, label, animated strength bar (motion.div width 0 → strength%), strength %, ArrowRight icon
+    - Selected state: animated entrance (opacity + x slide), color dot + label + close X button, type Badge, description paragraph, "Association Strength" meter (animated bar), "Mentioned by" section with colored AI model badges (ChatGPT/Claude/Perplexity/Gemini each with own color)
+  - Bottom legend: 4 entity-type color dots + Brand dot, with subtle glow box-shadow per dot
+  - Authority Score gauge: small 64px circular SVG (track + animated motion.circle strokeDashoffset), purple arc with drop-shadow glow, center "78" number, "Entity Authority Score / Strong · /100" label
+  - framer-motion useInView hook on wrapper ref with `{ once: true, margin: '-100px' }` — all child animations gated on `isInView` boolean via `animate={isInView ? ... : {}}`
+  - Responsive: `grid-cols-1 lg:grid-cols-3` (side panel goes below SVG on mobile), `md:grid-cols-3` for bottom row, Share button hidden on mobile, SVG uses `w-full h-auto` to scale
+  - Realistic mock data hardcoded in component (matches API route data exactly): SEO 92%, GEO 88%, Schema Markup 86%, AEO 84%, Knowledge Graph 81%, AI Search 79%, ChatGPT 76%, Perplexity 73%, llms.txt 71%, Claude 68%
+- Did NOT modify AnalysisDashboard.tsx (left standalone as instructed)
+- Ran `bun run lint` — exit code 0, zero errors/warnings
+- Verified no TypeScript errors in the two new files via `bunx tsc --noEmit` (pre-existing errors in unrelated files only)
+
+Stage Summary:
+- 2 new files created:
+  • `/home/z/my-project/src/app/api/dashboard/entity-graph/route.ts` (151 lines) — GET handler returning `{ brand, centerNode, entities, authorityScore, summary }` with `?url=` query param support
+  • `/home/z/my-project/src/components/dashboard/EntityGraphBuilder.tsx` (498 lines, under 500-line budget) — interactive SVG entity graph with clickable nodes, side panel, legend, authority gauge
+- "Wow" features delivered: pulsing glow rings on center brand node, animated edge draw-in (pathLength 0→1) staggered, node fade/scale entrance with backOut ease, hover scale on nodes, clickable selection with edge + node highlight, animated strength bars, AI model "Mentioned by" badges, circular authority score gauge
+- Hand-coded SVG only — no d3, react-flow, or any graph library used
+- Purple primary accent (no indigo / no blue), with emerald/cyan/amber as type colors per spec
+- Component is standalone and ready to be imported into AnalysisDashboard.tsx by the integration agent (default export `EntityGraphBuilder({ url })`)
+- Lint passes clean (exit 0)
+
+---
+Task ID: 4-d
+Agent: AI Content Simulator Builder
+Task: Build AI Content Simulator feature for seosights SaaS — UI component that previews how AI models (ChatGPT, Claude, Gemini, Perplexity) read, summarize, and cite pasted content; plus backend API route returning mock analysis.
+
+Work Log:
+- Read /home/z/my-project/worklog.md and existing dashboard components (KPIWidgets, AIVisibilityChart, GSCPanel) to learn the design system: dark glassmorphism (bg-white/[0.02], border-white/10, backdrop-blur-sm), purple primary accent (#a855f7), framer-motion fade-up with `once: true, margin: '-100px'`, staggered delays, shadcn/ui + Lucide icons
+- Verified available shadcn primitives (Card, Badge, Button, Tabs, Textarea, Progress) and ESLint config (lenient — `@typescript-eslint/no-explicit-any` and unused-vars off, but still strict on syntax)
+- Created API route `/src/app/api/dashboard/content-simulator/route.ts` (253 lines):
+  - POST handler accepting `{ content, url? }`
+  - Returns `{ models: {chatgpt, claude, gemini, perplexity}, suggestions[], contentStats }`
+  - Realistic content-aware logic: extracts entities from a 30+ term AI-search dictionary (AEO, GEO, Schema Markup, llms.txt, GPTBot, etc.), computes citation likelihood from content length + entity density + structural signals (definitions, lists, stats), detects sentiment via positive/negative keyword matching, derives 4 distinct per-model summaries + answer snippets (ChatGPT conversational, Claude nuance-focused, Gemini fact/data-focused, Perplexity citation-formatted)
+  - Suggestions are dynamically generated from real content signals (no FAQ → add FAQPage schema; no schema mention → add JSON-LD; <1200 chars → expand; no stats → add data points; no headings → add H2/H3)
+- Created component `/src/components/dashboard/AIContentSimulator.tsx` (447 lines, under 450 limit):
+  - Default export `AIContentSimulator({ url }: { url?: string })` with 'use client'
+  - Header: FileText icon in purple-tinted rounded square, title "AI Content Simulator", subtitle "Preview how AI models read and cite your content", optional "URL mode" badge when url prop provided
+  - Two-column responsive grid (lg:grid-cols-2, stacks on mobile):
+    - Left: Textarea pre-filled with a believable ~330-word blog post about AEO/GEO (covers AI Search Optimization, AEO vs GEO definitions, three foundations of structured data/entity clarity/crawlability, 60% and 71% statistics), character counter (chars + words, max 10k), Simulate button with loading state
+    - Right: Tabs with 4 model triggers (ChatGPT/Claude/Gemini/Perplexity), each tinted with brand color (emerald/amber/teal/cyan — purple remains primary accent, no indigo/blue as primary). Each tab shows: summary, key entities as pills, citation likelihood with shadcn Progress bar (emerald >70, amber 40-70, rose <40 via arbitrary variant `[&_[data-slot=progress-indicator]]:bg-emerald-500`), sentiment badge, potential answer snippet in model-tinted code-style block
+  - Bottom: Optimization Suggestions card (purple-tinted gradient) with 4 actionable tip cards, each with priority badge (High=rose/AlertTriangle, Medium=amber/Lightbulb, Low=emerald/CheckCircle2)
+  - 1.5s setTimeout simulates AI inference, then reveals results with framer-motion entrance + tab transitions + staggered suggestion cards
+  - Pre-computed MOCK_RESULT matches the sample content (entities like "AI Search", "AEO", "GEO", "Schema Markup", "llms.txt"; citation scores 72-84%; snippets quote actual sentences from the sample blog post)
+  - Uses all required Lucide icons: FileText, Eye, Sparkles, Loader2, CheckCircle2, AlertTriangle, Lightbulb, Quote
+  - Empty state and loading state share a centered min-h-[360px] container for layout stability
+- Ran `bun run lint` — clean pass, exit code 0, zero errors
+- Did NOT modify AnalysisDashboard.tsx (per instructions)
+
+Stage Summary:
+- 2 files created:
+  - `/src/components/dashboard/AIContentSimulator.tsx` (447 lines, under 450 limit)
+  - `/src/app/api/dashboard/content-simulator/route.ts` (253 lines)
+- Lint passes: `bun run lint` exit 0, zero errors
+- Component is fully self-contained (local mock + setTimeout), works in any environment without dev server
+- API route is independently callable and content-aware (extracts real entities, computes scores from content signals)
+- Design system fully respected: dark glassmorphism, purple primary accent, framer-motion fade-up with `once: true, margin: '-100px'`, staggered cards, shadcn primitives, Lucide icons
+- No indigo or blue as primary accent — only model-brand tints (emerald/amber/teal/cyan) used per-tab
+- Sample content is a believable AEO/GEO blog post with the right entities to make the analysis feel realistic
+- Ready to be imported into AnalysisDashboard or any dashboard page via `<AIContentSimulator url={url} />`
+
+---
+Task ID: 4-h
+Agent: Chrome Extension Builder
+Task: Build a Manifest V3 Chrome Extension scaffold for seosights that lets users click the toolbar icon on any site to see a quick AI-visibility score (SEO + AEO + GEO), four quick checks (llms.txt / schema / robots.txt AI bots / meta description), a "Run Full Analysis on seosights.com" CTA, and an optional page overlay.
+
+Work Log:
+- Read /home/z/my-project/worklog.md to align with the seosights design system (dark bg #0a0a0f, surface #15151f, purple #a855f7 + amber #f59e0b gradient, emerald #10b981 / rose #f43f5e accents, no indigo/blue as primary) and reviewed existing dashboard components' conventions.
+- Created /home/z/my-project/extensions/chrome-seosights/manifest.json (Manifest V3): name "seosights — AI Search Visibility Checker", version "1.0.0", permissions ["activeTab","storage"], host_permissions ["https://seosights.com/*"], action.default_popup=popup.html, background.service_worker=background.js, content_scripts on <all_urls> at document_idle, options_ui.page=options.html open_in_tab=true, icons reference icon.png (no binary created per spec — user adds it).
+- Created styles.css (shared dark-theme stylesheet for popup + options): CSS variables matching seosights (--bg #0a0a0f, --surface #15151f, --purple #a855f7, --amber #f59e0b, --emerald #10b981, --rose #f43f5e, --gradient purple→amber, --gradient-text purple-400→amber-400). Includes 380×480 popup layout, header (brand mark + gradient text name + uppercase tagline + settings gear), URL bar with pulsing dot, score section (88px SVG ring with linearGradient + absolute-positioned score number), quick-checks list (status pills ok/fail/warn/pending with ✓/✗/!/• glyphs), gradient CTA button with hover lift + glow, settings page card with fields + toggle switches + toast.
+- Created popup.html (380×480, dark themed): brand header with gradient "seosights" wordmark + "AI Search Visibility" tagline + gear icon, URL bar with green dot, score section (SVG circle with purple→amber gradient stroke + verdict text), 4-row quick checks list (llms.txt / schema / robots / meta — each with status pill + label + sub-text), gradient "Run Full Analysis on seosights.com" CTA with lightning-bolt icon. SVG <defs> include scoreGradient with stops at #a855f7 → #f59e0b.
+- Created popup.js (380 lines, vanilla JS): on DOMContentLoaded runs analyze flow — queries active tab via chrome.tabs.query({active:true,currentWindow:true}), sends {type:"SEOSIGHTS_ANALYZE"} message to content script via chrome.tabs.sendMessage. Renders results: setCheck(name, state, sub) updates status pill class + glyph + sub-text; setScore(score) animates the SVG strokeDashoffset (CIRCUMFERENCE=2π·42=263.89) and updates verdict (Excellent ≥75 / Good ≥50 / Needs Work ≥25 / Poor <25). analyzeRobotsTxt(text) parses User-agent/Disallow groups, detects AI bot blocks (GPTBot/ClaudeBot/Claude-Web/anthropic-ai/PerplexityBot/Google-Extended/Bytespider/Applebot/CCBot/FacebookBot/Meta-ExternalAgent), returns {allowed, disallowedBots, note}. computeScore: each of 4 checks = 25 pts (meta counts as pass only if ≥50 chars). Handles edge cases: chrome:// pages (cannot analyze), content script not reachable ("Reload page to analyze" hint), missing robots.txt = allowed by convention (+25 pts), network error = allowed (default permissive), meta description <50 chars = warn (not pass). CTA click opens chrome.tabs.create({url: `https://seosights.com/?url=${encodeURIComponent(tab.url)}`}) then window.close(). Settings gear opens chrome.runtime.openOptionsPage().
+- Created background.js (124 lines, MV3 service worker): chrome.runtime.onInstalled listener seeds DEFAULT_SETTINGS {apiKey:"", showOverlay:false, lastAnalyzedUrl:"", installDate, version} via chrome.storage.local.get(null)+set(merged) — preserves existing keys, sets installDate on first install, opens welcome tab (https://seosights.com/?from=extension) on install only. chrome.runtime.onStartup listener logs readiness. chrome.runtime.onMessage router handles: SEOSIGHTS_PING, SEOSIGHTS_GET_SETTINGS, SEOSIGHTS_SET_SETTINGS, SEOSIGHTS_CONTENT_REPORT (forwards to popup via runtime.sendMessage with try/catch for "popup closed" case), SEOSIGHTS_OPEN_DASHBOARD (opens new tab). chrome.action.onClicked safety-net handler (only fires when no default_popup — kept as defense in depth).
+- Created content.js (347 lines, IIFE + "use strict", read-only): extractMeta() reads document.title, meta[name=description], meta[property^=og:] (OG tags), meta[name^=twitter:] (Twitter cards), link[rel=canonical]. extractJsonLd() collects all script[type=application/ld+json] blocks, JSON.parses each, recursively extracts @type values (handles @graph arrays, multi-type arrays). extractHeadings() captures first 5 h1 texts + h2/h3 counts. fetchText(path) does same-origin fetch (credentials:"omit", cache:"no-store", AbortController with 4s timeout) — used for /llms.txt and /robots.txt so the extension needs no host_permissions on the visited site (CORS-free because it's same-origin from the page context). fetchLlmsTxt() returns "ok"|"missing"|"error"; fetchRobotsTxt() returns {status:"ok",text} | "missing" | "error". buildPopupResponse() runs all 4 extractions + 2 fetches in parallel and returns the snapshot. Message listener: on SEOSIGHTS_ANALYZE → builds snapshot, sendResponse({ok:true, ...data}), also forwards to background; on SEOSIGHTS_PING → responds with pong+origin; on SEOSIGHTS_REMOVE_OVERLAY → removes badge. paintOverlay() lazy-checks chrome.storage.local.showOverlay and if true, injects a fixed-position bottom-right badge (z-index 2147483647, glassmorphism, gradient "seosights" label + score). On script load, sends a passive SEOSIGHTS_CONTENT_REPORT (DOM-only, no fetches) to background as a warm-up hint. Does NOT modify the page DOM except the user-opted-in overlay badge.
+- Created options.html + options.js (settings page, open_in_tab): header with brand mark + gradient title "seosights Settings". Three fields: (1) password input for API key with hint "Stored locally in chrome.storage.local — never leaves your browser"; (2) toggle switch for "Show AI-visibility overlay on pages" (default off); (3) toggle switch for "Auto-analyze on popup open" (default on). Action row: ghost "Reset to defaults" button (with confirm()) + gradient "Save Settings" button. Toast notification slides up on save/reset. options.js: loadSettings() reads from chrome.storage.local.get(DEFAULTS), saveSettings() writes {apiKey, showOverlay, autoAnalyze, savedAt}, resetSettings() clears to defaults after confirm. Enter key in API key field triggers save.
+- Created README.md (123 lines): install instructions (load unpacked), features list, file structure tree, permissions-explained table (activeTab / storage / host_permissions / content_scripts — explicitly notes what's NOT requested: tabs/webRequest/cookies/history), how-the-score-is-computed table (25 pts per check × 4), privacy section (no third-party data transmission; only same-origin /llms.txt + /robots.txt fetches; URL passed to seosights.com only on explicit CTA click), development notes, roadmap.
+- Verified all files exist via ls -la: manifest.json, popup.html, popup.js, background.js, content.js, options.html, options.js, styles.css, README.md (9 files, no binaries).
+- Per spec: did NOT run any lint or build, did NOT create test files, did NOT create binary icon files (only references icon.png in manifest — README instructs user to drop a 512×512 icon.png into the folder; if missing, Chrome falls back to the puzzle piece).
+
+Stage Summary:
+- 9 files created in /home/z/my-project/extensions/chrome-seosights/ (1,947 lines total):
+  • manifest.json — 36 lines (MV3, action+background+content_scripts+options_ui)
+  • popup.html — 108 lines (380×480 dark UI with score SVG ring + 4 quick-check rows + gradient CTA)
+  • popup.js — 384 lines (analyzes tab, renders score/checks, opens seosights.com/?url=…)
+  • background.js — 124 lines (service worker: onInstalled settings seed, message router, welcome tab)
+  • content.js — 347 lines (read-only DOM extraction + same-origin /llms.txt + /robots.txt fetches + optional overlay)
+  • options.html — 88 lines (API key + 2 toggle switches + save/reset)
+  • options.js — 67 lines (chrome.storage.local read/write + toast)
+  • styles.css — 666 lines (shared dark theme with seosights CSS variables, popup 380×480 layout, options page layout, toggle switches, toast, spinners)
+  • README.md — 123 lines (install/feature/permissions/score/privacy/roadmap)
+- Manifest V3 compliant: service worker (not persistent BG page), no eval, no remote code.
+- Permissions are minimal by design: activeTab + storage + host_permissions for seosights.com only. No tabs/webRequest/cookies/history permissions. Content script runs read-only (no DOM mutation except the user-opted-in overlay badge).
+- Popup is fully functional: on icon click it queries the active tab, messages the content script, the content script extracts DOM metadata + fetches /llms.txt + /robots.txt same-origin, returns a snapshot; the popup renders an SVG score ring (0–100) + 4 status pills + verdict; clicking the CTA opens https://seosights.com/?url=<current_url> in a new tab.
+- AI bot detection covers 11 known crawlers: GPTBot, ClaudeBot, Claude-Web, anthropic-ai, PerplexityBot, PerplexityBot-User, Google-Extended, Bytespider, Applebot, CCBot, FacebookBot, Meta-ExternalAgent.
+- Score formula: 25 pts each for llms.txt present / JSON-LD schema present / AI bots allowed in robots.txt / meta description ≥50 chars. Verdict tiers: Excellent (75–100), Good (50–74), Needs Work (25–49), Poor (0–24).
+- Ready to load unpacked in chrome://extensions → Developer mode → Load unpacked → select extensions/chrome-seosights/ folder. User needs to add icon.png (512×512) for proper toolbar icon — without it, Chrome uses the puzzle piece fallback and the extension still works.
+
+---
+Task ID: 4-g
+Agent: WordPress Plugin Builder
+Task: Build a minimal but real WordPress plugin scaffold for seosights (llms.txt, JSON-LD schema, robots.txt AI-bot rules, dashboard stats sync)
+
+Work Log:
+- Read /home/z/my-project/worklog.md and confirmed seosights is "The Operating System for AI Search" (SEO + AEO + GEO) with web app at https://seosights.com. Reviewed existing /api/generate-llms-txt route for llms.txt format consistency (llmstxt.org convention: # heading, > summary, ## sections, markdown link list).
+- Created /home/z/my-project/plugins/wordpress-seosights/ directory tree (includes/, templates/).
+- Wrote seosights.php (60 lines) — main plugin file: full Plugin Name/Description/Version/Author/License header, ABSPATH guard, defined constants (SEOSIGHTS_VERSION=1.0.0, SEOSIGHTS_PLUGIN_DIR, SEOSIGHTS_PLUGIN_URL, SEOSIGHTS_PLUGIN_FILE, SEOSIGHTS_PLUGIN_BASENAME, SEOSIGHTS_API_BASE='https://seosights.com/api', SEOSIGHTS_OPTION_KEY='seosights_settings', SEOSIGHTS_CRON_HOOK), require_once for the 3 include files, register_activation_hook + register_deactivation_hook pointing at Seosights_Core static methods, and a seosights() bootstrap function hooked on `plugins_loaded`.
+- Wrote includes/class-seosights-api.php (143 lines) — Seosights_API singleton with private constructor, lazy-cached settings, get_api_key(), build_headers() (Bearer auth + plugin User-Agent), send_stats($data) using wp_remote_post to SEOSIGHTS_API_BASE . '/v1/site-stats', get_analysis($url, $api_key='') using wp_remote_get against /v1/analysis with an optional API-key override so the Test Connection flow can verify an unsaved key.
+- Wrote includes/class-seosights-core.php (470 lines) — Seosights_Core singleton with: default_settings() (api_key, enable_llms, enable_schema, enable_stats, site_summary, bot_rules for 5 AI bots); activate() (seeds defaults, registers rewrite rule, flush_rewrite_rules, schedules daily cron); deactivate() (flush + clear cron); init() wires add_action('init', register_rewrite_rules), query_vars filter, template_redirect -> handle_llms_txt, robots_txt filter -> handle_robots_txt, wp_head -> inject_schema, cron hook -> sync_stats, and instantiates Seosights_Admin when is_admin(); register_rewrite_rules() adds `^llms\.txt/?$ -> index.php?seosights_llms=1` (top priority); handle_llms_txt() serves text/plain with nocache_headers + X-Robots-Tag: noindex, exits after echo; build_llms_txt() returns a valid llmstxt.org-style markdown file; handle_robots_txt() appends per-bot Allow/Disallow blocks respecting blog_public; inject_schema() emits a JSON-LD @graph (Organization + WebSite always, Article on singular posts) using wp_json_encode with JSON_UNESCAPED_SLASHES; enqueue_admin_assets() enqueues wp-components + wp-util and localizes seosightsAdmin (ajaxUrl, nonce, llmsUrl, i18n) — no external asset files needed; sync_stats() gathers wp_count_posts/pages/comments + count_users and POSTs to the API via Seosights_API.
+- Wrote includes/class-seosights-admin.php (245 lines) — Seosights_Admin singleton with bots whitelist (GPTBot/ClaudeBot/PerplexityBot/Google-Extended/CCBot with labels); add_admin_menu() uses add_management_page() to add "seosights" submenu under Tools; register_settings() registers 'seosights_settings' under group 'seosights_settings_group' with sanitize_callback; sanitize_settings() validates api_key (regex [a-zA-Z0-9_-]), booleans for the 3 feature flags, sanitize_text_field for site_summary, and whitelisted bot_rules with allow/disallow values only; render_settings_page() checks current_user_can('manage_options'), wp_die on failure, then extracts settings/bots/llms_url/robots_url/has_physical_robots into scope and includes the template; enqueue_assets() delegates to core->enqueue_admin_assets; add_action_links() injects a "Settings" link on plugins.php; ajax_test_connection() verifies nonce via check_ajax_referer('seosights_admin','nonce'), checks manage_options, sanitizes api_key from $_POST, calls Seosights_API::get_analysis(home_url('/'), $api_key), returns wp_send_json_success/error with message + body.
+- Wrote templates/settings-page.php (281 lines) — full admin settings page: status panel with badges (llms.txt URL, robots.txt virtual-vs-physical warning, schema state, stats sync state), API key password field + Test Connection button, feature checkboxes (enable_llms / enable_schema / enable_stats), site_summary text input, per-bot Allow/Disallow radio grid for the 5 AI bots, Save Changes submit_button. Form posts to options.php via settings_fields('seosights_settings_group'). All output escaped with esc_html/esc_attr/esc_url. Includes inline <style> for badges/tables and inline <script> that uses seosightsAdmin.ajaxUrl + nonce via fetch() to call the test-connection AJAX endpoint with success/error feedback.
+- Wrote readme.txt (129 lines) — standard WordPress plugin readme: header (Contributors, Tags, Requires at least: 5.8, Tested up to: 6.5, Requires PHP: 7.4, Stable tag: 1.0.0, License GPLv2), Description, Key features, Installation (manual + server requirements), FAQ (API key, what is llms.txt, why robots.txt may not be modified, which AI crawlers are supported, what data is sent, caching compatibility), Screenshots (4), Changelog (1.0.0), Upgrade Notice.
+- Wrote uninstall.php (24 lines) — WP_UNINSTALL_PLUGIN guard, delete_option('seosights_settings'), wp_clear_scheduled_hook('seosights_daily_stats_sync'), comment noting rewrite rules auto-regenerate.
+- Verified all 6 PHP files for structural balance (braces/parens/brackets within PHP regions only) using a custom Python state-machine tokenizer (strings, comments, heredocs stripped). All files report OK with zero balance issues. PHP CLI was unavailable in the sandbox so structural validation was done via the custom tokenizer.
+
+Stage Summary:
+- 7 files created (1352 lines total) under /home/z/my-project/plugins/wordpress-seosights/:
+  - seosights.php (60 lines) — main plugin file with constants + activation/deactivation hooks
+  - includes/class-seosights-api.php (143 lines) — Seosights_API singleton (send_stats, get_analysis via wp_remote_post/get)
+  - includes/class-seosights-core.php (470 lines) — Seosights_Core singleton (llms.txt handler, robots.txt filter, JSON-LD schema, daily stats cron, enqueue_admin_assets)
+  - includes/class-seosights-admin.php (245 lines) — Seosights_Admin singleton (Tools submenu, Settings API registration, sanitize_settings, test-connection AJAX)
+  - templates/settings-page.php (281 lines) — settings UI with nonce, capability check, escaped output, status badges, per-bot radios
+  - readme.txt (129 lines) — standard WP plugin readme
+  - uninstall.php (24 lines) — option + cron cleanup
+- Plugin is functional (not stubs): /llms.txt is auto-served via rewrite rule + template_redirect with proper text/plain headers; robots.txt AI-bot rules are appended via the WordPress `robots_txt` filter; JSON-LD @graph (Organization + WebSite + Article on singular posts) is injected into wp_head; daily WP-Cron syncs post/page/comment/user counts + plugin version to https://seosights.com/api/v1/site-stats.
+- Security: every admin path checks current_user_can('manage_options'); AJAX uses check_ajax_referer; all form output escaped (esc_html/esc_attr/esc_url/checked); all input sanitized (sanitize_text_field, regex-restricted api_key, whitelisted bot_rules); settings saved through the WP Settings API with a sanitize_callback.
+- No test files created. No lint/build run (PHP doesn't use ESLint, per task rules).

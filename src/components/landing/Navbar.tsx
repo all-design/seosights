@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Menu, X } from 'lucide-react'
@@ -9,7 +10,7 @@ const navLinks = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'How It Works', href: '#how-it-works' },
-  { label: 'Affiliates', href: '#affiliate' },
+  { label: 'Affiliates', href: '/affiliates', external: true },
   { label: 'Get Started', href: '#cta' },
 ]
 
@@ -72,15 +73,25 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-1">
-              {navLinks.map((link) => (
-                <button
-                  key={link.label}
-                  onClick={() => scrollToSection(link.href)}
-                  className="px-4 py-2.5 min-h-[44px] inline-flex items-center text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
-                >
-                  {link.label}
-                </button>
-              ))}
+              {navLinks.map((link) =>
+                link.external ? (
+                  <Link
+                    key={link.label}
+                    href={link.href}
+                    className="px-4 py-2.5 min-h-[44px] inline-flex items-center text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <button
+                    key={link.label}
+                    onClick={() => scrollToSection(link.href)}
+                    className="px-4 py-2.5 min-h-[44px] inline-flex items-center text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                  >
+                    {link.label}
+                  </button>
+                )
+              )}
             </div>
 
             {/* Desktop CTA */}
@@ -132,15 +143,26 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
               transition={{ duration: 0.2 }}
             >
               <div className="px-4 py-4 space-y-1">
-                {navLinks.map((link) => (
-                  <button
-                    key={link.label}
-                    onClick={() => scrollToSection(link.href)}
-                    className="block w-full text-left px-4 py-3.5 min-h-[48px] text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
-                  >
-                    {link.label}
-                  </button>
-                ))}
+                {navLinks.map((link) =>
+                  link.external ? (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      className="block w-full text-left px-4 py-3.5 min-h-[48px] text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <button
+                      key={link.label}
+                      onClick={() => scrollToSection(link.href)}
+                      className="block w-full text-left px-4 py-3.5 min-h-[48px] text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                    >
+                      {link.label}
+                    </button>
+                  )
+                )}
                 <div className="pt-2">
                   <Button
                     onClick={onStartFree}

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>seosights — Settings</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="options">
+  <div class="options-shell">
+
+    <header class="options-header">
+      <div class="brand-mark">S</div>
+      <h1>seosights Settings</h1>
+      <p>Configure your AI Search Visibility Checker extension.</p>
+    </header>
+
+    <div class="options-card">
+
+      <!-- API key -->
+      <div class="field">
+        <label class="field-label" for="api-key">seosights API Key</label>
+        <input id="api-key" type="password" placeholder="sk-ss-..." autocomplete="off" spellcheck="false" />
+        <span class="field-hint">
+          Paste your seosights API key to enable authenticated full analyses.
+          Stored locally in <code>chrome.storage.local</code> — never leaves your browser.
+        </span>
+      </div>
+
+      <!-- Overlay toggle -->
+      <div class="toggle-row">
+        <div class="meta">
+          <div class="meta-title">Show AI-visibility overlay on pages</div>
+          <div class="meta-hint">
+            Displays a small score badge in the corner of every page you visit.
+            Off by default.
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="show-overlay" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Auto-open toggle -->
+      <div class="toggle-row">
+        <div class="meta">
+          <div class="meta-title">Auto-analyze on popup open</div>
+          <div class="meta-hint">
+            Run quick checks immediately when you click the extension icon.
+            Disable to load the popup instantly and run checks manually.
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="auto-analyze" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Actions -->
+      <div class="options-actions">
+        <button id="reset-btn" class="btn-ghost" type="button">Reset to defaults</button>
+        <button id="save-btn" class="cta" type="button" style="padding: 9px 18px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Save Settings
+        </button>
+      </div>
+
+    </div>
+
+    <div class="options-footer">
+      <p>
+        seosights — The Operating System for AI Search (SEO + AEO + GEO).<br />
+        <a href="https://seosights.com" target="_blank" rel="noreferrer">seosights.com</a>
+      </p>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast">Saved</div>
+
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>seosights — AI Search Visibility</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="popup">
+  <div class="popup-shell">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div class="brand-text">
+          <span class="brand-name">seosights</span>
+          <span class="brand-tagline">AI Search Visibility</span>
+        </div>
+      </div>
+      <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- URL bar -->
+    <div class="url-bar">
+      <span class="dot" id="url-dot"></span>
+      <span class="url" id="current-url">Loading…</span>
+    </div>
+
+    <!-- Score circle -->
+    <section class="score-section">
+      <div style="position: relative; width: 88px; height: 88px; flex-shrink: 0;">
+        <svg class="score-svg" viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a855f7"/>
+              <stop offset="100%" stop-color="#f59e0b"/>
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="50" cy="50" r="42"/>
+          <circle class="progress" id="score-progress" cx="50" cy="50" r="42"
+                  stroke-dasharray="263.89" stroke-dashoffset="263.89"
+                  transform="rotate(-90 50 50)"/>
+        </svg>
+        <div class="score-text">
+          <div style="text-align: center;">
+            <div class="score-number" id="score-number">—</div>
+            <div class="score-unit">/ 100</div>
+          </div>
+        </div>
+      </div>
+      <div class="score-meta">
+        <div class="score-label">AI Visibility Score</div>
+        <div class="score-verdict" id="score-verdict">Analyzing…</div>
+        <div class="score-hint" id="score-hint">SEO + AEO + GEO combined</div>
+      </div>
+    </section>
+
+    <!-- Quick checks -->
+    <div class="checks">
+      <div class="checks-header">
+        <span>Quick Checks</span>
+        <span id="checks-count">0 / 4</span>
+      </div>
+
+      <div class="check" data-check="llms">
+        <span class="status pending" id="status-llms">•</span>
+        <span class="label">llms.txt present?</span>
+        <span class="sub" id="sub-llms">checking…</span>
+      </div>
+
+      <div class="check" data-check="schema">
+        <span class="status pending" id="status-schema">•</span>
+        <span class="label">Schema markup detected?</span>
+        <span class="sub" id="sub-schema">checking…</span>
+      </div>
+
+      <div class="check" data-check="robots">
+        <span class="status pending" id="status-robots">•</span>
+        <span class="label">AI bots allowed in robots.txt?</span>
+        <span class="sub" id="sub-robots">checking…</span>
+      </div>
+
+      <div class="check" data-check="meta">
+        <span class="status pending" id="status-meta">•</span>
+        <span class="label">Meta description present?</span>
+        <span class="sub" id="sub-meta">checking…</span>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button id="run-analysis" class="cta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      Run Full Analysis on seosights.com
+    </button>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

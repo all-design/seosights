@@ -62,6 +62,7 @@ import {
 import PendingApprovalsPanel from '@/components/dashboard/PendingApprovalsPanel'
 import GSCPanel from '@/components/dashboard/GSCPanel'
 import AlertsPanel from '@/components/dashboard/AlertsPanel'
+import AdvancedAITools from '@/components/dashboard/AdvancedAITools'
 
 const container = {
   hidden: { opacity: 0 },
@@ -3221,6 +3222,9 @@ export default function AnalysisDashboard({ onStartFree, onOpenWebhooks, onOpenA
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* ── Advanced AI Tools (Phase 4 suite) ─────────────── */}
+          <AdvancedAITools url={data?.url || undefined} />
 
           {/* ── Bottom CTA ────────────────────────────────── */}
           <motion.div variants={item}>

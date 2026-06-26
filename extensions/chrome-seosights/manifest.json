@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "seosights — AI Search Visibility Checker",
+  "version": "1.0.0",
+  "description": "Check any website's AI search visibility (SEO + AEO + GEO) in one click.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://seosights.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "seosights — AI Search Visibility Checker",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}
