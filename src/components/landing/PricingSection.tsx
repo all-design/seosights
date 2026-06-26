@@ -24,7 +24,8 @@ import {
   Code,
   UserCheck,
   MessageSquare,
-  Settings,
+  Crown,
+  Rocket,
 } from 'lucide-react'
 
 interface PricingSectionProps {
@@ -38,11 +39,11 @@ const plans = [
   {
     name: 'Starter',
     subtitle: 'For website owners & bloggers',
-    price: '$5',
+    price: '$19',
     period: '/month',
-    freeTrial: '1 month free trial',
+    freeTrial: '14-day free trial',
     description:
-      'Ideal for website owners, bloggers, and small businesses who want insight into their AI and SEO visibility.',
+      'For website owners, bloggers, and small businesses who want insight into their AI and SEO visibility.',
     features: [
       {
         icon: Search,
@@ -83,17 +84,68 @@ const plans = [
     glowColor: 'hover:shadow-[0_0_30px_rgba(16,185,129,0.15)]',
   },
   {
-    name: 'Pro Agency',
-    subtitle: 'White-Label for agencies',
+    name: 'Pro',
+    subtitle: 'For growing teams & freelancers',
     price: '$79',
     period: '/month',
-    freeTrial: null,
+    freeTrial: '14-day free trial',
     description:
-      'For SEO agencies and marketing teams generating reports for their clients. Save $5,000/month vs hiring.',
+      'For SEO freelancers and growing marketing teams who need the full Three Sights engine. Most popular.',
     features: [
       {
         icon: Check,
         title: 'Everything in Starter, plus:',
+        description: '',
+      },
+      {
+        icon: Brain,
+        title: 'Entity & Brand Mentions',
+        description:
+          'Advanced analytics tracking how often AI models mention your brand or entity.',
+      },
+      {
+        icon: Bot,
+        title: 'Full AI Crawler Radar',
+        description:
+          'Real-time monitoring of GPTBot, ClaudeBot, PerplexityBot, and 14+ AI crawlers.',
+      },
+      {
+        icon: Download,
+        title: 'llms.txt Generator + Schema Tools',
+        description: 'One-click generate llms.txt, FAQ schema, and structured data.',
+      },
+      {
+        icon: BarChart3,
+        title: '5 Domains / Projects',
+        description: 'Track up to 5 domains simultaneously.',
+      },
+      {
+        icon: Mail,
+        title: 'AI Visibility Alerts',
+        description: 'Email alerts when AI citations drop or crawlers get blocked.',
+      },
+    ],
+    cta: 'Start Pro Trial',
+    planKey: 'pro' as const,
+    ctaAction: 'pro' as const,
+    highlighted: true,
+    borderColor: 'border-amber-500/40',
+    iconColor: 'text-amber-400',
+    iconBg: 'bg-amber-500/20',
+    glowColor: 'hover:shadow-[0_0_40px_rgba(245,158,11,0.15)]',
+  },
+  {
+    name: 'Agency',
+    subtitle: 'White-label for agencies',
+    price: '$199',
+    period: '/month',
+    freeTrial: '14-day free trial',
+    description:
+      'For SEO agencies generating reports for clients. Save $5,000/month vs hiring. Full white-label.',
+    features: [
+      {
+        icon: Check,
+        title: 'Everything in Pro, plus:',
         description: '',
       },
       {
@@ -108,12 +160,6 @@ const plans = [
         description: 'Track up to 20 domains/clients simultaneously.',
       },
       {
-        icon: Brain,
-        title: 'Entity & Brand Mentions',
-        description:
-          'Advanced analytics tracking how often AI models mention your brand or entity.',
-      },
-      {
         icon: Download,
         title: 'Unlimited PDF & CSV Export',
         description: 'Unlimited report exports for fast client delivery.',
@@ -124,28 +170,33 @@ const plans = [
         description:
           'Quick-scan potential client websites for cold email campaign creation.',
       },
+      {
+        icon: Code,
+        title: 'Custom Agent Prompts',
+        description: 'Tailor AI agents with custom prompts for your niche.',
+      },
     ],
-    cta: 'Start Pro Agency',
-    planKey: 'pro' as const,
-    ctaAction: 'pro' as const,
-    highlighted: true,
-    borderColor: 'border-amber-500/40',
-    iconColor: 'text-amber-400',
-    iconBg: 'bg-amber-500/20',
-    glowColor: 'hover:shadow-[0_0_40px_rgba(245,158,11,0.15)]',
+    cta: 'Start Agency Trial',
+    planKey: 'managed' as const,
+    ctaAction: 'managed' as const,
+    highlighted: false,
+    borderColor: 'border-purple-500/40',
+    iconColor: 'text-purple-400',
+    iconBg: 'bg-purple-500/20',
+    glowColor: 'hover:shadow-[0_0_30px_rgba(168,85,247,0.15)]',
   },
   {
-    name: 'Managed',
-    subtitle: 'Done-For-You service',
+    name: 'Enterprise',
+    subtitle: 'Done-for-you & custom',
     price: 'Custom',
     period: '',
     freeTrial: null,
     description:
-      'Complete dominance in your niche. Our team + 8 AI agents handle everything while you focus on your business. Pricing tailored to your needs.',
+      'Complete dominance in your niche. Our team + 8 AI agents handle everything while you focus on your business. Tailored to your needs.',
     features: [
       {
         icon: Check,
-        title: 'Everything in Pro, plus:',
+        title: 'Everything in Agency, plus:',
         description: '',
       },
       {
@@ -155,33 +206,29 @@ const plans = [
           'Regular strategic consultations and transparent campaign progress reporting.',
       },
       {
-        icon: Code,
-        title: 'Custom Agent Prompts',
-        description:
-          'Tailor AI agents with custom prompts for your specific niche and strategy.',
+        icon: Rocket,
+        title: 'Priority Queue & SLA',
+        description: 'Your analyses run first. Dedicated support with SLA.',
       },
       {
         icon: Link2,
-        title: 'Priority Queue',
-        description:
-          'Your analyses run first, ahead of all other users in the queue.',
+        title: 'Unlimited Domains',
+        description: 'No cap on domains or clients.',
       },
       {
         icon: UserCheck,
-        title: 'White-Label Reports',
-        description:
-          'Fully branded reports with your logo, colors, and custom domain for client delivery.',
+        title: 'Custom Domain White-Label',
+        description: 'Fully branded portal on your own domain.',
       },
       {
         icon: MessageSquare,
         title: 'Content Humanization',
-        description:
-          'Content tailored for AI engines (AEO) while maintaining natural tone that converts.',
+        description: 'Content tailored for AI engines while maintaining natural tone.',
       },
     ],
-    cta: 'Contact Us',
+    cta: 'Contact Sales',
     planKey: 'managed' as const,
-    ctaAction: 'managed' as const,
+    ctaAction: 'contact' as const,
     highlighted: false,
     borderColor: 'border-cyan-500/30',
     iconColor: 'text-cyan-400',
@@ -212,26 +259,28 @@ export default function PricingSection({ onStartFree, onAgencyRegister, onTierSe
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-6"
           >
             <Star className="w-3.5 h-3.5" />
-            One Tool. Three Sights. Zero Agency Fees.
+            One Platform. Three Sights. Zero Agency Fees.
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Save <span className="text-amber-400">$5,000/month</span> vs
-            Agencies. See All Three Sights.
+            Pricing that scales{' '}
+            <span className="bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400 bg-clip-text text-transparent">
+              with your ambition
+            </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            No contracts. Cancel anytime. Start free, scale as you grow — from
-            solo founders to full-service agencies. All Three Sights included.
+            14-day free trial. No credit card required. No contracts — cancel
+            anytime. All Three Sights included on every plan.
           </p>
         </motion.div>
 
-        {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+        {/* Pricing Cards — 4 tiers */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-5 max-w-7xl mx-auto">
           {plans.map((plan, i) => (
             <motion.div
               key={plan.name}
               initial={{ opacity: 0, y: 40 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: 0.15 * i }}
+              transition={{ duration: 0.5, delay: 0.12 * i }}
             >
               <PricingCard
                 name={plan.name}
@@ -259,14 +308,21 @@ export default function PricingSection({ onStartFree, onAgencyRegister, onTierSe
 
         {/* Bottom note */}
         <motion.div
-          className="text-center mt-12"
+          className="text-center mt-12 space-y-2"
           initial={{ opacity: 0 }}
           animate={isInView ? { opacity: 1 } : {}}
           transition={{ duration: 0.5, delay: 0.8 }}
         >
           <p className="text-muted-foreground text-sm">
             All plans include full SEO · AEO · GEO analysis. No credit card
-            required for free trial. No contracts — cancel anytime.
+            required for trial. No contracts — cancel anytime.
+          </p>
+          <p className="text-muted-foreground/60 text-xs flex items-center justify-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1"><Check className="w-3 h-3 text-emerald-400" /> 14-day free trial</span>
+            <span className="text-muted-foreground/30">·</span>
+            <span className="inline-flex items-center gap-1"><Shield className="w-3 h-3 text-emerald-400" /> No credit card</span>
+            <span className="text-muted-foreground/30">·</span>
+            <span className="inline-flex items-center gap-1"><Crown className="w-3 h-3 text-amber-400" /> Cancel anytime</span>
           </p>
         </motion.div>
       </div>

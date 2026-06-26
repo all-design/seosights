@@ -3,9 +3,15 @@
 import { useState, useEffect, useRef } from 'react'
 import Navbar from '@/components/landing/Navbar'
 import HeroSection from '@/components/landing/HeroSection'
-import StatsSection from '@/components/landing/StatsSection'
+import SocialProofSection from '@/components/landing/SocialProofSection'
+import DashboardPreview from '@/components/landing/DashboardPreview'
 import FeaturesSection from '@/components/landing/FeaturesSection'
+import AIVisibilityTimeline from '@/components/landing/AIVisibilityTimeline'
+import RoadmapChecklist from '@/components/landing/RoadmapChecklist'
 import HowItWorksSection from '@/components/landing/HowItWorksSection'
+import ComparisonSection from '@/components/landing/ComparisonSection'
+import FreeToolsSection from '@/components/landing/FreeToolsSection'
+import IntegrationsSection from '@/components/landing/IntegrationsSection'
 import PricingSection from '@/components/landing/PricingSection'
 import CTASection from '@/components/landing/CTASection'
 import AffiliateLandingSection from '@/components/landing/AffiliateLandingSection'
@@ -153,15 +159,21 @@ export default function Home() {
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Navbar onStartFree={() => setIsModalOpen(true)} />
       <HeroSection onStartFree={() => openRegistration('starter')} />
-      <StatsSection />
+      <SocialProofSection />
+      <DashboardPreview onStartFree={() => openRegistration('starter')} />
       <FeaturesSection />
+      <AIVisibilityTimeline />
+      <RoadmapChecklist />
       <HowItWorksSection />
+      <ComparisonSection onStartFree={() => openRegistration('starter')} />
+      <FreeToolsSection onStartFree={() => setIsModalOpen(true)} />
+      <IntegrationsSection />
       <PricingSection
         onStartFree={() => openRegistration('starter')}
         onTierSelect={openRegistration}
       />
-      <AffiliateLandingSection onBecomeReseller={() => setIsAffiliateOpen(true)} />
       <CTASection onStartFree={() => openRegistration('starter')} />
+      <AffiliateLandingSection onBecomeReseller={() => setIsAffiliateOpen(true)} />
       <Footer />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} defaultTab={loginDefaultTab} />

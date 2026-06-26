@@ -4,7 +4,23 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowRight, Globe, AlertTriangle, CheckCircle2, XCircle, Loader2, Sparkles, TrendingUp, BarChart3, Brain, Link2, Lock } from 'lucide-react'
+import {
+  ArrowRight,
+  Globe,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Sparkles,
+  TrendingUp,
+  BarChart3,
+  Brain,
+  Link2,
+  Lock,
+  Zap,
+  Eye,
+  EyeOff,
+} from 'lucide-react'
 
 interface HeroSectionProps {
   onStartFree?: () => void
@@ -101,49 +117,61 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
   }
 
   return (
-    <section className="relative bg-background text-white py-24 px-6 overflow-hidden">
+    <section className="relative bg-background text-white pt-32 pb-20 px-6 overflow-hidden">
       {/* Background AI effect — Blurred orbs */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full pointer-events-none opacity-20">
         <div className="absolute top-12 left-10 w-72 h-72 bg-purple-600 rounded-full blur-[120px]" />
         <div className="absolute bottom-12 right-10 w-96 h-96 bg-indigo-600 rounded-full blur-[150px]" />
+        <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-blue-600 rounded-full blur-[100px]" />
       </div>
 
-      <div className="relative max-w-4xl mx-auto text-center space-y-8">
-        {/* Top badge */}
+      <div className="relative max-w-5xl mx-auto text-center space-y-7">
+        {/* Top badge — positioning statement */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs font-medium text-purple-400">
-            <span>⚡ Not a Wrapper. A Purpose-Built SEO Engine.</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-medium text-purple-400">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>The Operating System for AI Search</span>
           </div>
         </motion.div>
 
-        {/* Main Heading */}
+        {/* Main Heading — problem-first, aggressive */}
         <motion.h1
-          className="text-5xl md:text-6xl font-black tracking-tight leading-none"
+          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05]"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          Get Customers from&nbsp;
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400">
-            Google &amp; AI
+          Your website is{' '}
+          <span className="inline-flex items-center gap-2">
+            <span className="bg-gradient-to-r from-rose-400 via-red-400 to-orange-400 bg-clip-text text-transparent">
+              invisible
+            </span>
           </span>
+          <br className="hidden sm:block" />
+          to{' '}
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400">
+            ChatGPT
+          </span>
+          .
         </motion.h1>
 
-        {/* Subheadline */}
+        {/* Subheadline — benefit, not features */}
         <motion.p
           className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto font-normal"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          8 AI agents audit, strategize, and auto-execute your SEO, AEO, and GEO — all while you sleep.
+          Stop optimizing only for Google. Rank in{' '}
+          <span className="text-foreground font-semibold">Google, ChatGPT, Claude &amp; Perplexity</span> —
+          with one platform that shows you why you&apos;re invisible, and fixes it automatically.
         </motion.p>
 
-        {/* URL Scan Form */}
+        {/* URL Scan Form — the "Try Demo" the user asked for */}
         <motion.div
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
@@ -153,8 +181,8 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
             action="/api/quick-audit"
             method="POST"
             onSubmit={(e) => { e.preventDefault(); handleQuickScan() }}
-            aria-label="Quick website SEO scan"
-            className="max-w-2xl mx-auto mt-10 p-2 bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur flex flex-col md:flex-row gap-2"
+            aria-label="Quick website AI visibility scan"
+            className="max-w-2xl mx-auto mt-8 p-2 bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur flex flex-col md:flex-row gap-2"
           >
             <div className="flex-1 flex items-center gap-3 px-3">
               <Globe className="w-5 h-5 text-slate-500 shrink-0" />
@@ -179,7 +207,10 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                   Scanning...
                 </>
               ) : (
-                'Analyze All Three Sights'
+                <>
+                  <Zap className="mr-2 w-4 h-4" />
+                  Try Free Demo
+                </>
               )}
             </Button>
           </form>
@@ -193,26 +224,37 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
               {scanError}
             </motion.p>
           )}
+
+          {/* Demo promise line */}
+          <motion.p
+            className="text-xs text-muted-foreground/60 mt-3 flex items-center justify-center gap-1.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+          >
+            <Lock className="w-3 h-3" />
+            No signup required · 20-second scan · See SEO + AEO + GEO scores instantly
+          </motion.p>
         </motion.div>
 
-        {/* Three Sights Indicators */}
+        {/* Three Sights Indicators — kept but slimmer */}
         <motion.div
-          className="flex flex-wrap justify-center items-center gap-6 pt-6 text-sm text-slate-400 font-medium"
+          className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 pt-4 text-sm text-slate-400 font-medium"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-purple-500" />
-            1st Sight: Traditional SEO
+            SEO — Google
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-indigo-500" />
-            2nd Sight: AI Assistants
+            AEO — ChatGPT &amp; Claude
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500" />
-            3rd Sight: Generative Engines
+            GEO — Perplexity &amp; Gemini
           </div>
         </motion.div>
 
@@ -233,7 +275,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                   <p className="text-sm text-muted-foreground">{scanResult.domain}</p>
                 </div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-xs font-medium text-purple-400">
-                  Free Scan
+                  Free Scan Result
                 </div>
               </div>
 
@@ -242,6 +284,24 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                 <ScoreRing score={scanResult.scores.seo} label="SEO" color="#a855f7" />
                 <ScoreRing score={scanResult.scores.aeo} label="AEO" color="#818cf8" />
                 <ScoreRing score={scanResult.scores.geo} label="GEO" color="#60a5fa" />
+              </div>
+
+              {/* AI Visibility summary line */}
+              <div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 via-transparent to-blue-500/10 border border-purple-500/20 rounded-xl text-center">
+                <p className="text-sm text-muted-foreground">
+                  {scanResult.blockedBots.length > 0 ? (
+                    <>
+                      <EyeOff className="inline w-4 h-4 text-rose-400 mr-1 -mt-0.5" />
+                      <span className="text-rose-400 font-semibold">{scanResult.blockedBots.length} AI crawler{scanResult.blockedBots.length > 1 ? 's' : ''} blocked</span>
+                      {' '}— you&apos;re invisible to their users.
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="inline w-4 h-4 text-emerald-400 mr-1 -mt-0.5" />
+                      <span className="text-emerald-400 font-semibold">All AI crawlers can access your site</span>
+                    </>
+                  )}
+                </p>
               </div>
 
               {/* Blocked Bots */}
@@ -361,17 +421,17 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <Lock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Want the full 8-agent strategy?</span>
+                  <span className="text-sm text-muted-foreground">Want the full execution plan?</span>
                 </div>
                 <Button
                   onClick={onStartFree}
                   size="lg"
                   className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-base px-8 py-5 shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50 transition-all duration-300 w-full sm:w-auto"
                 >
-                  Start 1-Month Free Trial — Full Report
+                  Start 14-Day Free Trial — No Card
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-                <p className="text-xs text-muted-foreground/50 mt-3">8 AI agents · Full SEO/AEO/GEO strategy · llms.txt generator · No credit card</p>
+                <p className="text-xs text-muted-foreground/50 mt-3">Full strategy · llms.txt generator · 90-day roadmap · Cancel anytime</p>
               </div>
             </motion.div>
           )}

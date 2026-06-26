@@ -19,8 +19,8 @@ const steps = [
   {
     number: '02',
     icon: Search,
-    title: '8 Agents Analyze All Three Sights',
-    description: 'Master Director orchestrates 7 specialist agents — analyzing your First Sight (SEO), Second Sight (AEO), and Third Sight (GEO) in parallel.',
+    title: 'AI Engine Analyzes All Three Sights',
+    description: 'Our engine audits your First Sight (SEO), Second Sight (AEO), and Third Sight (GEO) in parallel — checking Google, ChatGPT, Claude, Perplexity, Gemini & Copilot visibility.',
     color: 'text-cyan-400',
     bg: 'bg-cyan-500/20',
     border: 'border-cyan-500/30',
@@ -76,7 +76,7 @@ export default function HowItWorksSection() {
             <span className="text-emerald-400">Works</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            One URL. Three Sights. One unified strategy — auto-executed by 8 AI agents.
+            One URL. Three Sights. One unified strategy — auto-executed while you sleep.
           </p>
         </motion.div>
 

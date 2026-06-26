@@ -84,11 +84,11 @@ const featureCategories = [
     iconBg: 'bg-amber-500/20',
     sightColor: 'text-amber-400',
     features: [
-      { title: 'AI Crawler Access Audit', description: 'GPTBot, ClaudeBot, PerplexityBot crawl verification — know who can see you' },
-      { title: 'AI Citation Tracking', description: 'Monitor how often ChatGPT, Claude, Perplexity cite your content' },
+      { title: 'Can ChatGPT Read Your Site?', description: 'GPTBot, ClaudeBot, PerplexityBot crawl verification — know exactly who can see you' },
+      { title: 'AI Citation Tracking', description: 'Monitor how often ChatGPT, Claude, Perplexity, Gemini & Copilot cite your content' },
       { title: 'llms.txt Generator', description: 'One-click generate llms.txt & llms-full.txt for instant LLM discoverability' },
-      { title: 'Brand Mention Signals', description: 'Track brand mentions across Wikipedia, Reddit, YouTube, LinkedIn' },
-      { title: 'Entity Recognition Score', description: 'Knowledge graph presence and entity authority measurement' },
+      { title: 'Reddit & Wikipedia Authority', description: 'Track brand mentions, citation velocity, and authority signals AI engines trust' },
+      { title: 'Knowledge Graph Score', description: 'Entity recognition, knowledge panel presence, and entity authority measurement' },
     ],
   },
 ]

@@ -80,7 +80,7 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
             <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">Three Sights</span>?
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Set it up once. Your 8 AI agents work 24/7 — auditing, writing, and ranking across every Sight. Without the agency fees.
+            Set it up once. Your AI engine works 24/7 — auditing, writing, and ranking across every Sight. Without the agency fees.
           </p>
         </motion.div>
 
@@ -180,7 +180,7 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
         >
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Clock className="w-4 h-4 text-emerald-400" />
-            1 Month Free Trial
+            14-Day Free Trial
           </div>
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />

@@ -14,6 +14,8 @@ import {
   Settings,
   Loader2,
   AlertCircle,
+  Crown,
+  Palette,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { RegistrationTier } from '@/components/auth/RegistrationDialog'
@@ -157,11 +159,14 @@ export default function PricingCard({
               className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center`}
             >
               {name === 'Starter' && <Zap className={`w-4 h-4 ${iconColor}`} />}
-              {name === 'Pro Agency' && (
+              {name === 'Pro' && (
                 <Building2 className={`w-4 h-4 ${iconColor}`} />
               )}
-              {name === 'Managed' && (
-                <Settings className={`w-4 h-4 ${iconColor}`} />
+              {name === 'Agency' && (
+                <Palette className={`w-4 h-4 ${iconColor}`} />
+              )}
+              {name === 'Enterprise' && (
+                <Crown className={`w-4 h-4 ${iconColor}`} />
               )}
             </div>
             <div className="leading-none font-semibold text-xl">{name}</div>
@@ -219,9 +224,11 @@ export default function PricingCard({
             className={`w-full mt-6 font-semibold text-base py-5 transition-all duration-300 ${
               highlighted
                 ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_25px_rgba(245,158,11,0.3)] hover:shadow-[0_0_35px_rgba(245,158,11,0.5)]'
-                : name === 'Managed'
+                : name === 'Enterprise'
                   ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_0_25px_rgba(6,182,212,0.2)] hover:shadow-[0_0_35px_rgba(6,182,212,0.4)]'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.2)] hover:shadow-[0_0_35px_rgba(16,185,129,0.4)]'
+                  : name === 'Agency'
+                    ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_25px_rgba(168,85,247,0.2)] hover:shadow-[0_0_35px_rgba(168,85,247,0.4)]'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.2)] hover:shadow-[0_0_35px_rgba(16,185,129,0.4)]'
             }`}
             onClick={handleSubscribe}
             disabled={loading}
