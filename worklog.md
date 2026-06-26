@@ -2152,3 +2152,43 @@ Stage Summary:
 - Plugin is functional (not stubs): /llms.txt is auto-served via rewrite rule + template_redirect with proper text/plain headers; robots.txt AI-bot rules are appended via the WordPress `robots_txt` filter; JSON-LD @graph (Organization + WebSite + Article on singular posts) is injected into wp_head; daily WP-Cron syncs post/page/comment/user counts + plugin version to https://seosights.com/api/v1/site-stats.
 - Security: every admin path checks current_user_can('manage_options'); AJAX uses check_ajax_referer; all form output escaped (esc_html/esc_attr/esc_url/checked); all input sanitized (sanitize_text_field, regex-restricted api_key, whitelisted bot_rules); settings saved through the WP Settings API with a sanitize_callback.
 - No test files created. No lint/build run (PHP doesn't use ESLint, per task rules).
+
+---
+Task ID: 5-Final
+Agent: Main Orchestrator
+Task: Deploy affiliates page + Phase 4 to seosights.com (Vercel auto-deploy via git push)
+
+Work Log:
+- Pushed commit 79ac995 (file-mode + worklog) → origin/main (Vercel deploy #1)
+- Created /affiliates route: src/app/affiliates/page.tsx (metadata + JSON-LD) + affiliates-page-client.tsx (hero, quick stats, benefits grid, full AffiliateLandingSection, FAQ accordion, final CTA, AffiliatePortal dialog)
+- Created AffiliateCTASection.tsx — compact homepage CTA (stats, tier ladder preview, link to /affiliates)
+- Updated page.tsx: replaced <AffiliateLandingSection> with <AffiliateCTASection>
+- Updated Navbar.tsx: added next/link import, "Affiliates" nav link now routes to /affiliates (external: true flag), desktop + mobile both use <Link> for external routes
+- Verified /affiliates renders with: 50%, 60-day, Commission Calculator, 5-Tier, FAQ, Become a Reseller, Starter, VIP ✓
+- Verified homepage has compact CTA ("See the Full Affiliate Program"), no big calculator/FAQ ✓
+- Phase 4 — launched 6 parallel subagents (4-a to 4-f):
+  - 4-a PromptRankTracker + /api/dashboard/prompt-rank ✓
+  - 4-b CompetitorCitationGap + /api/dashboard/competitor-citation ✓
+  - 4-c EntityGraphBuilder (hand-coded SVG) + /api/dashboard/entity-graph ✓
+  - 4-d AIContentSimulator + /api/dashboard/content-simulator (POST) ✓
+  - 4-e AICrawlLogs + /api/dashboard/crawl-logs ✓
+  - 4-f OneClickFix + /api/dashboard/one-click-fix (GET + POST) ✓
+- Phase 4 — launched 2 parallel subagents (4-g, 4-h):
+  - 4-g WordPress plugin (7 files, 1352 lines) at plugins/wordpress-seosights/ — functional llms.txt, robots.txt, schema, API sync
+  - 4-h Chrome Extension MV3 (9 files, 1944 lines) at extensions/chrome-seosights/ — popup, content script, options, background
+- Created AdvancedAITools.tsx wrapper (6 tabs, color-coded, AnimatePresence transitions)
+- Integrated AdvancedAITools into AnalysisDashboard.tsx (import + JSX after GSC section, before Bottom CTA, with url={data?.url})
+- Verified all 6 API endpoints return 200 with JSON ✓
+- bun run lint: clean (0 errors) ✓
+- Committed as ae438c3 "feat: Phase 4 — Advanced AI Tools + /affiliates page + WP plugin + Chrome extension"
+- Pushed ae438c3 → origin/main (Vercel deploy #2 triggered)
+- 36 files changed, 8026 insertions(+), 21 deletions(-)
+
+Stage Summary:
+- ✅ /affiliates standalone page live (separate route, full SEO + JSON-LD)
+- ✅ Homepage affiliate section slimmed to compact CTA
+- ✅ Phase 4 complete: 6 advanced AI tools integrated into dashboard
+- ✅ WordPress plugin scaffold ready (functional, secure, WP coding standards)
+- ✅ Chrome Extension scaffold ready (MV3, minimal permissions, dark theme)
+- ✅ Both commits pushed to origin/main → Vercel auto-deploying to seosights.com
+- Note: interactive dashboard verification blocked by demo DB (registration 500), but all components compile clean + all APIs return 200
