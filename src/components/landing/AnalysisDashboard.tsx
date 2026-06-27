@@ -63,6 +63,11 @@ import PendingApprovalsPanel from '@/components/dashboard/PendingApprovalsPanel'
 import GSCPanel from '@/components/dashboard/GSCPanel'
 import AlertsPanel from '@/components/dashboard/AlertsPanel'
 import AdvancedAITools from '@/components/dashboard/AdvancedAITools'
+import MissionControlPanel from '@/components/dashboard/MissionControlPanel'
+import DiffPanel from '@/components/dashboard/DiffPanel'
+import CompetitorRacePanel from '@/components/dashboard/CompetitorRacePanel'
+import StickyScoreWidget from '@/components/dashboard/StickyScoreWidget'
+import IndexStatusPanel from '@/components/dashboard/IndexStatusPanel'
 
 const container = {
   hidden: { opacity: 0 },
@@ -812,7 +817,7 @@ export default function AnalysisDashboard({ onStartFree, onOpenWebhooks, onOpenA
   }
 
   return (
-    <div className="min-h-screen bg-background scroll-smooth">
+    <div className="min-h-screen bg-background scroll-smooth relative">
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -3226,6 +3231,26 @@ export default function AnalysisDashboard({ onStartFree, onOpenWebhooks, onOpenA
           {/* ── Advanced AI Tools (Phase 4 suite) ─────────────── */}
           <AdvancedAITools url={data?.url || undefined} />
 
+          {/* ── P0: AI Mission Control Dashboard ──────────────── */}
+          <motion.div variants={item}>
+            <MissionControlPanel domain={alertDomain} />
+          </motion.div>
+
+          {/* ── P0: AI Diff ───────────────────────────────────── */}
+          <motion.div variants={item}>
+            <DiffPanel domain={alertDomain} />
+          </motion.div>
+
+          {/* ── P0: Competitor Race ────────────────────────────── */}
+          <motion.div variants={item}>
+            <CompetitorRacePanel domain={alertDomain} />
+          </motion.div>
+
+          {/* ── P0: AI Index Status ────────────────────────────── */}
+          <motion.div variants={item}>
+            <IndexStatusPanel domain={alertDomain} />
+          </motion.div>
+
           {/* ── Bottom CTA ────────────────────────────────── */}
           <motion.div variants={item}>
             <Card className="bg-gradient-to-r from-emerald-500/10 via-background to-amber-500/10 border-emerald-500/20">
@@ -3301,6 +3326,11 @@ export default function AnalysisDashboard({ onStartFree, onOpenWebhooks, onOpenA
             </Badge>
           </button>
         </motion.div>
+      )}
+
+      {/* ── P0: Sticky AI Visibility Score Widget ──────────── */}
+      {alertDomain && (
+        <StickyScoreWidget domain={alertDomain} />
       )}
     </div>
   )
