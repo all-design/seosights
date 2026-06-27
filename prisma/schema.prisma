@@ -51,6 +51,7 @@ model User {
   feedItems             FeedItem[]
   actionItems           ActionItem[]
   recommendationSnapshots RecommendationSnapshot[]
+  replaySessions        ReplaySession[]
 }
 
 model Session {
@@ -353,16 +354,15 @@ model SystemSetting {
 }
 
 // ─── AI Visibility Feed & Monitoring ──────────────────────────────────
-// "Daily use" features — reasons for users to come back every day
 
 model VisibilitySnapshot {
   id            String   @id @default(cuid())
   userId        String?
   domain        String
   overallScore  Int      // AI Visibility Score 0-100
-  trustScore    Int      @default(0)   // Sub-score: Trust 0-100
-  freshnessScore Int     @default(0)   // Sub-score: Freshness 0-100
-  authorityScore Int     @default(0)   // Sub-score: Authority 0-100
+  trustScore    Int      @default(0)
+  freshnessScore Int     @default(0)
+  authorityScore Int     @default(0)
   perEngine     String   // JSON: { chatgpt: 72, claude: 55, gemini: 61, perplexity: 78, copilot: 48 }
   dataSource    String   @default("live") // live | estimated | simulation
   capturedAt    DateTime @default(now())
@@ -381,11 +381,11 @@ model CitationEvent {
   domain      String
   engine      String   // chatgpt | claude | gemini | perplexity | copilot
   eventType   String   // cited | uncited | rank_up | rank_down | first_mention | competitor_overtake
-  delta       Int      @default(0) // score change (+3, -5, etc.)
-  prompt      String?  // the prompt that triggered this event
-  pageUrl     String?  // which page was cited/uncited
-  competitor  String?  // competitor domain if relevant
-  metadata    String?  // JSON with extra details
+  delta       Int      @default(0)
+  prompt      String?
+  pageUrl     String?
+  competitor  String?
+  metadata    String?
   createdAt   DateTime @default(now())
 
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -405,12 +405,12 @@ model FeedItem {
   itemType    String   // citation_gained | citation_lost | rank_change | competitor_alert | new_entity | score_milestone | ai_discovery
   title       String
   description String
-  engine      String?  // which AI engine
-  delta       Int      @default(0) // e.g. +3, -5
+  engine      String?
+  delta       Int      @default(0)
   severity    String   @default("info") // info | warning | positive | critical
-  iconEmoji   String   @default("📊") // emoji for the feed card
+  iconEmoji   String   @default("📊")
   isRead      Boolean  @default(false)
-  metadata    String?  // JSON
+  metadata    String?
   createdAt   DateTime @default(now())
 
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -425,14 +425,14 @@ model FeedItem {
 
 model IndustryBenchmark {
   id              String   @id @default(cuid())
-  industry        String   @unique // e.g. "dentists", "law_firms", "saas", "hotels"
-  industryLabel   String   // human-readable: "Dentists", "Law Firms"
-  avgAIVisibility Int      @default(0) // average AI Visibility Score
+  industry        String   @unique
+  industryLabel   String
+  avgAIVisibility Int      @default(0)
   avgTrust        Int      @default(0)
   avgFreshness    Int      @default(0)
   avgAuthority    Int      @default(0)
-  perEngine       String   // JSON: { chatgpt: 55, claude: 48, ... }
-  sampleSize      Int      @default(0) // how many domains analyzed
+  perEngine       String   // JSON
+  sampleSize      Int      @default(0)
   updatedAt       DateTime @updatedAt
 
   @@index([industry])
@@ -441,9 +441,9 @@ model IndustryBenchmark {
 
 model PromptTemplate {
   id          String   @id @default(cuid())
-  industry    String   // e.g. "dentists", "saas", "law_firms"
-  category    String   // e.g. "service", "product", "local", "comparison"
-  prompt      String   // the actual prompt text
+  industry    String
+  category    String
+  prompt      String
   language    String   @default("en")
   isPopular   Boolean  @default(false)
   usageCount  Int      @default(0)
@@ -465,19 +465,26 @@ model ActionItem {
   description String
   priority    String   @default("medium") // low | medium | high | critical
   impact      String   @default("medium") // low | medium | high
-  estimatedScoreGain Int @default(0) // estimated AI Visibility Score improvement
-  status      String   @default("pending") // pending | in_progress | completed | dismissed
-  relatedUrl  String?  // URL of the page/asset to fix
-  metadata    String?  // JSON with action-specific details
+  estimatedScoreGain Int @default(0)
+  roiScore    Float    @default(0)
+  effortMinutes Int    @default(0)
+  queuePosition Int    @default(0)
+  status      String   @default("pending") // pending | in_progress | completed | dismissed | queued | auto_executing | auto_executed | auto_failed
+  relatedUrl  String?
+  metadata    String?
+  autoExecuteEnabled Boolean @default(false)
+  autoExecutedAt DateTime?
   completedAt DateTime?
   createdAt   DateTime @default(now())
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  autoExecutions AutoExecution[]
 
   @@index([userId])
   @@index([domain])
   @@index([status])
   @@index([priority])
+  @@index([roiScore])
   @@index([createdAt])
 }
 
@@ -485,18 +492,120 @@ model RecommendationSnapshot {
   id          String   @id @default(cuid())
   userId      String?
   domain      String
-  prompt      String   // the prompt used
+  prompt      String
   brand       String
   engines     String   // JSON: { chatgpt: { mentioned: true, position: 2, ... }, ... }
   overallScore Int     @default(0)
-  dataSource  String   @default("live") // live | estimated | simulation
+  dataSource  String   @default("live")
   capturedAt  DateTime @default(now())
 
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  diffsAsBefore RecommendationDiff[] @relation("BeforeSnapshot")
+  diffsAsAfter  RecommendationDiff[] @relation("AfterSnapshot")
 
   @@index([userId])
   @@index([domain])
   @@index([prompt])
   @@index([capturedAt])
   @@index([domain, capturedAt])
+}
+
+// ─── P1: AI Visibility Replay™ ───────────────────────────────────────
+
+model ReplaySession {
+  id            String   @id @default(cuid())
+  userId        String
+  domain        String
+  title         String
+  startDate     DateTime
+  endDate       DateTime
+  totalFrames   Int      @default(0)
+  highlights    String?  // JSON array
+  status        String   @default("ready") // ready | playing | completed
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domain])
+  @@index([startDate])
+}
+
+// ─── P1: AI Recommendation Recorder™ ─────────────────────────────────
+
+model RecommendationDiff {
+  id              String   @id @default(cuid())
+  userId          String?
+  domain          String
+  beforeSnapshotId String
+  afterSnapshotId  String
+  prompt          String
+  changes         String   // JSON: { gained, lost, positionChanges, scoreDelta }
+  severity        String   @default("info")
+  summary         String
+  capturedAt      DateTime @default(now())
+
+  beforeSnapshot  RecommendationSnapshot @relation("BeforeSnapshot", fields: [beforeSnapshotId], references: [id])
+  afterSnapshot   RecommendationSnapshot @relation("AfterSnapshot", fields: [afterSnapshotId], references: [id])
+
+  @@index([userId])
+  @@index([domain])
+  @@index([capturedAt])
+}
+
+// ─── P1: Auto Execute ────────────────────────────────────────────────
+
+model AutoExecution {
+  id              String   @id @default(cuid())
+  actionItemId    String
+  userId          String
+  domain          String
+  platform        String   // wordpress | webflow | shopify | custom
+  actionType      String   // schema_update | meta_tag | content_publish | robots_update | redirect_create
+  payload         String   // JSON
+  result          String?  // JSON
+  status          String   @default("pending") // pending | executing | success | failed | rolled_back
+  attempts        Int      @default(0)
+  lastAttemptAt   DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+  rollbackPayload String?  // JSON
+  createdAt       DateTime @default(now())
+
+  actionItem      ActionItem @relation(fields: [actionItemId], references: [id], onDelete: Cascade)
+
+  @@index([actionItemId])
+  @@index([userId])
+  @@index([domain])
+  @@index([platform])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─── P1: Email Digest "What changed overnight?" ──────────────────────
+
+model EmailDigest {
+  id              String   @id @default(cuid())
+  userId          String
+  domain          String
+  digestType      String   @default("overnight") // overnight | weekly | monthly
+  subject         String
+  scoreBefore     Int      @default(0)
+  scoreAfter      Int      @default(0)
+  scoreDelta      Int      @default(0)
+  citationsGained Int      @default(0)
+  citationsLost   Int      @default(0)
+  newOpportunities Int     @default(0)
+  topOpportunity  String?  // JSON
+  engineChanges   String?  // JSON
+  feedHighlights  String?  // JSON
+  sentAt          DateTime?
+  status          String   @default("pending") // pending | sent | failed
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([domain])
+  @@index([digestType])
+  @@index([status])
+  @@index([createdAt])
 }

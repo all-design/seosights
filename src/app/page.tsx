@@ -4,23 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import Navbar from '@/components/landing/Navbar'
 import HeroSection from '@/components/landing/HeroSection'
 import SocialProofSection from '@/components/landing/SocialProofSection'
-import AIVisibilityScoreSection from '@/components/landing/AIVisibilityScoreSection'
-import AIVisibilityMap from '@/components/landing/AIVisibilityMap'
-import AIMissionControl from '@/components/landing/AIMissionControl'
-import AIRecommendationSimulator from '@/components/landing/AIRecommendationSimulator'
-import TerminalPreview from '@/components/landing/TerminalPreview'
 import DashboardPreview from '@/components/landing/DashboardPreview'
-import AIRevenueCalculator from '@/components/landing/AIRevenueCalculator'
-import AICitationExplorer from '@/components/landing/AICitationExplorer'
-import AIOpportunityFinder from '@/components/landing/AIOpportunityFinder'
-import AIInfluenceGraph from '@/components/landing/AIInfluenceGraph'
-import AICompetitorWarRoom from '@/components/landing/AICompetitorWarRoom'
-import AIDailyFeedSection from '@/components/landing/AIDailyFeedSection'
-import IndustryBenchmarksSection from '@/components/landing/IndustryBenchmarksSection'
-import AIActionCenterSection from '@/components/landing/AIActionCenterSection'
-import AIVisibilityForecast from '@/components/landing/AIVisibilityForecast'
 import FeaturesSection from '@/components/landing/FeaturesSection'
 import AIVisibilityTimeline from '@/components/landing/AIVisibilityTimeline'
+import AIVisibilityReplay from '@/components/landing/AIVisibilityReplay'
+import AIRecommendationRecorder from '@/components/landing/AIRecommendationRecorder'
+import AIAutoExecute from '@/components/landing/AIAutoExecute'
+import AIOpportunityQueue from '@/components/landing/AIOpportunityQueue'
+import AIEmailDigest from '@/components/landing/AIEmailDigest'
 import RoadmapChecklist from '@/components/landing/RoadmapChecklist'
 import HowItWorksSection from '@/components/landing/HowItWorksSection'
 import ComparisonSection from '@/components/landing/ComparisonSection'
@@ -28,6 +19,7 @@ import FreeToolsSection from '@/components/landing/FreeToolsSection'
 import IntegrationsSection from '@/components/landing/IntegrationsSection'
 import PricingSection from '@/components/landing/PricingSection'
 import CTASection from '@/components/landing/CTASection'
+import AffiliateCTASection from '@/components/landing/AffiliateCTASection'
 import Footer from '@/components/landing/Footer'
 import URLInputModal from '@/components/landing/URLInputModal'
 import LoginModal from '@/components/landing/LoginModal'
@@ -171,88 +163,27 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Navbar onStartFree={() => setIsModalOpen(true)} />
-      {/* 1 ── HERO: The ONE question ─────────────────────────────── */}
       <HeroSection onStartFree={() => openRegistration('starter')} />
-
-      {/* 2 ── SOCIAL PROOF ───────────────────────────────────────── */}
       <SocialProofSection />
-
-      {/* 3 ── THE KPI: AI Visibility Score™ ──────────────────────── */}
-      <AIVisibilityScoreSection onStartFree={() => openRegistration('starter')} />
-
-      {/* 4 ── AI VISIBILITY MAP ──────────────────────────────────── */}
-      <AIVisibilityMap onStartFree={() => openRegistration('starter')} />
-
-      {/* 4.5 ── AI MISSION CONTROL ──────────────────────────────── */}
-      <AIMissionControl onStartFree={() => openRegistration('starter')} />
-
-      {/* 5 ── DAILY USE: Reasons to come back every morning ──────── */}
-      <AIDailyFeedSection onStartFree={() => openRegistration('starter')} />
-
-      {/* 6 ── DAILY USE: Forecast ────────────────────────────────── */}
-      <AIVisibilityForecast onStartFree={() => openRegistration('starter')} />
-
-      {/* 7 ── DAILY USE: Score tracking timeline ─────────────────── */}
-      <AIVisibilityTimeline />
-
-      {/* 8 ── DIFFERENTIATION: Industry Benchmarks ───────────────── */}
-      <IndustryBenchmarksSection onStartFree={() => openRegistration('starter')} />
-
-      {/* 9 ── DIFFERENTIATION: Recommendation Simulator ──────────── */}
-      <AIRecommendationSimulator onStartFree={() => openRegistration('starter')} />
-
-      {/* 10 ── DIFFERENTIATION: Action Center ────────────────────── */}
-      <AIActionCenterSection onStartFree={() => openRegistration('starter')} />
-
-      {/* 11 ── DEEP ANALYSIS: Citation Explorer ──────────────────── */}
-      <AICitationExplorer onStartFree={() => openRegistration('starter')} />
-
-      {/* 12 ── DEEP ANALYSIS: Opportunity Finder ─────────────────── */}
-      <AIOpportunityFinder onStartFree={() => openRegistration('starter')} />
-
-      {/* 13 ── DEEP ANALYSIS: Competitor War Room ────────────────── */}
-      <AICompetitorWarRoom onStartFree={() => openRegistration('starter')} />
-
-      {/* 14 ── DEEP ANALYSIS: Influence Graph ────────────────────── */}
-      <AIInfluenceGraph onStartFree={() => openRegistration('starter')} />
-
-      {/* 15 ── BUSINESS CASE: Revenue Calculator ─────────────────── */}
-      <AIRevenueCalculator onStartFree={() => openRegistration('starter')} />
-
-      {/* 16 ── BUSINESS CASE: Terminal Preview ───────────────────── */}
-      <TerminalPreview onStartFree={() => openRegistration('starter')} />
-
-      {/* 17 ── FEATURES ──────────────────────────────────────────── */}
-      <FeaturesSection />
-
-      {/* 18 ── HOW IT WORKS ──────────────────────────────────────── */}
-      <HowItWorksSection />
-
-      {/* 19 ── COMPARISON ────────────────────────────────────────── */}
-      <ComparisonSection onStartFree={() => openRegistration('starter')} />
-
-      {/* 20 ── DASHBOARD PREVIEW ─────────────────────────────────── */}
       <DashboardPreview onStartFree={() => openRegistration('starter')} />
-
-      {/* 21 ── FREE TOOLS ────────────────────────────────────────── */}
-      <FreeToolsSection onStartFree={() => setIsModalOpen(true)} />
-
-      {/* 22 ── INTEGRATIONS ──────────────────────────────────────── */}
-      <IntegrationsSection />
-
-      {/* 23 ── ROADMAP ───────────────────────────────────────────── */}
+      <FeaturesSection />
+      <AIVisibilityTimeline />
+      <AIVisibilityReplay onStartFree={() => openRegistration('starter')} />
+      <AIRecommendationRecorder onStartFree={() => openRegistration('starter')} />
+      <AIAutoExecute onStartFree={() => openRegistration('starter')} />
+      <AIOpportunityQueue onStartFree={() => openRegistration('starter')} />
+      <AIEmailDigest onStartFree={() => openRegistration('starter')} />
       <RoadmapChecklist />
-
-      {/* 24 ── PRICING ───────────────────────────────────────────── */}
+      <HowItWorksSection />
+      <ComparisonSection onStartFree={() => openRegistration('starter')} />
+      <FreeToolsSection onStartFree={() => setIsModalOpen(true)} />
+      <IntegrationsSection />
       <PricingSection
         onStartFree={() => openRegistration('starter')}
         onTierSelect={openRegistration}
       />
-
-      {/* 25 ── CTA ──────────────────────────────────────────────── */}
       <CTASection onStartFree={() => openRegistration('starter')} />
-
-      {/* 26 ── FOOTER ───────────────────────────────────────────── */}
+      <AffiliateCTASection />
       <Footer />
       <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} defaultTab={loginDefaultTab} />

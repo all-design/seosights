@@ -1,0 +1,164 @@
+/**
+ * Auto Execute™ API
+ *
+ * GET  — Fetch AutoExecution records for a domain with optional filters
+ * POST — Create a new AutoExecution record with status "pending"
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
+
+const VALID_PLATFORMS = ['wordpress', 'webflow', 'shopify', 'custom']
+const VALID_ACTION_TYPES = ['schema_update', 'meta_tag', 'content_publish', 'robots_update', 'redirect_create']
+const VALID_STATUSES = ['pending', 'executing', 'success', 'failed', 'rolled_back']
+
+// ── GET: Fetch AutoExecution records ────────────────────────────
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const domain = searchParams.get('domain')
+    const userId = searchParams.get('userId') || undefined
+    const status = searchParams.get('status') || undefined
+    const limit = parseInt(searchParams.get('limit') || '20', 10)
+
+    if (!domain) {
+      return NextResponse.json(
+        { error: 'domain query parameter is required' },
+        { status: 400 }
+      )
+    }
+
+    if (status && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json(
+        { error: `status must be one of: ${VALID_STATUSES.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    const where: Record<string, unknown> = { domain }
+    if (userId) where.userId = userId
+    if (status) where.status = status
+
+    const executions = await db.autoExecution.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        actionItem: {
+          select: {
+            id: true,
+            actionType: true,
+            title: true,
+            priority: true,
+            status: true,
+          },
+        },
+      },
+    })
+
+    // Summary stats
+    const totalExecutions = await db.autoExecution.count({ where: { domain } })
+    const pendingCount = await db.autoExecution.count({ where: { domain, status: 'pending' } })
+    const successCount = await db.autoExecution.count({ where: { domain, status: 'success' } })
+    const failedCount = await db.autoExecution.count({ where: { domain, status: 'failed' } })
+
+    return NextResponse.json({
+      executions,
+      stats: {
+        total: totalExecutions,
+        pending: pendingCount,
+        success: successCount,
+        failed: failedCount,
+      },
+    })
+  } catch (error) {
+    console.error('[auto-execute] GET error:', error instanceof Error ? error.message : 'Unknown')
+    return NextResponse.json(
+      { error: 'Failed to fetch auto execution records' },
+      { status: 500 }
+    )
+  }
+}
+
+// ── POST: Create a new AutoExecution ────────────────────────────
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { actionItemId, userId, domain, platform, actionType, payload } = body
+
+    // Validate required fields
+    if (!actionItemId || !userId || !domain || !platform || !actionType) {
+      return NextResponse.json(
+        { error: 'actionItemId, userId, domain, platform, and actionType are required' },
+        { status: 400 }
+      )
+    }
+
+    if (!VALID_PLATFORMS.includes(platform)) {
+      return NextResponse.json(
+        { error: `platform must be one of: ${VALID_PLATFORMS.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    if (!VALID_ACTION_TYPES.includes(actionType)) {
+      return NextResponse.json(
+        { error: `actionType must be one of: ${VALID_ACTION_TYPES.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Verify the action item exists
+    const actionItem = await db.actionItem.findUnique({
+      where: { id: actionItemId },
+    })
+
+    if (!actionItem) {
+      return NextResponse.json(
+        { error: 'ActionItem not found' },
+        { status: 404 }
+      )
+    }
+
+    // Verify the action item belongs to the user and domain
+    if (actionItem.userId !== userId || actionItem.domain !== domain) {
+      return NextResponse.json(
+        { error: 'ActionItem does not belong to the specified user/domain' },
+        { status: 403 }
+      )
+    }
+
+    // Create the AutoExecution with status "pending"
+    const execution = await db.autoExecution.create({
+      data: {
+        actionItemId,
+        userId,
+        domain,
+        platform,
+        actionType,
+        payload: payload ? JSON.stringify(payload) : '{}',
+        status: 'pending',
+        attempts: 0,
+      },
+    })
+
+    // Update the ActionItem status to indicate auto-execution is queued
+    await db.actionItem.update({
+      where: { id: actionItemId },
+      data: {
+        status: 'auto_executing',
+        autoExecuteEnabled: true,
+      },
+    })
+
+    return NextResponse.json({ execution }, { status: 201 })
+  } catch (error) {
+    console.error('[auto-execute] POST error:', error instanceof Error ? error.message : 'Unknown')
+    return NextResponse.json(
+      { error: 'Failed to create auto execution' },
+      { status: 500 }
+    )
+  }
+}
