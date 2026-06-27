@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -90,10 +90,12 @@ Return ONLY valid JSON:
   "insight": "one-line actionable insight"
 }`
 
-    const raw = await Promise.race([
-      createChatCompletion([{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMessage }], { temperature: 0.35 }),
-      new Promise<null>((_, reject) => setTimeout(() => reject(new Error('LLM timeout')), 30000)),
-    ])
+    const routerResult = await routeLLM(
+      [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMessage }],
+      { taskType: 'scoring', temperature: 0.35, allowSimulation: true }
+    )
+    const raw = routerResult.content
+    const dataStatus: DataStatus = routerResult.status
     if (!raw) throw new Error('Empty LLM response')
 
     const parsed = parseLLMJson(raw)
@@ -101,7 +103,10 @@ Return ONLY valid JSON:
     const eng = (parsed.perEngine ?? {}) as Record<string, unknown>
     const overall = clamp(parsed.overallScore, 50)
 
-    const response: VisibilityScoreResponse = {
+    // Data is heavily clamped to [0,100] range — mark as estimated if it was originally 'live'
+    const finalStatus: DataStatus = dataStatus === 'live' ? 'estimated' : dataStatus
+
+    const response: VisibilityScoreResponse & { _meta: { status: DataStatus; model: string; provider: string; latencyMs: number } } = {
       overallScore: overall,
       dimensions: {
         citationFrequency: clamp(dims.citationFrequency, overall - 5),
@@ -119,10 +124,20 @@ Return ONLY valid JSON:
         ? (parsed.verdict as VisibilityScoreResponse['verdict'])
         : overall >= 75 ? 'Dominant' : overall >= 55 ? 'Competitive' : overall >= 35 ? 'Emerging' : 'Invisible',
       insight: typeof parsed.insight === 'string' ? parsed.insight : fallbackData(brand).insight,
+      _meta: {
+        status: finalStatus,
+        model: routerResult.model,
+        provider: routerResult.provider,
+        latencyMs: routerResult.latencyMs,
+      },
     }
     return NextResponse.json(response)
   } catch (err) {
-    console.error('[visibility-score] LLM failed, returning fallback:', err instanceof Error ? err.message : 'Unknown')
-    return NextResponse.json(fallbackData(brand || 'your brand'))
+    console.error('[visibility-score] LLM failed, returning simulation:', err instanceof Error ? err.message : 'Unknown')
+    const fallback = fallbackData(brand || 'your brand')
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }

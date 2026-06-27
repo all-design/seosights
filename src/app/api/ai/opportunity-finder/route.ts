@@ -8,7 +8,7 @@
  * but the brand is not, with projected impact and recommendations.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -132,28 +132,45 @@ Include exactly 8 missing sources: Reddit, Quora, G2, Trustpilot, Crunchbase, Wi
 Use Lucide icon names for the "icon" field (e.g. MessageCircle, HelpCircle, Star, Shield, Database, Globe, Play, BookOpen).
 Make the data realistic — competitor should have significantly more mentions than the brand.`
 
-    const raw = await createChatCompletion(
+    const routerResult = await routeLLM(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Analyze the citation gap for "${brand}" vs "${competitorName}"` },
       ],
-      { temperature: 0.7 }
+      { taskType: 'strategy', temperature: 0.7, allowSimulation: true }
     )
+    const raw = routerResult.content
+    const dataStatus: DataStatus = routerResult.status
 
     const parsed = parseLLMResponse(raw)
 
     if (parsed) {
-      return NextResponse.json(parsed)
+      return NextResponse.json({
+        ...parsed,
+        _meta: {
+          status: dataStatus,
+          model: routerResult.model,
+          provider: routerResult.provider,
+          latencyMs: routerResult.latencyMs,
+        },
+      })
     }
 
     // LLM returned non-parseable response — use fallback with brand names
     console.warn('[opportunity-finder] LLM response not valid JSON, using fallback')
-    return NextResponse.json(buildFallback(brand, competitorName))
+    return NextResponse.json({
+      ...buildFallback(brand, competitorName),
+      _meta: { status: 'estimated' as DataStatus, model: routerResult.model, provider: routerResult.provider, latencyMs: routerResult.latencyMs },
+    })
   } catch (err) {
-    console.error('[opportunity-finder] Error:', err instanceof Error ? err.message : 'Unknown')
+    console.error('[opportunity-finder] LLM failed, returning simulation:', err instanceof Error ? err.message : 'Unknown')
     // Return fallback data even on complete failure
     const brand = 'Your Brand'
     const competitor = 'Top Competitor'
-    return NextResponse.json(buildFallback(brand, competitor))
+    const fallback = buildFallback(brand, competitor)
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }

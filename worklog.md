@@ -2830,3 +2830,145 @@ Stage Summary:
 - ✅ AIVisibilityForecast wired to POST /api/ai/forecast — maps projections to chart, tasks to checklist
 - ✅ All 6: fire-and-forget fetch, mock data as fallback, "Live AI" badge when real data used
 - ✅ Zero lint errors, zero TypeScript errors, no visual changes
+
+---
+Task ID: 3-db
+Agent: schema-updater
+Task: Update Prisma schema with new AI Visibility models
+
+Work Log:
+- Added VisibilitySnapshot, CitationEvent, FeedItem, IndustryBenchmark, PromptTemplate, ActionItem, RecommendationSnapshot models
+- Added relation fields to User model
+- Ran db:push successfully
+
+Stage Summary:
+- New models added for feed, events, benchmarks, prompts, actions, snapshots
+- Database schema updated and pushed
+
+---
+Task ID: 3-routes
+Agent: route-updater
+Task: Update all AI API routes with AI Router and transparency labels
+
+Work Log:
+- Updated 8 AI routes to use routeLLM instead of createChatCompletion
+- Added _meta field with status/model/provider/latencyMs to all responses
+- Added 'simulation' status to fallback data in catch blocks
+- Added 'estimated' status when data is heavily processed/clamped
+- TaskType mapping: visibility-score→scoring, recommendation-simulator→reasoning, citation-explorer→entity_extraction, opportunity-finder→strategy, forecast→reasoning, revenue-calculator→scoring, influence-graph→entity_extraction, competitor-war-room→strategy
+- Routes with heavy clamping (visibility-score, forecast, revenue-calculator) demote 'live' → 'estimated'
+- Routes with non-parseable fallback (opportunity-finder, competitor-war-room) use 'estimated' for fallback-blended data
+- All catch blocks now return { ...fallback, _meta: { status: 'simulation' } }
+- ESLint passes cleanly, dev server running without errors
+
+Stage Summary:
+- All AI routes now use AI Router for smart model selection
+- All responses have transparency labels (live/estimated/simulation)
+- Fallback data is clearly marked as 'simulation'
+- Heavily processed data is marked as 'estimated'
+
+---
+Task ID: 4-frontend
+Agent: frontend-components-creator
+Task: Create dashboard components for Feed, Benchmarks, PromptLibrary, ActionCenter, CitationVelocityHeatmap
+
+Work Log:
+- Created AIVisibilityFeed.tsx — LinkedIn-style daily feed with severity styles, engine colors, read/unread indicators, time-ago formatting, and animated entry
+- Created IndustryBenchmarks.tsx — Industry comparison table with animated score bars, verdict icons, user score comparison, and sorted display
+- Created PromptLibrary.tsx — Searchable prompt library with industry/category filter pills, copy-to-clipboard, search input, and popular badges
+- Created AIActionCenter.tsx — Daily task checklist with priority styles, checkbox toggling, progress bar, score gain tracking, and external links
+- Created CitationVelocityHeatmap.tsx — GitHub contribution graph style heatmap with hover tooltips, legend, and responsive grid
+- All 5 components pass lint with zero errors
+
+Stage Summary:
+- 5 new dashboard components created in /src/components/dashboard/
+- All components use shadcn/ui + Tailwind CSS + framer-motion animations
+- All components have loading skeleton states, data source transparency badges (Live/Estimated/Simulation), and responsive design
+- Each component integrates with corresponding API endpoints (/api/ai/feed, /api/ai/benchmarks, /api/ai/prompt-library, /api/ai/action-center)
+
+---
+Task ID: 4-api
+Agent: api-routes-creator
+Task: Create new AI API routes for feed, benchmarks, prompt-library, recommendation-history, action-center, content-gap, entity-health
+
+Work Log:
+- Created /src/app/api/ai/feed/route.ts — AI Visibility Feed (GET, domain param, DB-first with LLM fallback, simulation fallback)
+- Created /src/app/api/ai/benchmarks/route.ts — Industry Benchmarks (GET, industry param, 20 industries with per-engine scores)
+- Created /src/app/api/ai/prompt-library/route.ts — Prompt Library (GET, static prompt data with DB overlay, industry/category filtering)
+- Created /src/app/api/ai/recommendation-history/route.ts — AI Recommendation History (GET, time-series with per-engine position tracking)
+- Created /src/app/api/ai/action-center/route.ts — AI Action Center (GET + PUT, task management with priority/impact/scoring)
+- Created /src/app/api/ai/content-gap/route.ts — AI Content Gap (POST, competitor analysis with gap types: topic/entity/format/source)
+- Created /src/app/api/ai/entity-health/route.ts — Entity Health (POST, knowledge graph analysis with entity status classification)
+
+Stage Summary:
+- 7 new API routes created with AI Router integration
+- All routes return _meta transparency labels (status, model, provider, latencyMs)
+- All routes have simulation fallbacks clearly marked as _meta.status: 'simulation'
+- Data flow: Database → LLM (via routeLLM) → Simulation fallback
+- Lint passes with zero errors
+
+---
+Task ID: 4-frontend2
+Agent: Frontend Agent
+Task: Create 3 additional dashboard components (EntityHealth, AIContentGap, MultiBrandDashboard)
+
+Work Log:
+- Created /src/components/dashboard/EntityHealth.tsx
+  - Entity health cards with status indicators (strong/weak/disconnected/missing)
+  - Uses STATUS_CONFIG for color-coded status with icons (Shield, AlertTriangle, Unplug, CircleDot)
+  - TYPE_ICONS emoji mapping for entity types (Person, Organization, Product, Service, Concept)
+  - Shows overall entity health score, status counts, and per-entity details (authority, connections, priority)
+  - ScrollArea with max-h-[400px] for long lists
+  - Framer Motion staggered animations
+  - Simulation data with 8 entity items
+- Created /src/components/dashboard/AIContentGap.tsx
+  - Content gap analysis showing topics AI associates with competitors but not the user
+  - Filterable by gap type (topic, entity, format, source) with Badge-based filter buttons
+  - Shows severity, estimated score gain, and competitor names for each gap
+  - GAP_TYPE_STYLES and SEVERITY_STYLES for consistent color theming
+  - Total potential gain badge in header (+39 AI Visibility Points)
+  - ScrollArea with max-h-[400px]
+  - Framer Motion staggered animations
+  - Simulation data with 6 content gap items
+- Created /src/components/dashboard/MultiBrandDashboard.tsx
+  - Agency semafor view for managing multiple client brands
+  - StatusLight component with glowing CSS shadows (emerald/amber/red)
+  - TrendIcon component showing up/down/stable trend arrows
+  - Search/filter functionality with Input component
+  - Health summary badges (Healthy, Warning, Critical counts)
+  - Per-brand progress bar, AI visibility score, trend delta, and alert badges
+  - ScrollArea with max-h-[500px]
+  - Framer Motion staggered animations
+  - Simulation data with 6 brand entries
+- All 3 components pass ESLint without errors
+
+Stage Summary:
+- 3 new dashboard components created: EntityHealth, AIContentGap, MultiBrandDashboard
+- All use simulation data (marked with "○ Simulation" badges)
+- All use consistent design patterns: Card wrapper, backdrop-blur, border-border/50, ScrollArea, Framer Motion animations
+- All components are 'use client' and accept domain prop (except MultiBrandDashboard which is standalone)
+
+---
+Task ID: 4-landing
+Agent: Landing Page Agent
+Task: Create 4 new landing page sections (AIDailyFeedSection, IndustryBenchmarksSection, PromptLibrarySection, AIActionCenterSection)
+
+Work Log:
+- Reviewed existing dashboard components (AIVisibilityFeed, IndustryBenchmarks, PromptLibrary, AIActionCenter) for data models and UI patterns
+- Reviewed existing landing sections (AICompetitorWarRoom, AIVisibilityScoreSection) for marketing/preview styling patterns
+- Created AIDailyFeedSection.tsx: Marketing preview of the AI Visibility Feed with 5 sample feed items (citation_gained, citation_lost, competitor_alert, new_entity, score_milestone), staggered animations, emerald accent, "See your feed" CTA
+- Created IndustryBenchmarksSection.tsx: Ranked list of 10 industries with animated bars, scores, change indicators, SaaS highlighted as user industry, "See where you stand" CTA
+- Created PromptLibrarySection.tsx: 3 industry pill filters (SaaS, Healthcare, Law Firms) with 5 prompts each, AnimatePresence tab switching, category badges, "Try it free" CTA
+- Created AIActionCenterSection.tsx: 6 sample tasks with interactive checkboxes, priority badges, score gain badges, animated progress bar, "Start improving" CTA
+- All sections use 'use client', framer-motion (AnimatePresence, motion, useInView), shadcn/ui (Badge, Button, Card, Checkbox), Lucide icons
+- All sections use emerald/green as primary accent color, responsive mobile-first design, subtle stagger entry animations
+- Integrated all 4 sections into page.tsx after AICompetitorWarRoom, before AIVisibilityForecast
+- ESLint passes with no errors
+- Dev server compiles and renders successfully
+
+Stage Summary:
+- 4 new public-facing landing page sections created and integrated
+- Consistent emerald/green accent color scheme across all new sections
+- Each section has CTA button that triggers the registration flow (via onStartFree prop)
+- All sections feature staggered entry animations via framer-motion useInView
+- Sections placed between AICompetitorWarRoom and AIVisibilityForecast on the homepage

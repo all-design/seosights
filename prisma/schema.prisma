@@ -46,6 +46,11 @@ model User {
   alerts          VisibilityAlert[]
   tokenUsageLogs  TokenUsageLog[]
   affiliate       Affiliate?
+  visibilitySnapshots   VisibilitySnapshot[]
+  citationEvents        CitationEvent[]
+  feedItems             FeedItem[]
+  actionItems           ActionItem[]
+  recommendationSnapshots RecommendationSnapshot[]
 }
 
 model Session {
@@ -345,4 +350,153 @@ model SystemSetting {
 
   @@index([key])
   @@index([category])
+}
+
+// ─── AI Visibility Feed & Monitoring ──────────────────────────────────
+// "Daily use" features — reasons for users to come back every day
+
+model VisibilitySnapshot {
+  id            String   @id @default(cuid())
+  userId        String?
+  domain        String
+  overallScore  Int      // AI Visibility Score 0-100
+  trustScore    Int      @default(0)   // Sub-score: Trust 0-100
+  freshnessScore Int     @default(0)   // Sub-score: Freshness 0-100
+  authorityScore Int     @default(0)   // Sub-score: Authority 0-100
+  perEngine     String   // JSON: { chatgpt: 72, claude: 55, gemini: 61, perplexity: 78, copilot: 48 }
+  dataSource    String   @default("live") // live | estimated | simulation
+  capturedAt    DateTime @default(now())
+
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domain])
+  @@index([capturedAt])
+  @@index([domain, capturedAt])
+}
+
+model CitationEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  domain      String
+  engine      String   // chatgpt | claude | gemini | perplexity | copilot
+  eventType   String   // cited | uncited | rank_up | rank_down | first_mention | competitor_overtake
+  delta       Int      @default(0) // score change (+3, -5, etc.)
+  prompt      String?  // the prompt that triggered this event
+  pageUrl     String?  // which page was cited/uncited
+  competitor  String?  // competitor domain if relevant
+  metadata    String?  // JSON with extra details
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domain])
+  @@index([engine])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([domain, createdAt])
+}
+
+model FeedItem {
+  id          String   @id @default(cuid())
+  userId      String?
+  domain      String
+  itemType    String   // citation_gained | citation_lost | rank_change | competitor_alert | new_entity | score_milestone | ai_discovery
+  title       String
+  description String
+  engine      String?  // which AI engine
+  delta       Int      @default(0) // e.g. +3, -5
+  severity    String   @default("info") // info | warning | positive | critical
+  iconEmoji   String   @default("📊") // emoji for the feed card
+  isRead      Boolean  @default(false)
+  metadata    String?  // JSON
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domain])
+  @@index([itemType])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([domain, createdAt])
+}
+
+model IndustryBenchmark {
+  id              String   @id @default(cuid())
+  industry        String   @unique // e.g. "dentists", "law_firms", "saas", "hotels"
+  industryLabel   String   // human-readable: "Dentists", "Law Firms"
+  avgAIVisibility Int      @default(0) // average AI Visibility Score
+  avgTrust        Int      @default(0)
+  avgFreshness    Int      @default(0)
+  avgAuthority    Int      @default(0)
+  perEngine       String   // JSON: { chatgpt: 55, claude: 48, ... }
+  sampleSize      Int      @default(0) // how many domains analyzed
+  updatedAt       DateTime @updatedAt
+
+  @@index([industry])
+  @@index([avgAIVisibility])
+}
+
+model PromptTemplate {
+  id          String   @id @default(cuid())
+  industry    String   // e.g. "dentists", "saas", "law_firms"
+  category    String   // e.g. "service", "product", "local", "comparison"
+  prompt      String   // the actual prompt text
+  language    String   @default("en")
+  isPopular   Boolean  @default(false)
+  usageCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([industry])
+  @@index([category])
+  @@index([isPopular])
+  @@index([language])
+}
+
+model ActionItem {
+  id          String   @id @default(cuid())
+  userId      String
+  domain      String
+  actionType  String   // fix_schema | create_faq | add_author | create_llms_txt | reddit_answer | g2_review | wikipedia | entity_fix | content_update | crawl_fix
+  title       String
+  description String
+  priority    String   @default("medium") // low | medium | high | critical
+  impact      String   @default("medium") // low | medium | high
+  estimatedScoreGain Int @default(0) // estimated AI Visibility Score improvement
+  status      String   @default("pending") // pending | in_progress | completed | dismissed
+  relatedUrl  String?  // URL of the page/asset to fix
+  metadata    String?  // JSON with action-specific details
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domain])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model RecommendationSnapshot {
+  id          String   @id @default(cuid())
+  userId      String?
+  domain      String
+  prompt      String   // the prompt used
+  brand       String
+  engines     String   // JSON: { chatgpt: { mentioned: true, position: 2, ... }, ... }
+  overallScore Int     @default(0)
+  dataSource  String   @default("live") // live | estimated | simulation
+  capturedAt  DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([domain])
+  @@index([prompt])
+  @@index([capturedAt])
+  @@index([domain, capturedAt])
 }

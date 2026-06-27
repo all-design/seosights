@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -131,18 +131,15 @@ Return ONLY valid JSON:
   }
 }`
 
-    const llmPromise = createChatCompletion(
+    const routerResult = await routeLLM(
       [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userMessage },
       ],
-      { temperature: 0.4 }
+      { taskType: 'entity_extraction', temperature: 0.4, allowSimulation: true }
     )
-
-    const raw = await Promise.race([
-      llmPromise,
-      new Promise<null>((_, reject) => setTimeout(() => reject(new Error('LLM timeout')), 30000)),
-    ])
+    const raw = routerResult.content
+    const dataStatus: DataStatus = routerResult.status
 
     if (!raw) throw new Error('Empty LLM response')
 
@@ -168,9 +165,19 @@ Return ONLY valid JSON:
     return NextResponse.json({
       totalCitations: typeof parsed.totalCitations === 'number' ? parsed.totalCitations : totalCitations,
       engines,
+      _meta: {
+        status: dataStatus,
+        model: routerResult.model,
+        provider: routerResult.provider,
+        latencyMs: routerResult.latencyMs,
+      },
     })
   } catch (err) {
-    console.error('[citation-explorer] LLM failed, returning fallback:', err instanceof Error ? err.message : 'Unknown')
-    return NextResponse.json(fallbackData(brand || 'your brand'))
+    console.error('[citation-explorer] LLM failed, returning simulation:', err instanceof Error ? err.message : 'Unknown')
+    const fallback = fallbackData(brand || 'your brand')
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }

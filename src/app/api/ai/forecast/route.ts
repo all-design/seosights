@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -101,17 +101,25 @@ Return JSON:
 
 Return ONLY the JSON object — no markdown, no commentary.`
 
-    let forecast: ForecastResponse
+    let forecast: ForecastResponse & { _meta: { status: DataStatus; model: string; provider: string; latencyMs: number } }
     try {
-      const raw = await createChatCompletion(
+      const routerResult = await routeLLM(
         [
           { role: 'system', content: 'You are a precise JSON-returning AI visibility forecaster. Output only valid JSON.' },
           { role: 'user', content: prompt },
         ],
-        { temperature: 0.4 },
+        { taskType: 'reasoning', temperature: 0.4, allowSimulation: true },
       )
+      const raw = routerResult.content
+      const dataStatus: DataStatus = routerResult.status
+
+      if (!raw) throw new Error('Empty LLM response')
+
       const parsed = JSON.parse(sanitizeJSON(raw)) as ForecastResponse
       const cs = Number(parsed.currentScore) || currentScore || 28
+
+      // Scores are clamped to [1,99] range — mark as estimated if originally 'live'
+      const finalStatus: DataStatus = dataStatus === 'live' ? 'estimated' : dataStatus
 
       forecast = {
         currentScore: cs,
@@ -128,10 +136,20 @@ Return ONLY the JSON object — no markdown, no commentary.`
             }))
           : fallbackForecast(brand, cs).tasks,
         summary: String(parsed.summary || `${brand} AI visibility forecast over 90 days.`),
+        _meta: {
+          status: finalStatus,
+          model: routerResult.model,
+          provider: routerResult.provider,
+          latencyMs: routerResult.latencyMs,
+        },
       }
     } catch (llmErr) {
       console.error('[forecast] LLM failed, using fallback:', llmErr instanceof Error ? llmErr.message : 'Unknown')
-      forecast = fallbackForecast(brand, currentScore || 28)
+      const fallback = fallbackForecast(brand, currentScore || 28)
+      forecast = {
+        ...fallback,
+        _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+      }
     }
 
     return NextResponse.json(forecast)

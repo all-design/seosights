@@ -14,6 +14,10 @@ import AICitationExplorer from '@/components/landing/AICitationExplorer'
 import AIOpportunityFinder from '@/components/landing/AIOpportunityFinder'
 import AIInfluenceGraph from '@/components/landing/AIInfluenceGraph'
 import AICompetitorWarRoom from '@/components/landing/AICompetitorWarRoom'
+import AIDailyFeedSection from '@/components/landing/AIDailyFeedSection'
+import IndustryBenchmarksSection from '@/components/landing/IndustryBenchmarksSection'
+import PromptLibrarySection from '@/components/landing/PromptLibrarySection'
+import AIActionCenterSection from '@/components/landing/AIActionCenterSection'
 import AIVisibilityForecast from '@/components/landing/AIVisibilityForecast'
 import CommunityLeaderboard from '@/components/landing/CommunityLeaderboard'
 import AgentMarketplace from '@/components/landing/AgentMarketplace'
@@ -170,28 +174,49 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Navbar onStartFree={() => setIsModalOpen(true)} />
+      {/* ── HERO: The ONE question ─────────────────────────────────── */}
       <HeroSection onStartFree={() => openRegistration('starter')} />
       <SocialProofSection />
+
+      {/* ── THE KPI: AI Visibility Score™ ──────────────────────────── */}
       <AIVisibilityScoreSection onStartFree={() => openRegistration('starter')} />
       <AIVisibilityMap onStartFree={() => openRegistration('starter')} />
+
+      {/* ── DAILY USE: Reasons to come back every morning ──────────── */}
+      <AIDailyFeedSection onStartFree={() => openRegistration('starter')} />
+      <AIVisibilityForecast onStartFree={() => openRegistration('starter')} />
+      <PromptLibrarySection onStartFree={() => openRegistration('starter')} />
+
+      {/* ── DIFFERENTIATION: Nobody else has this ─────────────────── */}
+      <IndustryBenchmarksSection onStartFree={() => openRegistration('starter')} />
       <AIRecommendationSimulator onStartFree={() => openRegistration('starter')} />
-      <TerminalPreview onStartFree={() => openRegistration('starter')} />
-      <DashboardPreview onStartFree={() => openRegistration('starter')} />
-      <AIRevenueCalculator onStartFree={() => openRegistration('starter')} />
+      <AIActionCenterSection onStartFree={() => openRegistration('starter')} />
+
+      {/* ── DEEP ANALYSIS: For the serious user ───────────────────── */}
       <AICitationExplorer onStartFree={() => openRegistration('starter')} />
       <AIOpportunityFinder onStartFree={() => openRegistration('starter')} />
-      <AIInfluenceGraph onStartFree={() => openRegistration('starter')} />
       <AICompetitorWarRoom onStartFree={() => openRegistration('starter')} />
-      <AIVisibilityForecast onStartFree={() => openRegistration('starter')} />
+      <AIInfluenceGraph onStartFree={() => openRegistration('starter')} />
+
+      {/* ── BUSINESS CASE: ROI & terminal ─────────────────────────── */}
+      <AIRevenueCalculator onStartFree={() => openRegistration('starter')} />
+      <TerminalPreview onStartFree={() => openRegistration('starter')} />
+
+      {/* ── COMMUNITY & ECOSYSTEM ─────────────────────────────────── */}
       <CommunityLeaderboard onStartFree={() => openRegistration('starter')} />
       <AgentMarketplace onStartFree={() => openRegistration('starter')} />
+
+      {/* ── TRUST & PROOF ─────────────────────────────────────────── */}
       <FeaturesSection />
       <AIVisibilityTimeline />
-      <RoadmapChecklist />
       <HowItWorksSection />
       <ComparisonSection onStartFree={() => openRegistration('starter')} />
+      <DashboardPreview onStartFree={() => openRegistration('starter')} />
+
+      {/* ── CLOSING ──────────────────────────────────────────────── */}
       <FreeToolsSection onStartFree={() => setIsModalOpen(true)} />
       <IntegrationsSection />
+      <RoadmapChecklist />
       <PricingSection
         onStartFree={() => openRegistration('starter')}
         onTierSelect={openRegistration}

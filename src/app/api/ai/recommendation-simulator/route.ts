@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -159,19 +159,16 @@ Return ONLY valid JSON:
   "overallVerdict": "brief summary"
 }`
 
-    // Call LLM with 30s timeout
-    const llmPromise = createChatCompletion(
+    // Call LLM via AI Router
+    const routerResult = await routeLLM(
       [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userMessage },
       ],
-      { temperature: 0.4 }
+      { taskType: 'reasoning', temperature: 0.4, allowSimulation: true }
     )
-
-    const raw = await Promise.race([
-      llmPromise,
-      new Promise<null>((_, reject) => setTimeout(() => reject(new Error('LLM timeout')), 30000)),
-    ])
+    const raw = routerResult.content
+    const dataStatus: DataStatus = routerResult.status
 
     if (!raw) throw new Error('Empty LLM response')
 
@@ -191,21 +188,31 @@ Return ONLY valid JSON:
       ? whyNot.slice(0, 5).map((r) => ({ title: r.title || '', detail: r.detail || '' }))
       : fallbackData(prompt, brand).reasons
 
-    const response: SimulationResponse = {
+    const response: SimulationResponse & { _meta: { status: DataStatus; model: string; provider: string; latencyMs: number } } = {
       prompt,
       brand,
       results,
       reasons,
       overallVerdict: typeof parsed.overallVerdict === 'string' ? parsed.overallVerdict : '',
+      _meta: {
+        status: dataStatus,
+        model: routerResult.model,
+        provider: routerResult.provider,
+        latencyMs: routerResult.latencyMs,
+      },
     }
 
     return NextResponse.json(response)
   } catch (err) {
-    console.error('[recommendation-simulator] LLM failed, returning fallback:', err instanceof Error ? err.message : 'Unknown')
+    console.error('[recommendation-simulator] LLM failed, returning simulation:', err instanceof Error ? err.message : 'Unknown')
     // Return fallback so the UI never breaks
     const body = await req.json().catch(() => ({}))
     const { prompt, brand: rawBrand, url } = body as { prompt?: string; brand?: string; url?: string }
     const brand = rawBrand || (url ? extractBrandFromUrl(url) : '') || 'your brand'
-    return NextResponse.json(fallbackData(prompt || 'Best CRM for startups', brand))
+    const fallback = fallbackData(prompt || 'Best CRM for startups', brand)
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }

@@ -8,7 +8,7 @@
  * across ChatGPT, Claude, Gemini, and Perplexity.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -149,26 +149,43 @@ Use Lucide icon names for the "icon" field.
 Severity is 1-10 (10 = most critical).
 Make the data realistic and insightful.`
 
-    const raw = await createChatCompletion(
+    const routerResult = await routeLLM(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Run competitive war room analysis for "${brand}" vs "${competitorList}"` },
       ],
-      { temperature: 0.7 }
+      { taskType: 'strategy', temperature: 0.7, allowSimulation: true }
     )
+    const raw = routerResult.content
+    const dataStatus: DataStatus = routerResult.status
 
     const parsed = parseLLMResponse(raw)
 
     if (parsed) {
-      return NextResponse.json(parsed)
+      return NextResponse.json({
+        ...parsed,
+        _meta: {
+          status: dataStatus,
+          model: routerResult.model,
+          provider: routerResult.provider,
+          latencyMs: routerResult.latencyMs,
+        },
+      })
     }
 
     // LLM returned non-parseable response — use fallback
     console.warn('[competitor-war-room] LLM response not valid JSON, using fallback')
-    return NextResponse.json(buildFallback(brand, competitors || []))
+    return NextResponse.json({
+      ...buildFallback(brand, competitors || []),
+      _meta: { status: 'estimated' as DataStatus, model: routerResult.model, provider: routerResult.provider, latencyMs: routerResult.latencyMs },
+    })
   } catch (err) {
-    console.error('[competitor-war-room] Error:', err instanceof Error ? err.message : 'Unknown')
+    console.error('[competitor-war-room] LLM failed, returning simulation:', err instanceof Error ? err.message : 'Unknown')
     // Return fallback data even on complete failure
-    return NextResponse.json(buildFallback('Your Brand', []))
+    const fallback = buildFallback('Your Brand', [])
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -126,19 +126,25 @@ Return JSON:
 
 Return ONLY the JSON object — no markdown, no commentary.`
 
-    let projection: RevenueProjection
+    let projection: RevenueProjection & { _meta: { status: DataStatus; model: string; provider: string; latencyMs: number } }
 
     try {
-      const raw = await createChatCompletion(
+      const routerResult = await routeLLM(
         [
           { role: 'system', content: 'You are a precise JSON-returning revenue analyst. Output only valid JSON.' },
           { role: 'user', content: prompt },
         ],
-        { temperature: 0.4 },
+        { taskType: 'scoring', temperature: 0.4, allowSimulation: true },
       )
+      const raw = routerResult.content
+      const dataStatus: DataStatus = routerResult.status
+
+      if (!raw) throw new Error('Empty LLM response')
+
       const parsed = JSON.parse(sanitizeJSON(raw)) as RevenueProjection
 
-      // Validate required fields with safe defaults
+      // Validate required fields with safe defaults — significant processing, mark as estimated
+      const finalStatus: DataStatus = dataStatus === 'live' ? 'estimated' : dataStatus
       projection = {
         achievableVisibility: Number(parsed.achievableVisibility) || currentVisibility * 2,
         extraImpressions: Number(parsed.extraImpressions) || 0,
@@ -150,13 +156,23 @@ Return ONLY the JSON object — no markdown, no commentary.`
         assumptions: Array.isArray(parsed.assumptions)
           ? parsed.assumptions.map(String).slice(0, 5)
           : ['LLM-generated projection'],
+        _meta: {
+          status: finalStatus,
+          model: routerResult.model,
+          provider: routerResult.provider,
+          latencyMs: routerResult.latencyMs,
+        },
       }
     } catch (llmErr) {
       console.error(
-        '[revenue-calculator] LLM failed, using fallback:',
+        '[revenue-calculator] LLM failed, returning simulation:',
         llmErr instanceof Error ? llmErr.message : 'Unknown',
       )
-      projection = fallbackProjection({ visitors, currentVisibility, industry, url })
+      const fallback = fallbackProjection({ visitors, currentVisibility, industry, url })
+      projection = {
+        ...fallback,
+        _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+      }
     }
 
     return NextResponse.json(projection)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM, type DataStatus } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -108,15 +108,20 @@ Return JSON:
 
 Return ONLY the JSON object — no markdown, no commentary.`
 
-    let graph: InfluenceGraphResponse
+    let graph: InfluenceGraphResponse & { _meta: { status: DataStatus; model: string; provider: string; latencyMs: number } }
     try {
-      const raw = await createChatCompletion(
+      const routerResult = await routeLLM(
         [
           { role: 'system', content: 'You are a precise JSON-returning entity graph analyst. Output only valid JSON.' },
           { role: 'user', content: prompt },
         ],
-        { temperature: 0.5 },
+        { taskType: 'entity_extraction', temperature: 0.5, allowSimulation: true },
       )
+      const raw = routerResult.content
+      const dataStatus: DataStatus = routerResult.status
+
+      if (!raw) throw new Error('Empty LLM response')
+
       const parsed = JSON.parse(sanitizeJSON(raw)) as InfluenceGraphResponse
       graph = {
         nodes: Array.isArray(parsed.nodes)
@@ -133,10 +138,20 @@ Return ONLY the JSON object — no markdown, no commentary.`
               strength: (VALID_STR.has(e.strength as string) ? e.strength : 'broken') as 'strong' | 'broken',
             }))
           : fallbackGraph(brand).edges,
+        _meta: {
+          status: dataStatus,
+          model: routerResult.model,
+          provider: routerResult.provider,
+          latencyMs: routerResult.latencyMs,
+        },
       }
     } catch (llmErr) {
-      console.error('[influence-graph] LLM failed, using fallback:', llmErr instanceof Error ? llmErr.message : 'Unknown')
-      graph = fallbackGraph(brand)
+      console.error('[influence-graph] LLM failed, returning simulation:', llmErr instanceof Error ? llmErr.message : 'Unknown')
+      const fallback = fallbackGraph(brand)
+      graph = {
+        ...fallback,
+        _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+      }
     }
 
     return NextResponse.json(graph)

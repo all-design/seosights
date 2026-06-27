@@ -64,6 +64,21 @@ const factors: ScoreFactor[] = [
   },
 ]
 
+// ── Sub-scores (Trust, Freshness, Authority) ──────────────────────────
+interface SubScore {
+  key: string
+  label: string
+  value: number
+  color: string
+  description: string
+}
+
+const subScores: SubScore[] = [
+  { key: 'trust', label: 'Trust', value: 51, color: 'from-emerald-500 to-teal-400', description: 'How much AI engines trust your brand' },
+  { key: 'freshness', label: 'Freshness', value: 91, color: 'from-cyan-500 to-blue-400', description: 'How recent and updated your content is' },
+  { key: 'authority', label: 'Authority', value: 68, color: 'from-amber-500 to-yellow-400', description: 'How authoritative your entity presence is' },
+]
+
 const DEMO_FACTORS = factors.map((f) => f.value)
 
 // ── Circular score gauge (hand-coded SVG, 270° arc) ──────────────────────
@@ -159,7 +174,7 @@ function ScoreGauge({ score, inView }: { score: number; inView: boolean }) {
       {/* Center number + label */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-          AI Visibility Score
+          AI Visibility Score™
         </span>
         <motion.span
           className="text-6xl sm:text-7xl font-bold tabular-nums bg-gradient-to-br from-purple-200 via-fuchsia-200 to-purple-300 bg-clip-text text-transparent leading-none"
@@ -394,12 +409,60 @@ export default function AIVisibilityScoreSection({
           </div>
         </motion.div>
 
+        {/* Sub-scores: Trust, Freshness, Authority */}
+        <motion.div
+          className="max-w-4xl mx-auto mb-16"
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.8 }}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center">
+                <Gauge className="w-4 h-4 text-purple-300" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">
+                AI Visibility Score™ Sub-Scores
+              </h3>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            {subScores.map((s, i) => (
+              <div
+                key={s.key}
+                className="rounded-xl border border-white/10 bg-card p-5 hover:border-purple-500/30 transition-colors text-center"
+              >
+                <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{s.label}</div>
+                <motion.span
+                  className={`text-4xl font-bold tabular-nums bg-gradient-to-r ${s.color} bg-clip-text text-transparent`}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={isInView ? { opacity: 1, scale: 1 } : {}}
+                  transition={{ duration: 0.5, delay: 1 + i * 0.15 }}
+                >
+                  {s.value}
+                </motion.span>
+                <span className="text-xs text-muted-foreground"> / 100</span>
+                <div className="mt-3 h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+                  <motion.div
+                    className={`h-full rounded-full bg-gradient-to-r ${s.color}`}
+                    initial={{ width: 0 }}
+                    animate={isInView ? { width: `${s.value}%` } : {}}
+                    transition={{ duration: 1.2, delay: 1.1 + i * 0.15, ease: 'easeOut' }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">{s.description}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
         {/* Footer line */}
         <motion.div
           className="text-center"
           initial={{ opacity: 0 }}
           animate={isInView ? { opacity: 1 } : {}}
-          transition={{ duration: 0.6, delay: 1 }}
+          transition={{ duration: 0.6, delay: 1.2 }}
         >
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm text-muted-foreground">
