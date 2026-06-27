@@ -2232,3 +2232,382 @@ Stage Summary:
 - ✅ Responsive: mobile (375x812) + desktop (1920x1080) verified, sticky footer CSS correct
 - ✅ Lint clean, zero console/page errors on both homepage and /affiliates
 - Note: Production dashboard view requires user registration (DB works on Vercel, not in local sandbox)
+
+---
+Task ID: 2-g
+Agent: Community + Marketplace Builder
+Task: Build CommunityLeaderboard and AgentMarketplace landing components
+
+Work Log:
+- Read worklog.md for project context (8-agent system, landing component patterns)
+- Surveyed existing landing components (AgentOSSection, StatsSection, ComparisonSection, BuildInPublicSection) for framer-motion + shadcn/ui patterns
+- Verified UI primitives available: Badge, Button, Card, Table (with overflow-x-auto wrapper)
+- Built /src/components/landing/CommunityLeaderboard.tsx (374 lines):
+  - 'use client', default export CommunityLeaderboard({ onStartFree })
+  - Badge "The Leaderboard" (purple), headline "Who dominates AI visibility this week?", subhead
+  - 4 tabs (Highest Score / Fastest Growing / Top SaaS / Top Agencies) with useState<TabKey> + shared layoutId="leaderboard-tab" pill that slides between tabs
+  - Top 8 rows per tab, each with rank (#1..#8), Crown for #1, Medal for #2/#3 (gold/amber/slate)
+  - Brand favicon-dot (colored circle w/ first letter) + category chip + big gradient score + weekly delta (emerald TrendingUp or rose TrendingDown)
+  - AnimatePresence mode="wait" wraps the keyed Table for crossfade on tab switch + staggered motion.tr entrance (0.04s per row)
+  - Dashed-border "Your brand could be here — claim your spot, start tracking →" CTA row at bottom of table (onStartFree)
+  - Footer "Scores updated every Monday. Public profile pages coming soon."
+  - id="leaderboard", py-24, purple primary, emerald/rose deltas, gold/amber medals, dark theme
+  - Table horizontally scrollable on mobile (min-w-[640px] inside overflow-x-auto)
+- Built /src/components/landing/AgentMarketplace.tsx (251 lines):
+  - 'use client', default export AgentMarketplace({ onStartFree })
+  - Badge "Coming Soon — Agent Marketplace" (purple) with pulsing "Soon" sub-tag
+  - Headline "The App Store for AI Visibility agents.", subhead about 80% revenue share
+  - 6 agent cards (Dental/Law/RealEstate/Ecommerce/SaaS/Enterprise) with name, author, description, price, "Notify me" button (purple outline, Bell icon)
+  - Each card: opacity-90 (muted), "Soon" ribbon with pulsing dot, hover lift + purple glow, accent gradient per vertical
+  - Builder CTA panel below grid: gradient panel "Build an agent. Reach 10,000+ seosights users. Keep 80% revenue." with "Apply as a builder →" button (onStartFree)
+  - Responsive grid 1→2→3 columns, staggered entrance (0.08s per card)
+  - id="marketplace", py-24, purple/fuchsia primary, dark theme
+- Ran `bunx tsc --noEmit --pretty 2>&1 | grep -iE "CommunityLeaderboard|AgentMarketplace" | head` — returned 0 lines (zero TS errors in either new file)
+
+Stage Summary:
+- Two new landing components created and type-clean
+- CommunityLeaderboard: tabbed ranking table with 4 datasets, animated tab transitions, medal iconography, CTA row, footer
+- AgentMarketplace: 6 coming-soon agent cards with notify-me CTAs + builder-recruitment panel
+- Both follow existing codebase conventions (purple primary on dark theme, framer-motion staggered entrance, shadcn/ui Button/Badge/Card/Table)
+- Both under 450 line budget (374 / 251)
+- Neither yet wired into the main landing page route — next agent should import + render <CommunityLeaderboard onStartFree={...}/> and <AgentMarketplace onStartFree={...}/> in app/page.tsx (or equivalent landing composition) with onStartFree propagated from the parent
+
+---
+Task ID: 2-a
+Agent: AI Visibility Score Section Builder
+Task: Build AIVisibilityScoreSection landing component
+
+Work Log:
+- Read /home/z/my-project/worklog.md to understand project context: seosights is "The Operating System for AI Search" (SEO + AEO + GEO), web app at https://seosights.com. Reviewed existing landing components (AgentOSSection, StatsSection, HeroSection, BuildInPublicSection) to match the established design system: dark glassmorphism, framer-motion useInView pattern (once: true, margin: '-100px'), Card/Badge/Button from shadcn, lucide-react icons, 'use client' directive, default export convention.
+- Verified lucide-react icon exports via node require check: Gauge, Sparkles, ArrowRight, MessageSquareQuote, FileCode2, Network, Share2 all confirmed available.
+- Created /home/z/my-project/src/components/landing/AIVisibilityScoreSection.tsx (381 lines, under the 450-line budget):
+  - 'use client' directive at top
+  - Default export: AIVisibilityScoreSection({ onStartFree }: { onStartFree?: () => void })
+  - Imports: motion + useInView from 'framer-motion', useRef from 'react', Button from '@/components/ui/button', Badge from '@/components/ui/badge', 7 lucide icons (Sparkles, Gauge, ArrowRight, MessageSquareQuote, Network, FileCode2, Share2)
+  - Hardcoded mock data: DEMO_SCORE=73, DEMO_BRAND='Acme Inc.', comparisons array (3 entries: Moz DA, Ahrefs DR, AI Visibility Score), factors array (4 entries: Citation Frequency 68, Entity Authority 81, Content Accessibility 92, Source Diversity 54)
+  - Hand-coded SVG ScoreGauge sub-component (270° arc, not a chart library):
+    • viewBox 0 0 320 320, center (160,160), radius 130
+    • Arc from 135° (bottom-left) clockwise 270° to 45° (bottom-right)
+    • Path command: M sx sy A r r 0 1 1 ex ey (large-arc-flag=1, sweep-flag=1)
+    • pathLength={1} normalization + strokeDasharray="1 1" + animate strokeDashoffset from 1 → (1 - score/100) = 0.27 for 73% fill
+    • 1.8s easeOut fill animation, 0.2s delay, triggered by parent useInView
+    • Purple linear gradient (a855f7 → c026d3 → d946ef) on the fill stroke
+    • 11 tick marks (0,10,…,100) with every 5th tick major + tinted purple
+    • Pulsing glow ring behind gauge: motion.div with infinite scale [1,1.08,1] + opacity [0.55,0.9,0.55] over 3.5s, blur-3xl, purple/fuchsia gradient
+    • Drop-shadow filter on the fill arc for extra glow
+    • Center: "AI Visibility Score" label (uppercase tracking-widest), big "73" number (text-6xl→7xl) with purple→fuchsia bg-clip-text gradient + tabular-nums, "/100" suffix, and a small pill with "Acme Inc." + emerald pulse dot indicating "live"
+  - Section layout (top to bottom):
+    1. Badge pill "The New Standard" (purple outline + bg-purple-500/10 + Sparkles icon)
+    2. Headline "One number tells you if AI will [recommend your business]." with purple gradient highlight on the bracketed phrase
+    3. Subhead (exact spec text) — "Domain Rating measures links. AI Visibility Score measures whether ChatGPT, Claude, Gemini & Perplexity actually cite you. 0–100. Updated daily. The metric your competitors will quote in boardrooms."
+    4. Central animated gauge (ScoreGauge component, 280px mobile → 360px desktop)
+    5. Comparison row (3 cards, md:grid-cols-3): Domain Authority (Moz) / Domain Rating (Ahrefs) / AI Visibility Score. Third card highlighted with border-2 border-purple-500/60 + shadow-[0_0_40px_rgba(168,85,247,0.22)] glow. Each card has Gauge icon, "Today's metric"/"Yesterday's metric" pill, name, and "Measures backlinks"/"Measures AI citations" line.
+    6. Score breakdown grid (sm:grid-cols-2, 4 cards): each card has icon tile (purple-500/15 bg), label, description, numeric value (e.g. "68/100"), and a thin 1.5px progress bar with gradient fill animated from width 0 → value% on inView (1.2s easeOut, staggered 0.1s delays).
+    7. Footer line: "Tracked across 5 AI engines. 40+ signals. Updated every 24 hours." with bolded numerics, plus a large gradient CTA button "Start tracking your score →" that calls onStartFree prop. Button uses purple→fuchsia gradient + purple glow shadow.
+  - Color rule enforced: purple/fuchsia as PRIMARY throughout (a855f7, c026d3, d946ef, purple-300/400/500/600, fuchsia-400/500/600). NO indigo, NO blue as primary. Emerald used ONLY for the "live" pulse dot. Slate/zinc neutrals via text-foreground/text-muted-foreground.
+  - Dark theme: section bg-background, cards bg-card with border border-white/10, text-foreground / text-muted-foreground.
+  - Background: absolute radial purple glow bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.08),transparent_70%)] + overflow-hidden to clip.
+  - Fully responsive: max-w-7xl mx-auto px-4 sm:px-6 lg:px-8, gauge scales 280px→360px, breakdown grid 1col→2col, comparison 1col→3col.
+  - Section padding py-24, id="ai-visibility-score" on the section element.
+  - All animations use framer-motion motion.* + useInView(ref, { once: true, margin: '-100px' }) from a single ref at the section root.
+- TypeScript check: ran `bunx tsc --noEmit --pretty 2>&1 | grep -i "AIVisibilityScoreSection"` → empty output, zero type errors in the new file. (Other pre-existing errors elsewhere in the codebase are unrelated and were ignored per task instructions.)
+
+Stage Summary:
+- Single file created: /home/z/my-project/src/components/landing/AIVisibilityScoreSection.tsx (381 lines)
+- Default export AIVisibilityScoreSection({ onStartFree }) ready to drop into the homepage composition
+- Visual anchor is the hand-coded 270° SVG gauge with animated arc fill (strokeDashoffset from 1 → 0.27 over 1.8s) showing score 73 for "Acme Inc.", purple gradient stroke, pulsing glow ring, tick marks, and a centered gradient number with "AI Visibility Score" label
+- Branding payload delivered: positions AI Visibility Score as "the Domain Authority / Domain Rating of the AI Search era" via the 3-card comparison row (Moz DA / Ahrefs DR / AI Visibility Score) with the third card visually highlighted as "Today's metric"
+- Score breakdown shows the 4 contributing factors (Citation Frequency 68, Entity Authority 81, Content Accessibility 92, Source Diversity 54) with animated progress bars to communicate that the score is composite + transparent
+- Premium feel via Stripe/Linear-grade spacing, gradient text, glow shadows, smooth staggered framer-motion inView animations
+- TypeScript clean for this file (no errors); purple-only primary color rule respected; under 450-line budget
+- Next action: a downstream agent should import AIVisibilityScoreSection into src/app/page.tsx (e.g. between StatsSection and FeaturesSection, or after HeroSection) and pass the existing onStartFree handler
+
+---
+Task ID: 2-b
+Agent: AI Recommendation Simulator Builder
+Task: Build AIRecommendationSimulator landing component
+
+Work Log:
+- Read worklog.md for project context (logo transparency + 8-agent system from Task 2)
+- Inspected existing landing components (AgentOSSection, AIVisibilityTimeline, CTASection) and shadcn/ui primitives (Button, Input, Badge, Card) to match conventions
+- Created /src/components/landing/AIRecommendationSimulator.tsx as 'use client' default export with { onStartFree } prop signature
+- Built mock data layer: shared REASONS array + 4 PromptScenario objects (one per quick-prompt chip) using a row() helper for compact, consistent engine results
+- Default "Best CRM for startups" scenario uses the exact spec mock values (ChatGPT pos #2 conf 78, Claude not mentioned, Gemini pos #4 conf 61, Perplexity not mentioned) with the specified competitor and source chips
+- Implemented 3-state UI via useState (currentPrompt, isSimulating, hasResults) + useInView for scroll-triggered header animations
+- Prompt input row: search-icon Input prefilled with default prompt, purple-gradient Run simulation Button, Enter-to-run, 4 quick-prompt chips below
+- Loading state: 1.8s simulated delay with 4 staggered engine rows (each with spinning Loader2 + "Querying <engine>…" label + animated shimmer bar)
+- Results: 2x2 grid (md+) collapsing to 1 column on mobile; each EngineResultCard has colored dot (emerald/amber/blue/cyan), Mentioned/Not Mentioned status badge (green/red), position + quoted snippet OR "You're invisible here." for not-mentioned, animated confidence bar (purple gradient for mentioned, red for not), competitor chips, source chips with ExternalLink icon
+- Not-mentioned cards use red border + red accent for the alarming "I need to fix this" emotion
+- Expandable "Why isn't your brand mentioned?" panel below grid with 3 reason bullets, each with a "Fix →" link that fires onStartFree
+- Footer: "This is what your customers see every day. Are you the answer?" + purple-gradient "Simulate your prompts →" button (onStartFree)
+- Color rule enforced: purple/fuchsia primary throughout (CTAs, gradients, source chips, focus rings, background radial glow); engine dots are small colored dots only (emerald/amber/blue/cyan) per spec
+- Used AnimatePresence mode="wait" for loading/results/idle transitions and staggered engine card entrance (delay 0.1 + index*0.12)
+- Compressed mock data and JSX to bring file from ~736 lines down to 539 lines (under 550 cap) while keeping readability
+- Ran `bunx tsc --noEmit --pretty 2>&1 | grep -i AIRecommendationSimulator` → no type errors reported
+
+Stage Summary:
+- New file: /src/components/landing/AIRecommendationSimulator.tsx (539 lines)
+- Default export: AIRecommendationSimulator({ onStartFree?: () => void })
+- Section id="recommendation-simulator", py-24, dark theme, purple primary, subtle radial purple glow
+- Killer-feature centerpiece: type prompt → 1.8s staggered multi-engine loading → 2x2 results grid with Mentioned/Not Mentioned status, position, snippet, confidence bar, competitor chips, source chips, and expandable "Why" panel with fix CTAs
+- 4 quick-prompt scenarios wired with realistic swapped competitor/source data
+- TypeScript check passed (0 errors for this file)
+- Component is ready to be imported into src/app/page.tsx (e.g. between AIVisibilityTimeline and RoadmapChecklist) — not wired in this task per scope
+
+---
+Task ID: 2-c
+Agent: Revenue Calculator + Forecast Builder
+Task: Build AIRevenueCalculator and AIVisibilityForecast landing components
+
+Work Log:
+- Read worklog.md for project context; reviewed existing landing components (AIVisibilityTimeline, CTASection, HowItWorksSection) for styling + framer-motion patterns
+- Confirmed shadcn Slider (@radix-ui/react-slider) and Checkbox components available at '@/components/ui/slider' and '@/components/ui/checkbox'
+- Confirmed framer-motion v12 installed with `animate`, `useMotionValue`, `useInView`, `AnimatePresence` exports
+- Wrote /src/components/landing/AIRevenueCalculator.tsx (400 lines):
+  * Purple-primary "CEO Math" section with badge + headline + subhead
+  * 3-column input grid: visitors slider (1K–500K, default 50K), current AI visibility slider (0–100%, default 12%), achievable target (computed 41% with industry-benchmark note)
+  * Custom shadcn Slider styling: purple gradient range, glowing thumb via [data-slot] selectors
+  * 5-stage horizontal funnel (Monthly Visitors → AI Visibility → Extra Impressions → Extra Leads → Extra Monthly Revenue) connected by ArrowRight/ArrowDown (rotates 90deg on mobile)
+  * Final revenue card highlighted with purple gradient bg + 0_0_30px purple glow
+  * Live recompute via useMemo: extraImpressions = visitors*(achv-cur)/100, extraLeads = impressions*0.0145, extraRevenue = leads*180
+  * Count-up hook (useMotionValue + animate + useEffect) animates monthly + annual figures on inView and on every slider change (starts from current displayed value, not 0)
+  * AnimatePresence delta chip below funnel showing "+$X/mo" or "-$X/mo" green/rose pill when revenue meaningfully changes (>50 delta)
+  * Annual revenue $X/year in large purple-gradient text + calculation footnote
+  * Footer: "This is the conversation that gets you budget. Show your CFO." + purple CTA button (onStartFree)
+- Wrote /src/components/landing/AIVisibilityForecast.tsx (421 lines):
+  * Purple-primary "90-Day Trajectory" section with badge + headline + subhead
+  * Forecast card with 2-col layout (lg:grid-cols-2): task list left, projection chart right
+  * 20 realistic AEO/GEO/SEO tasks with shadcn Checkboxes (default first 16 checked = headline scenario "16/20 → 91 in 90 days")
+  * Tasks render as buttons (full-row click target); completed tasks get purple bg + line-through label
+  * Scrollable task container (max-h-[340px]) with custom-scroll class
+  * Projection model: trajectory = [44, 44+tasks*1.0625, 44+tasks*2.1875, 44+tasks*2.9375], clamped to 100
+  * Hand-coded SVG line chart (560x280 viewBox, 4 data points): smooth cubic-bezier path, purple gradient area under line, gridlines at 0/25/50/75/100, X-axis labels Today/30d/60d/90d
+  * Animated line draw-in (pathLength 0→1 on inView, 1.4s easeInOut), dots + value-label badges appear staggered
+  * Chart redraws smoothly when tasks toggle (motion.path animates `d` since both paths share 4-point structure)
+  * Below chart: dynamic summary "If you complete X of 20 tasks, your AI Visibility Score reaches Y in 90 days." with AnimatePresence on the score number (fade/slide swap on change)
+  * Animated progress bar (gradient purple→fuchsia) showing completedTasks/20
+  * Footer: purple "Forecast your trajectory" CTA button (onStartFree)
+- Ran `bunx tsc --noEmit --pretty 2>&1 | grep -iE "AIRevenueCalculator|AIVisibilityForecast"` → zero output (no type errors in either file)
+- Both files verified under 450-line limit (400 + 421)
+- Color discipline: purple primary throughout, emerald reserved only for positive-delta pill and "+pts" deltas; no indigo/blue primary
+- Both sections use py-24 padding, dark theme, responsive (sliders full-width mobile, funnel stacks vertically on mobile, forecast card stacks via grid-cols-1 lg:grid-cols-2)
+- IDs set: id="revenue-calculator" and id="forecast" as specified
+
+Stage Summary:
+- Two new landing components shipped: AIRevenueCalculator.tsx (CEO math / revenue calculator with live funnel + count-up animation) and AIVisibilityForecast.tsx (90-day projection with interactive task list + hand-coded SVG chart)
+- Both default-export React components accept { onStartFree?: () => void } prop, matching existing landing section convention
+- Type-checks clean (no errors in either new file); all other pre-existing project errors untouched
+- Total lines: 821 (both files); each under 450-line limit
+- Purple-primary color system maintained throughout, emerald used only for positive deltas
+- Files ready to be imported into src/app/page.tsx landing composition (next integration step)
+
+---
+Task ID: 2-f
+Agent: Visibility Map + Terminal Preview Builder
+Task: Build AIVisibilityMap and TerminalPreview landing components
+
+Work Log:
+- Read worklog.md for context (Phase 4 + QA-Final state). Reviewed existing landing components (AIVisibilityTimeline, AgentOSSection, DashboardPreview, CTASection) to match design system: dark theme, py-24 sections, max-w-7xl container, framer-motion inView pattern, Badge/Button from shadcn/ui, purple/amber/emerald accent palette.
+- Wrote /src/components/landing/AIVisibilityMap.tsx (243 lines):
+  - 'use client' + default export `AIVisibilityMap({ onStartFree })`
+  - Purple Badge "Your Visibility At A Glance" (Eye icon)
+  - Headline "Five AI engines. Five different verdicts." with purple→pink→amber gradient on second clause
+  - 5-engine bar map centered max-w-3xl: ChatGPT 82 (emerald dot), Claude 61 (amber dot), Gemini 91 (violet dot #8b5cf6), Perplexity 53 (cyan dot), Copilot 74 (blue dot)
+  - Each row: name+colored dot (w-28/sm:w-32 col) | full-width track bg-white/5 | filled bar that animates width 0→score% on inView (staggered delay 0.3+i*0.12, ease 'easeOut', duration 1.1s)
+  - Score number rendered INSIDE bar at right edge (flex justify-end pr-2, font-mono text-lg, white with drop-shadow) — slides in with the bar
+  - Bar color logic: ≥70 emerald (Dominant, Activity icon), 40-69 amber (Competitive, TrendingUp icon), <40 rose (Invisible, EyeOff icon)
+  - Status row aligned under track: status label + "— insight" (Claude insight matches spec example verbatim)
+  - Aggregate callout: "Overall AI Visibility Score: 72 / 100" computed as round(mean(82,61,91,53,74))=72, big purple mono number + emerald pill "↑ 4 since last week" (ArrowUpRight icon)
+  - Footer Button "Map your visibility →" (Activity icon, bg-purple-500 hover:bg-purple-400, purple glow shadow)
+  - id="visibility-map", py-24, purple glow backdrop
+- Wrote /src/components/landing/TerminalPreview.tsx (481 lines, under 500):
+  - 'use client' + default export `TerminalPreview({ onStartFree })`
+  - Purple Badge "The Terminal" (Radio icon)
+  - Headline "The Bloomberg Terminal for AI Visibility." with gradient
+  - Subhead verbatim from spec
+  - Terminal card max-w-6xl, rounded-xl, bg-slate-950/80, purple glow shadow-[0_0_60px_rgba(168,85,247,0.12)]
+  - Top bar: 3 chrome dots (rose/amber/emerald) + monospace title "seosights — AI Visibility Terminal — Acme Inc." + live clock (useEffect setInterval 1000ms, useState<Date|null> null to avoid SSR hydration mismatch) + LIVE pulse (framer-motion opacity 1→0.45→1 loop 1.6s, emerald dot + "LIVE" mono)
+  - Grid: grid-cols-1 md:grid-cols-3 gap-3 p-3
+    * Panel A (md:col-span-2): AI Visibility Score — 72/100 big purple mono (ticking ±1 every 3s, clamp 68-76) + emerald "+4 30-day trend" pill (TrendingUp icon) + hand-coded SVG sparkline (30 values, purple #a855f7, smooth cubic-bezier + gradient area fill + end dot)
+    * Panel B: Citation Velocity — today's count big amber mono (ticking ±1 every 3s, clamp 5-11) + 7-day mini bar chart (today highlighted amber-400, others amber-500/40, M/T/W/T/F/S/S labels)
+    * Panel C: Live AI Crawl — 4 monospace rows: GPTBot→/pricing, ClaudeBot→/blog/llms-txt, PerplexityBot→/robots.txt (blocked, rose dot), Google-Extended→/ (all with status dot + time)
+    * Panel D: Prompt Rankings — 3 rows: "best crm for startups" #2 emerald, "crm for small business" #5 emerald, "affordable crm" — italic rose "not ranked"
+    * Panel E: Top Competitor Gap — Bot icon (rose) + "Notion" + TrendingDown + "+111 citations" rose mono
+    * Panel F (md:col-span-3): Entity Authority — hand-coded SVG half-arc radial gauge 81/100 purple + 4 metadata cells (Wikipedia Yes, Wikidata Yes, Crunchbase No rose, Knowledge Graph Linked purple) + monospace hint "Add a Crunchbase profile to close the citation gap."
+  - Each panel: bg-slate-950/60 border-white/5 rounded-lg p-3, header label text-[10px] uppercase tracking-wider text-muted-foreground with purple dot
+  - Footer Button "Get terminal access →" (Activity icon, purple)
+  - id="terminal", py-24
+- Compaction pass: tightened type signatures (Sparkline, RadialGauge, Panel, TerminalPreview) and inlined CrawlRow/PromptRow interfaces to bring TerminalPreview from 517→481 lines, under the 500-line limit.
+- Type-check: `bunx tsc --noEmit --pretty 2>&1 | grep -iE "AIVisibilityMap|TerminalPreview"` → empty output (zero errors). Pre-existing errors in unrelated AICitationExplorer.tsx remain (out of scope for this task).
+
+Stage Summary:
+- ✅ AIVisibilityMap.tsx (243 lines, <350 limit) — per-engine bar viz with 5 engines, animated widths, status insights, aggregate score 72/100 with emerald delta, purple-primary footer CTA
+- ✅ TerminalPreview.tsx (481 lines, <500 limit) — Bloomberg-style terminal mock with 6 dense panels, live clock + LIVE pulse, ticking score/citation numbers every 3s, hand-coded SVG sparkline + radial gauge, monospace data, dark slate-950 terminal aesthetic
+- ✅ Both files type-check clean (zero TS errors in grep filter)
+- ✅ Design system consistent with existing landing components (Badge/Button shadcn/ui, framer-motion inView, purple primary, py-24 sections, max-w containers)
+- ✅ Color rules respected: purple primary throughout, engine dots small/colored only, score bars emerald/amber/rose by state, no indigo/blue primary
+- ✅ Responsive: file 1 bars full-width on mobile; file 2 grid→single column on mobile, clock hidden on <sm, panels stack cleanly
+- ✅ All required Lucide icons used from the approved list (Activity, TrendingUp, TrendingDown, EyeOff, Eye, ArrowUpRight / Radio, Clock, Bot, Activity, TrendingUp, TrendingDown)
+- Note: Components built but NOT yet wired into /src/app/page.tsx (out of scope — parent orchestrator will integrate alongside any sibling section builders from this batch)
+
+---
+Task ID: 2-e
+Agent: Influence Graph + War Room Builder
+Task: Build AIInfluenceGraph and AICompetitorWarRoom landing components
+
+Work Log:
+- Read worklog.md for full context on Phase 4 dashboard + EntityGraphBuilder precedent (hand-coded SVG, purple primary)
+- Built /src/components/landing/AIInfluenceGraph.tsx (518 lines, under 550-line budget):
+  • Badge: "The Authority Map" (purple), headline + subhead per spec
+  • Hand-coded SVG (760×780 viewBox, NO graph library) with 6 vertical layers: Brand → Entities (4) → Reviews/Forums (5) → News (3) → Wikipedia/Wikidata (2) → AI Engines (4) = 19 nodes total
+  • 24 edges between adjacent layers — solid purple = strong authority, dashed rose (#f43f5e) = broken/missing
+  • Edge endpoints math-trimmed to node radii (no overlap with circle strokes) using dx/dy/len vector calc
+  • Brand node: 3 pulsing concentric rings (staggered delay, repeat:Infinity), radial gradient fill, glow halo
+  • All other nodes: status-colored (strong=purple, weak=amber, missing=rose), status dot top-right, motion.g backOut entrance staggered by index, whileHover scale 1.12, onClick toggle selectedId
+  • selectedNode state — defaults to 'wikipedia' so the punchline panel ("#1 reason Claude doesn't cite you") shows on first scroll-in
+  • Edges draw in via framer-motion pathLength 0→1, staggered 0.04s per edge
+  • When a node is selected: its edges brighten (opacity 0.78) + thicken (strokeWidth 2.6) and other edges dim to 0.16
+  • AnimatePresence mode="wait" on side panel — slides x:20 on enter, x:-20 on exit
+  • Side panel: layer Badge, X close button, title, description, status Badge (emerald/amber/rose), purple CTA Button with fix label
+  • Empty state: 3-stat grid (solidCount=14, brokenCount=10, missingCount=5) computed dynamically
+  • Legend below SVG: 5 swatches (solid edge, dashed-red edge, strong/weak/missing dots)
+  • Footer: "Map your influence graph →" Button (onStartFree)
+  • Layout: lg:grid-cols-5 (SVG col-span-3, panel col-span-2); stacks to 1 col on mobile
+  • id="influence-graph", py-24, dark theme, purple radial blur accent
+- Built /src/components/landing/AICompetitorWarRoom.tsx (363 lines, under 450-line budget):
+  • Badge: "Competitive Intelligence" (purple), headline + subhead per spec
+  • Competitor selector: 3 chips (Notion 📝 / Monday.com 📊 / ClickUp ⚡), activeId state, default 'notion'
+  • Active chip = purple-600 fill + glow shadow; inactive = white/5 + muted
+  • Comparison matrix: HTML table with min-w-[640px] + overflow-x-auto wrapper (horizontal scroll on mobile)
+    - Rows: ChatGPT / Claude / Gemini / Perplexity (color-coded text per engine)
+    - Columns: AI Engine | You | Competitor | Gap | Top reason
+    - Gap cell: red badge (TrendingDown) if negative, green badge (TrendingUp) if positive, white badge (Minus) if neutral; gap value prefixed with + if positive
+    - Rows stagger-in (x:-10, opacity 0→1, 0.08s delay each)
+  • Reasons breakdown: grid md:grid-cols-2, AnimatePresence mode="wait" wrapping whole grid keyed on active.id (slide y:15 enter, y:-15 exit when switching competitor)
+    - 5 reason cards per competitor: Reddit presence / Wikipedia article / Review volume (G2) / News coverage / Schema & llms.txt
+    - Each card: icon (MessageSquare/BookOpen/Star/Newspaper/FileCode2) in rose-tinted square (or muted if neutral), label, severity %, detail line, gap bar (you vs competitor), "Close this gap →" link
+    - Schema card always neutral (severity 0) — shows "No action needed" with CheckCircle2 icon
+    - Gap bar animates width 0→{severity}% on inView, staggered 0.08s
+  • "Why {name} wins" header above reasons with "N fixable gaps" purple Badge (counts non-neutral reasons)
+  • Footer: "Enter the war room →" Button (onStartFree)
+  • id="war-room", py-24, dark theme, purple radial blur accent
+- Both files use 'use client', default exports, useState, framer-motion, shadcn Button/Badge (+Card in file 2), Lucide icons
+- Color discipline: purple primary throughout, NO indigo/blue primary; rose for broken edges + negative gaps; emerald for wins/positive gaps; amber for weak status
+- Ran `bunx tsc --noEmit --pretty 2>&1 | grep -iE "AIInfluenceGraph|AICompetitorWarRoom" | head` → ZERO TypeScript errors in either file (no output = clean)
+
+Stage Summary:
+- ✅ /src/components/landing/AIInfluenceGraph.tsx — 518 lines, hand-coded SVG influence graph (19 nodes, 24 edges, solid/dashed distinction, clickable nodes with side panel + fix CTA, pulsing brand node, animated edge draw-in + node entrance, AnimatePresence side panel, default selection = Wikipedia for instant punchline)
+- ✅ /src/components/landing/AICompetitorWarRoom.tsx — 363 lines, competitor chips + engine × you/competitor matrix table + 5-card reasons breakdown with gap bars and Close-this-gap CTAs, AnimatePresence reason switching when competitor changes
+- ✅ Both components compile clean — zero TypeScript errors
+- ✅ Both within line budgets (File 1: 518/550, File 2: 363/450)
+- ✅ Both follow design spec exactly: purple primary, rose for gaps/broken, emerald for wins, dark theme, py-24, proper IDs, responsive (grid stacks on mobile, table scrolls horizontally)
+- ✅ Ready for integration agent to import into page.tsx and wire onStartFree
+
+---
+Task ID: 2-d
+Agent: Citation Explorer + Opportunity Finder Builder
+Task: Build AICitationExplorer and AIOpportunityFinder landing components
+
+Work Log:
+- Read worklog.md and inspected existing landing components (AIVisibilityTimeline, BacklinksSection, ComparisonSection, FreeToolsSection) to match conventions: 'use client', framer-motion useInView pattern, shadcn Button/Badge/Card, purple/emerald accent system, onStartFree prop, py-24 section padding.
+- Verified lucide-react@0.525.0 icon availability: `Wikipedia` and `Reddit` are NOT exported by this version. Substituted `BookOpen` for Wikipedia-style sources and `MessagesSquare` for Reddit threads. All other icons in the task's listed palette exist.
+- Built /src/components/landing/AICitationExplorer.tsx (399 lines):
+  * Purple "The AI Backlink Checker" badge, gradient headline, subhead about ChatGPT recommending competitors.
+  * 4-column clickable engine summary bar (ChatGPT 31×, Claude 14×, Gemini 8×, Perplexity 42×), each with engine-specific accent color (emerald/amber/cyan/purple).
+  * useState activeEngine + useState expandedId for tab + row expansion.
+  * 24 mock citation sources for "Acme CRM" (6 per engine): Reddit, Wikipedia, G2, Forbes, Medium, GitHub, Quora, Trustpilot, Crunchbase — each with mentions count, last-seen date, High/Medium/Low authority pill, and an italic quoted snippet revealed on row expand.
+  * AnimatePresence mode="wait" for tab switching, staggered card entrance, height-animated expandable rows with ChevronDown rotation.
+  * Footer "Explore your citations →" purple button (onStartFree).
+- Built /src/components/landing/AIOpportunityFinder.tsx (396 lines):
+  * Purple "Where You're Losing" badge, headline "Your competitor is mentioned 162 times. You: 11." with rose accent.
+  * 3-column comparison header: You (11, rose) | −151 citation gap (rose, center) | Top Competitor Notion (162, emerald).
+  * 8-card missing-sources grid: Reddit (38), Quora (12), G2 (24), Trustpilot (9), Crunchbase (6), Wikidata (4), YouTube (18), Wikipedia (1) — each showing competitor-vs-you delta, gap, and purple "Fix →" button. Hover reveals CSS tooltip: "We'll generate a step-by-step plan to get cited here."
+  * Staggered card entrance with motion variants.
+  * Projected impact callout: "Closing 4 of these gaps could add ~48 AI citations and raise your AI Visibility Score by ~14 points."
+  * Footer "Find your opportunities →" purple button (onStartFree).
+- Compressed mock data to single-line-per-entry object literals to keep both files under the 500-line limit (399 + 396).
+- Fixed apostrophe-in-string bug (Acme CRM's) by switching that snippet to backtick template literal.
+- Ran `bunx tsc --noEmit --pretty 2>&1 | grep -iE "AICitationExplorer|AIOpportunityFinder" | head` → zero TypeScript errors for both files.
+
+Stage Summary:
+- Two new landing components shipped, both under 500 lines, both TypeScript-clean.
+- AICitationExplorer.tsx: 4-engine tabbed citation explorer with expandable source rows and quoted snippets; purple primary, per-engine accent colors; uses useState activeEngine + useState expandedId; AnimatePresence for tab + row transitions.
+- AIOpportunityFinder.tsx: comparison header (11 vs 162 = −151 gap), 8-card missing-sources grid with hover tooltips and "Fix →" CTAs, projected impact callout (+48 citations, +14 points); purple primary, rose for losses, emerald for competitor/positive.
+- Both components follow existing project conventions: 'use client', default export, onStartFree prop, framer-motion useInView, shadcn Button/Badge/Card, dark theme, py-24 section padding, ids `citation-explorer` and `opportunity-finder`.
+- Icon substitution noted in worklog: lucide-react@0.525.0 lacks Wikipedia/Reddit exports → BookOpen + MessagesSquare used as visually-equivalent substitutes. No external libs added.
+- Next action: integrate both sections into the landing page route (likely app/page.tsx or a sections aggregator) — not done in this task per scope.
+
+---
+Task ID: 2-c
+Agent: Revenue Calculator + Forecast Builder
+Task: Build AIRevenueCalculator and AIVisibilityForecast landing components
+
+Work Log:
+- Read /home/z/my-project/worklog.md (last ~150 lines) for Phase 4 + QA-Final context; noted prior 2-c entry had shipped both files. Re-entered to verify current on-disk state still matches the spec and re-ran the type-check.
+- Inspected /home/z/my-project/src/components/landing/AIRevenueCalculator.tsx (400 lines, under 450 limit):
+  * 'use client', default export `AIRevenueCalculator({ onStartFree })`, id="revenue-calculator", py-24
+  * Purple "The CEO Math" Badge + gradient headline "Turn AI visibility into revenue." + spec subhead
+  * shadcn Slider (@radix-ui/react-slider confirmed present at @/components/ui/slider) used for Step 1 visitors (1K–500K, default 50K) and Step 2 current AI visibility (0–100%, default 12%); both styled with purple gradient range + glowing thumb via [data-slot=...] selectors
+  * Step 3 achievable (41%) shown as computed target with "based on your industry benchmark" note
+  * 5-stage horizontal funnel (Visitors → AI Visibility → Extra Impressions → Extra Leads → Extra Monthly Revenue) with ArrowRight (rotated to ArrowDown on mobile via md:rotate-0); revenue card highlighted with purple gradient bg + 0_0_30px purple glow
+  * useMemo live recompute: extraImpressions = visitors*(41-currentVis)/100, extraLeads = extraImpressions*0.0145, extraRevenue = extraLeads*180
+  * Count-up via useMotionValue+animate(useCountUp hook) animates monthly + annual figures, re-fires on every target change (starts from current displayed value, not 0)
+  * AnimatePresence delta chip below funnel showing "+$X/mo" emerald / "-$X/mo" rose pill when revenue changes by >$50
+  * Annual revenue "$X/year" in big purple-gradient text + calculation footnote
+  * Footer: "This is the conversation that gets you budget. Show your CFO." + purple "Calculate your revenue →" Button (onStartFree)
+- Inspected /home/z/my-project/src/components/landing/AIVisibilityForecast.tsx (421 lines, under 450 limit):
+  * 'use client', default export `AIVisibilityForecast({ onStartFree })`, id="forecast", py-24
+  * Purple "Your 90-Day Trajectory" Badge + gradient headline "See your AI Visibility Score 90 days from now." + spec subhead
+  * 2-col forecast card (lg:grid-cols-2, stacks on mobile): scrollable task list left, projection chart right
+  * 20 realistic AEO/GEO/SEO tasks with shadcn Checkbox (@/components/ui/checkbox confirmed present); DEFAULT_CHECKED=16 matches the headline "16/20 → 91 in 90 days" scenario
+  * Tasks rendered as full-row buttons; completed tasks get purple bg + line-through label
+  * Hand-coded SVG (560×280 viewBox, 4 data points 44/61/79/91 at default): smooth cubic-bezier path, purple gradient area under line, gridlines at 0/25/50/75/100, X-axis labels Today/30d/60d/90d, dots + value-label badges
+  * Animated line draw-in via motion.path pathLength 0→1 on inView (1.4s easeInOut); dots + badges stagger in
+  * Projection model: trajectory = [44, 44+tasks*1.0625, 44+tasks*2.1875, 44+tasks*2.9375], clamped to 100 — chart path smoothly re-animates as tasks toggle
+  * Below chart: dynamic "If you complete X of 20 tasks, your AI Visibility Score reaches Y in 90 days." with AnimatePresence on the score number (fade/slide swap)
+  * Animated progress bar (purple→fuchsia gradient, 0_0_10px glow) showing completedTasks/20
+  * Footer: purple "Forecast your trajectory →" Button (onStartFree)
+- Ran `cd /home/z/my-project && bunx tsc --noEmit --pretty 2>&1 | grep -iE "AIRevenueCalculator|AIVisibilityForecast" | head` → ZERO output (no type errors in either file)
+- Verified spec markers via ripgrep: 'use client', useState, useMemo, useInView, AnimatePresence, useMotionValue+animate, id="revenue-calculator"/id="forecast", bg-purple-600 CTAs, purple primary throughout, emerald reserved for positive deltas only, no indigo/blue primary
+- Both files already present from a prior 2-c run; this pass confirms they still satisfy every spec requirement and remain TypeScript-clean
+
+Stage Summary:
+- ✅ /src/components/landing/AIRevenueCalculator.tsx (400 lines, <450) — CEO-math revenue calculator: 3-step input (visitors slider, current AI visibility slider, achievable 41% target), live 5-stage funnel, count-up monthly+annual revenue, AnimatePresence delta chip, purple-highlighted revenue card with glow, footer CFO-sell CTA. id="revenue-calculator".
+- ✅ /src/components/landing/AIVisibilityForecast.tsx (421 lines, <450) — 90-day projection: 20-task interactive checklist (16 default done), hand-coded SVG line chart (44→61→79→91) with purple gradient area + animated pathLength draw-in + dot/badge stagger, dynamic "X of 20 → score Y in 90 days" summary with AnimatePresence score swap, animated progress bar, footer forecast CTA. id="forecast".
+- ✅ Both files TypeScript-clean (grep filter returned empty)
+- ✅ Color discipline: purple primary throughout, emerald only for positive-delta chip; no indigo/blue primary
+- ✅ All required hooks present: useState (sliders/checkboxes), useMemo (computed funnel/trajectory), useInView (chart/count-up triggers), AnimatePresence (delta chip + score swap), useMotionValue+animate (count-up)
+- ✅ shadcn/ui Slider + Checkbox used (both confirmed to exist at @/components/ui/slider and @/components/ui/checkbox — Radix-backed)
+- ✅ Both sections responsive (sliders full-width mobile, funnel stacks via flex-col md:flex-row, forecast card stacks via grid-cols-1 lg:grid-cols-2), py-24, dark theme
+- Components ready for integration into /src/app/page.tsx (next step — out of scope for this task)
+
+---
+Task ID: 2-h
+Agent: Free Tools Expansion
+Task: Expand free-tools.ts with 25+ new tool entries
+
+Work Log:
+- Read worklog.md (last 120 lines) for Phase 4 dashboard context and free-tools design precedents
+- Read /src/data/free-tools.ts in full (831 lines) — confirmed FreeTool interface shape and existing 10 tool entries (ai-visibility-checker, llms-txt-generator, schema-generator, robots-txt-tester, gptbot-checker, claudebot-checker, geo-audit, aeo-audit, prompt-visibility-checker, entity-graph-viewer)
+- Audited /src/components/site/IconRenderer.tsx — only 9 icons supported (Eye, FileText, Code, Bot, Search, Globe, MessageSquare, Network, Sparkles). New tools need 12 additional icons.
+- Verified lucide-react@0.525.0 exports for all candidate icons via `ls node_modules/lucide-react/dist/esm/icons/` (link-2, quote, trending-up, gauge, target, bar-chart-3, shield-check, list-checks, help-circle, tag, calculator, book-open, brain all present)
+- Extended IconRenderer.tsx: imported + added switch cases for Link2, Quote, TrendingUp, Gauge, Target, BarChart3, ShieldCheck, ListChecks, HelpCircle, Tag, Calculator, BookOpen, Brain (default fallback unchanged — still Sparkles)
+- Appended 27 new FreeTool entries to freeTools array via single Edit operation (replaced the closing `},\n]` of entity-graph-viewer with `},\n<27 new entries>\n]`). Existing 10 tools untouched, interface untouched, freeToolCategories untouched, getToolBySlug/getRelatedTools unchanged.
+- New tools (slugs): chatgpt-rank-checker, claude-rank-checker, gemini-rank-checker, perplexity-rank-checker, copilot-rank-checker, ai-citation-checker, brand-mention-scanner, ai-snippet-tester, citation-velocity-tracker, entity-finder, entity-gap-analyzer, ai-authority-score, knowledge-graph-explorer, wikidata-checker, ai-readiness-audit, ai-content-readability-checker, answer-format-checker, ai-crawl-tester, ai-schema-generator, ai-prompt-generator, faq-schema-generator, ai-meta-tag-generator, ai-competitor-citation-report, ai-opportunity-finder, ai-visibility-forecast, ai-revenue-calculator, ai-influence-graph-viewer
+- Status split: first 12 = live (per-engine rank checkers, citation/mention/snippet/velocity tools, entity-finder, entity-gap-analyzer, ai-authority-score); remaining 15 = coming-soon
+- Category distribution: Visibility 14, Entities 7, Schema 4, Audits 4, Crawlers 1 — matches the existing 5 categories exactly
+- Color discipline: every new tool uses purple/fuchsia/violet/emerald/amber/cyan (NO indigo, NO blue as primary). Existing indigo (claudebot-checker) and blue (robots-txt-tester) entries untouched per task rules.
+- Voice/tone matched existing tools: taglines are outcome-focused ("Will ChatGPT recommend you first?", "Will Claude cite you first?", "What does AI think you are?"), descriptions mention specific engines (ChatGPT/Claude/Gemini/Perplexity/Copilot, GPT-4o, Sonnet/Opus, Sonar, GPTBot/ClaudeBot/PerplexityBot/Google-Extended/CCBot), longDescriptions explain the AI-visibility problem before the solution, howItWorks = 3-4 steps with title+description, keyBenefits = 5 bullets, faq = 4 Q&A pairs, relatedSlugs = 3 genuinely-related tools drawn from the full 37-tool list
+- Realistic content throughout — concrete metrics (5-15 citations/week for healthy GEO program, 30-60 day gap closure, 0-100 scoring rubrics, 40-point audit, 30/60/90-day forecast), specific engine behavior nuances (Perplexity drives referral traffic vs. ChatGPT/Claude don't; Claude favors primary sources; Gemini is leading indicator for AI Overviews; Copilot dominates B2B at-work queries)
+- Ran `bunx tsc --noEmit --pretty 2>&1 | grep -iE "free-tools|IconRenderer" | head` → zero output (clean). Full `bunx tsc --noEmit` shows only pre-existing errors in unrelated files (api routes, dashboard components, landing components) — none in free-tools.ts or IconRenderer.tsx
+- Verified: 37 total tool entries in array (10 existing + 27 new), 12 live + 15 coming-soon among new tools, freeToolCategories array unchanged at 5 entries
+
+Stage Summary:
+- ✅ 27 new tools appended to /src/data/free-tools.ts (file grew from 831 → 2127 lines)
+- ✅ All 27 new tools populate every required FreeTool field (slug, name, tagline, description, longDescription, icon, color, bg, status, category, metaTitle, metaDescription, keywords[6-10], howItWorks[3-4], keyBenefits[5], faq[4], relatedSlugs[3], inputLabel, inputPlaceholder, ctaText, resultsIntro)
+- ✅ Existing 10 tools, FreeTool interface, freeToolCategories, and helper functions (getToolBySlug, getRelatedTools) untouched
+- ✅ IconRenderer.tsx extended with 13 new icon imports + cases (Link2, Quote, TrendingUp, Gauge, Target, BarChart3, ShieldCheck, ListChecks, HelpCircle, Tag, Calculator, BookOpen, Brain) — required for new tool icons to render correctly via the static switch-statement pattern (avoids react-hooks/static-components lint error)
+- ✅ Zero TypeScript errors in free-tools.ts and IconRenderer.tsx (verified via filtered tsc grep)
+- ✅ AI-visibility repositioning reinforced throughout — every tool frames around "will AI recommend/cite/mention/rank you" rather than generic SEO; per-engine specificity (ChatGPT/Claude/Gemini/Perplexity/Copilot) drives high-intent SEO long-tail
+- ✅ Color rules respected — purple/fuchsia/violet/emerald/amber/cyan only on new tools; no indigo/blue as primary
+- Next: integration agent should consider updating the /free-ai-seo-tools/page.tsx metadata ("10 Free AEO, GEO & LLM Visibility Tools" → "37 Free AI Visibility Tools") and the homepage FreeToolsSection to surface the expanded catalog; also consider rebuilding the sitemap to include the 27 new /free-ai-seo-tools/[slug] routes (generateStaticParams in [slug]/page.tsx already iterates the array, so no code change needed there — new routes will be statically generated automatically on next build)

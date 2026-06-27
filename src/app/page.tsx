@@ -4,7 +4,19 @@ import { useState, useEffect, useRef } from 'react'
 import Navbar from '@/components/landing/Navbar'
 import HeroSection from '@/components/landing/HeroSection'
 import SocialProofSection from '@/components/landing/SocialProofSection'
+import AIVisibilityScoreSection from '@/components/landing/AIVisibilityScoreSection'
+import AIVisibilityMap from '@/components/landing/AIVisibilityMap'
+import AIRecommendationSimulator from '@/components/landing/AIRecommendationSimulator'
+import TerminalPreview from '@/components/landing/TerminalPreview'
 import DashboardPreview from '@/components/landing/DashboardPreview'
+import AIRevenueCalculator from '@/components/landing/AIRevenueCalculator'
+import AICitationExplorer from '@/components/landing/AICitationExplorer'
+import AIOpportunityFinder from '@/components/landing/AIOpportunityFinder'
+import AIInfluenceGraph from '@/components/landing/AIInfluenceGraph'
+import AICompetitorWarRoom from '@/components/landing/AICompetitorWarRoom'
+import AIVisibilityForecast from '@/components/landing/AIVisibilityForecast'
+import CommunityLeaderboard from '@/components/landing/CommunityLeaderboard'
+import AgentMarketplace from '@/components/landing/AgentMarketplace'
 import FeaturesSection from '@/components/landing/FeaturesSection'
 import AIVisibilityTimeline from '@/components/landing/AIVisibilityTimeline'
 import RoadmapChecklist from '@/components/landing/RoadmapChecklist'
@@ -160,7 +172,19 @@ export default function Home() {
       <Navbar onStartFree={() => setIsModalOpen(true)} />
       <HeroSection onStartFree={() => openRegistration('starter')} />
       <SocialProofSection />
+      <AIVisibilityScoreSection onStartFree={() => openRegistration('starter')} />
+      <AIVisibilityMap onStartFree={() => openRegistration('starter')} />
+      <AIRecommendationSimulator onStartFree={() => openRegistration('starter')} />
+      <TerminalPreview onStartFree={() => openRegistration('starter')} />
       <DashboardPreview onStartFree={() => openRegistration('starter')} />
+      <AIRevenueCalculator onStartFree={() => openRegistration('starter')} />
+      <AICitationExplorer onStartFree={() => openRegistration('starter')} />
+      <AIOpportunityFinder onStartFree={() => openRegistration('starter')} />
+      <AIInfluenceGraph onStartFree={() => openRegistration('starter')} />
+      <AICompetitorWarRoom onStartFree={() => openRegistration('starter')} />
+      <AIVisibilityForecast onStartFree={() => openRegistration('starter')} />
+      <CommunityLeaderboard onStartFree={() => openRegistration('starter')} />
+      <AgentMarketplace onStartFree={() => openRegistration('starter')} />
       <FeaturesSection />
       <AIVisibilityTimeline />
       <RoadmapChecklist />

@@ -8,6 +8,19 @@ import {
   MessageSquare,
   Sparkles,
   Network,
+  Link2,
+  Quote,
+  TrendingUp,
+  Gauge,
+  Target,
+  BarChart3,
+  ShieldCheck,
+  ListChecks,
+  HelpCircle,
+  Tag,
+  Calculator,
+  BookOpen,
+  Brain,
   type LucideProps,
 } from 'lucide-react'
 
@@ -39,6 +52,32 @@ export default function IconRenderer({ name, ...props }: { name: string } & Luci
       return <Network {...props} />
     case 'Sparkles':
       return <Sparkles {...props} />
+    case 'Link2':
+      return <Link2 {...props} />
+    case 'Quote':
+      return <Quote {...props} />
+    case 'TrendingUp':
+      return <TrendingUp {...props} />
+    case 'Gauge':
+      return <Gauge {...props} />
+    case 'Target':
+      return <Target {...props} />
+    case 'BarChart3':
+      return <BarChart3 {...props} />
+    case 'ShieldCheck':
+      return <ShieldCheck {...props} />
+    case 'ListChecks':
+      return <ListChecks {...props} />
+    case 'HelpCircle':
+      return <HelpCircle {...props} />
+    case 'Tag':
+      return <Tag {...props} />
+    case 'Calculator':
+      return <Calculator {...props} />
+    case 'BookOpen':
+      return <BookOpen {...props} />
+    case 'Brain':
+      return <Brain {...props} />
     default:
       return <Sparkles {...props} />
   }

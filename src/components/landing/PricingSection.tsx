@@ -90,7 +90,7 @@ const plans = [
     period: '/month',
     freeTrial: '14-day free trial',
     description:
-      'For SEO freelancers and growing marketing teams who need the full Three Sights engine. Most popular.',
+      'For SEO freelancers and growing marketing teams who need the full AI Visibility engine. Most popular.',
     features: [
       {
         icon: Check,
@@ -192,7 +192,7 @@ const plans = [
     period: '',
     freeTrial: null,
     description:
-      'Complete dominance in your niche. Our team + 8 AI agents handle everything while you focus on your business. Tailored to your needs.',
+      'Complete dominance in your niche. Our team + AI agents handle everything while you focus on your business. Tailored to your needs.',
     features: [
       {
         icon: Check,
@@ -259,7 +259,7 @@ export default function PricingSection({ onStartFree, onAgencyRegister, onTierSe
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-6"
           >
             <Star className="w-3.5 h-3.5" />
-            One Platform. Three Sights. Zero Agency Fees.
+            One Metric. Five AI Engines. Zero Agency Fees.
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             Pricing that scales{' '}
@@ -269,7 +269,7 @@ export default function PricingSection({ onStartFree, onAgencyRegister, onTierSe
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             14-day free trial. No credit card required. No contracts — cancel
-            anytime. All Three Sights included on every plan.
+            anytime. Every plan tracks your AI Visibility Score across ChatGPT, Claude, Gemini & Perplexity.
           </p>
         </motion.div>
 
@@ -314,7 +314,7 @@ export default function PricingSection({ onStartFree, onAgencyRegister, onTierSe
           transition={{ duration: 0.5, delay: 0.8 }}
         >
           <p className="text-muted-foreground text-sm">
-            All plans include full SEO · AEO · GEO analysis. No credit card
+            All plans include AI Visibility Score tracking, citation monitoring, and llms.txt generation. No credit card
             required for trial. No contracts — cancel anytime.
           </p>
           <p className="text-muted-foreground/60 text-xs flex items-center justify-center gap-2 flex-wrap">

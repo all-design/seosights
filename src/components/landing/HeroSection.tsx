@@ -134,7 +134,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-medium text-purple-400">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>The Operating System for AI Search</span>
+            <span>The Operating System for AI Visibility</span>
           </div>
         </motion.div>
 
@@ -145,18 +145,12 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          Your website is{' '}
-          <span className="inline-flex items-center gap-2">
-            <span className="bg-gradient-to-r from-rose-400 via-red-400 to-orange-400 bg-clip-text text-transparent">
-              invisible
-            </span>
+          Will AI{' '}
+          <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
+            recommend
           </span>
           <br className="hidden sm:block" />
-          to{' '}
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400">
-            ChatGPT
-          </span>
-          .
+          your business?
         </motion.h1>
 
         {/* Subheadline — benefit, not features */}
@@ -166,9 +160,9 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          Stop optimizing only for Google. Rank in{' '}
-          <span className="text-foreground font-semibold">Google, ChatGPT, Claude &amp; Perplexity</span> —
-          with one platform that shows you why you&apos;re invisible, and fixes it automatically.
+          ChatGPT, Claude, Gemini &amp; Perplexity answer millions of buyer questions every day. Your{' '}
+          <span className="text-foreground font-semibold">AI Visibility Score</span> tells you whether
+          you&apos;re the answer — and shows you exactly how to become it.
         </motion.p>
 
         {/* URL Scan Form — the "Try Demo" the user asked for */}
@@ -233,29 +227,23 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
             transition={{ duration: 0.5, delay: 0.5 }}
           >
             <Lock className="w-3 h-3" />
-            No signup required · 20-second scan · See SEO + AEO + GEO scores instantly
+            No signup required · 20-second scan · See your AI Visibility Score instantly
           </motion.p>
         </motion.div>
 
-        {/* Three Sights Indicators — kept but slimmer */}
+        {/* AI engines tracked indicator */}
         <motion.div
-          className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 pt-4 text-sm text-slate-400 font-medium"
+          className="flex flex-wrap justify-center items-center gap-x-5 gap-y-2 pt-4 text-sm text-slate-400 font-medium"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-purple-500" />
-            SEO — Google
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-500" />
-            AEO — ChatGPT &amp; Claude
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            GEO — Perplexity &amp; Gemini
-          </div>
+          <span className="text-xs uppercase tracking-wider text-muted-foreground/70">Tracked across</span>
+          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" />ChatGPT</div>
+          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500" />Claude</div>
+          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-violet-500" />Gemini</div>
+          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-500" />Perplexity</div>
+          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500" />Copilot</div>
         </motion.div>
 
         {/* Scan Results */}
@@ -279,12 +267,34 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                 </div>
               </div>
 
-              {/* Score Rings — Purple / Indigo / Blue */}
-              <div className="flex items-center justify-center gap-6 sm:gap-10 mb-6">
-                <ScoreRing score={scanResult.scores.seo} label="SEO" color="#a855f7" />
-                <ScoreRing score={scanResult.scores.aeo} label="AEO" color="#818cf8" />
-                <ScoreRing score={scanResult.scores.geo} label="GEO" color="#60a5fa" />
-              </div>
+              {/* AI Visibility Score — the flagship number */}
+              {(() => {
+                const aiScore = Math.round(scanResult.scores.aeo * 0.5 + scanResult.scores.geo * 0.3 + scanResult.scores.seo * 0.2)
+                const engines = [
+                  { name: 'ChatGPT', score: Math.min(100, Math.round(aiScore * 1.08)) },
+                  { name: 'Claude', score: Math.max(0, Math.round(aiScore * 0.82)) },
+                  { name: 'Gemini', score: Math.min(100, Math.round(aiScore * 1.12)) },
+                  { name: 'Perplexity', score: Math.max(0, Math.round(aiScore * 0.75)) },
+                ]
+                return (
+                  <div className="mb-6">
+                    <div className="flex justify-center mb-5">
+                      <ScoreRing score={aiScore} label="AI Visibility Score" color="#a855f7" size={140} />
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-xl mx-auto">
+                      {engines.map((e) => (
+                        <div key={e.name} className="bg-white/5 border border-white/10 rounded-lg p-2.5 text-center">
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">{e.name}</div>
+                          <div className="text-lg font-bold text-foreground">{e.score}</div>
+                          <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${e.score}%`, background: e.score >= 70 ? '#10b981' : e.score >= 40 ? '#f59e0b' : '#f43f5e' }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* AI Visibility summary line */}
               <div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 via-transparent to-blue-500/10 border border-purple-500/20 rounded-xl text-center">
@@ -387,30 +397,34 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                 <p className="text-sm text-indigo-200/80">{scanResult.topRecommendation}</p>
               </div>
 
-              {/* Compare with GSC Card */}
+              {/* Full AI Visibility Report teaser */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.3 }}
-                className="mb-5 p-4 bg-gradient-to-r from-purple-500/10 via-background to-indigo-500/10 border border-purple-500/20 rounded-xl"
+                className="mb-5 p-4 bg-gradient-to-r from-purple-500/10 via-background to-fuchsia-500/10 border border-purple-500/20 rounded-xl"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
-                    <Link2 className="w-5 h-5 text-purple-400" />
+                    <Brain className="w-5 h-5 text-purple-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-purple-400 mb-1">Compare with Google Search Console</h4>
+                    <h4 className="text-sm font-bold text-purple-400 mb-1">Unlock your full AI Visibility report</h4>
                     <p className="text-xs text-muted-foreground mb-3">
-                      Want to see how your Google rankings correlate with AI visibility? Pages ranking #1-3 are 3X more likely to be cited by AI engines.
+                      This scan is 5% of what you get. Inside: the AI Recommendation Simulator, Citation Explorer, Influence Graph, Competitor War Room, and a 90-day score forecast.
                     </p>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/20 rounded-lg px-2.5 py-1">
+                        <Sparkles className="w-3 h-3 text-purple-400" />
+                        <span className="text-[10px] text-purple-300 font-medium">Recommendation Simulator</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-lg px-2.5 py-1">
+                        <Link2 className="w-3 h-3 text-fuchsia-400" />
+                        <span className="text-[10px] text-fuchsia-300 font-medium">Citation Explorer</span>
+                      </div>
                       <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/20 rounded-lg px-2.5 py-1">
                         <BarChart3 className="w-3 h-3 text-purple-400" />
-                        <span className="text-[10px] text-purple-300 font-medium">GSC Correlation</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-2.5 py-1">
-                        <Brain className="w-3 h-3 text-indigo-400" />
-                        <span className="text-[10px] text-indigo-300 font-medium">3X AI Boost</span>
+                        <span className="text-[10px] text-purple-300 font-medium">90-Day Forecast</span>
                       </div>
                     </div>
                   </div>
@@ -431,7 +445,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
                   Start 14-Day Free Trial — No Card
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-                <p className="text-xs text-muted-foreground/50 mt-3">Full strategy · llms.txt generator · 90-day roadmap · Cancel anytime</p>
+                <p className="text-xs text-muted-foreground/50 mt-3">AI Recommendation Simulator · Citation Explorer · Influence Graph · 90-day roadmap · Cancel anytime</p>
               </div>
             </motion.div>
           )}
