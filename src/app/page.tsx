@@ -7,6 +7,11 @@ import SocialProofSection from '@/components/landing/SocialProofSection'
 import DashboardPreview from '@/components/landing/DashboardPreview'
 import FeaturesSection from '@/components/landing/FeaturesSection'
 import AIVisibilityTimeline from '@/components/landing/AIVisibilityTimeline'
+import AIMissionControl from '@/components/landing/AIMissionControl'
+import AIDiff from '@/components/landing/AIDiff'
+import AICompetitorRace from '@/components/landing/AICompetitorRace'
+import AIStickyScore from '@/components/landing/AIStickyScore'
+import AIIndexStatus from '@/components/landing/AIIndexStatus'
 import AIVisibilityReplay from '@/components/landing/AIVisibilityReplay'
 import AIRecommendationRecorder from '@/components/landing/AIRecommendationRecorder'
 import AIAutoExecute from '@/components/landing/AIAutoExecute'
@@ -168,6 +173,11 @@ export default function Home() {
       <DashboardPreview onStartFree={() => openRegistration('starter')} />
       <FeaturesSection />
       <AIVisibilityTimeline />
+      <AIMissionControl onStartFree={() => openRegistration('starter')} />
+      <AIDiff onStartFree={() => openRegistration('starter')} />
+      <AICompetitorRace onStartFree={() => openRegistration('starter')} />
+      <AIStickyScore onStartFree={() => openRegistration('starter')} />
+      <AIIndexStatus onStartFree={() => openRegistration('starter')} />
       <AIVisibilityReplay onStartFree={() => openRegistration('starter')} />
       <AIRecommendationRecorder onStartFree={() => openRegistration('starter')} />
       <AIAutoExecute onStartFree={() => openRegistration('starter')} />
