@@ -247,6 +247,6 @@ function detectTierFromPriceId(priceId: string): string | null {
 function getTierFromPriceId(amount: number): string {
   if (amount >= 29900) return 'managed'   // $299.00+
   if (amount >= 7900) return 'pro'        // $79.00+
-  if (amount >= 500) return 'starter'     // $5.00+
+  if (amount >= 990) return 'starter'     // $9.90+
   return 'free_trial'
 }

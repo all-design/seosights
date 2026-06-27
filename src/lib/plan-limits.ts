@@ -15,7 +15,7 @@
  * 4. agents_enabled    — Which of the 8 agents are available
  * 5. allow_white_label — White-label reports (Pro+ only)
  * 6. monthly_cost_cap  — Maximum USD that agents can spend on LLM tokens per month
- *                         (Kill-Switch: prevents a $5 Starter user from burning $200 in API costs)
+ *                         (Kill-Switch: prevents a $9.90 Starter (promo) user from burning $200 in API costs)
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * KILL-SWITCH LOGIC (Financial Protection)
@@ -26,7 +26,7 @@
  * 2. Compare against monthly_cost_cap for their tier
  * 3. If cap exceeded → PAUSE agents, notify user to upgrade
  *
- * This prevents a single malicious Starter ($5) user from running
+ * This prevents a single malicious Starter ($9.90 promo) user from running
  * a 10,000-page site through 8 agents and generating a $200 OpenAI bill.
  */
 
@@ -64,7 +64,7 @@ export const PLAN_LIMITS: Record<string, PlanLimitConfig> = {
     max_audits_per_month: 10,
     allow_white_label: false,
     agents_enabled: ['all'],       // All 8 agents work, but only on 1 domain
-    monthly_cost_cap: 3.00,       // $3 cap — 60% of $5 revenue protected
+    monthly_cost_cap: 5.00,       // $5 cap — reasonable for $9.90 promo price
     priority_support: false,
     api_access: false,
   },
@@ -323,7 +323,7 @@ export interface CostCapResult {
  * 2. Compare against monthly_cost_cap for their tier
  * 3. If cap exceeded → PAUSE agents, notify user to upgrade
  *
- * Example: Starter plan ($5/month) → $3 monthly_cost_cap
+ * Example: Starter plan ($9.90/month promo) → $5 monthly_cost_cap
  *   If user's agents have already spent $3.01 in API costs this month,
  *   the system pauses agents and shows:
  *   "You've reached your processing limit for this month.

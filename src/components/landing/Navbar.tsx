@@ -68,7 +68,15 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                 seosights
               </span>
               <span className="text-[8px] tracking-[0.2em] text-purple-400/60 uppercase leading-none mt-0.5">
-                LOVE AT FIRST SIGHT
+                AI Visibility Intelligence
+              </span>
+            </div>
+
+            {/* Powered by AI Router™ badge */}
+            <div className="hidden md:flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-semibold text-emerald-400 tracking-wide uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Powered by AI Router™
               </span>
             </div>
 

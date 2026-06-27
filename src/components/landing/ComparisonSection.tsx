@@ -103,7 +103,7 @@ const rows: ComparisonRow[] = [
   },
   {
     feature: 'Price starts at',
-    seosights: '$19/mo',
+    seosights: '$9.90/mo',
     ahrefs: '$129/mo',
     semrush: '$139/mo',
     surfer: '$89/mo',

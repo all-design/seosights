@@ -49,7 +49,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     key: 'stripe_starter_price_id',
     label: 'Starter Plan Price ID',
-    description: 'Stripe Price ID for the Starter plan ($5/month).',
+    description: 'Stripe Price ID for the Starter plan ($9.90/month launch promo, then $19/month).',
     category: 'payment',
     isSecret: false,
     placeholder: 'price_...',

@@ -51,7 +51,7 @@ export const PLAN_PRICES = {
 
 // Monthly amounts for each plan (in cents, for fallback tier detection)
 export const PLAN_AMOUNTS = {
-  starter: 1900,    // $19.00
+  starter: 990,     // $9.90 (launch promo)
   pro: 7900,        // $79.00
   managed: 19900,   // $199.00
 } as const

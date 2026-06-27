@@ -45,6 +45,8 @@ interface PricingCardProps {
   userId?: string
   onStartFree?: () => void
   onTierSelect?: (tier: RegistrationTier) => void
+  promoNote?: string
+  originalPrice?: string
 }
 
 export default function PricingCard({
@@ -66,6 +68,8 @@ export default function PricingCard({
   userId,
   onStartFree,
   onTierSelect,
+  promoNote,
+  originalPrice,
 }: PricingCardProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -146,6 +150,15 @@ export default function PricingCard({
         </div>
       )}
 
+      {/* Promo badge */}
+      {promoNote && (
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+          <Badge className="bg-emerald-500 text-white font-bold px-4 py-1 shadow-[0_0_20px_rgba(16,185,129,0.3)] uppercase text-[10px] tracking-wider">
+            🚀 Launch Special — 50% Off
+          </Badge>
+        </div>
+      )}
+
       <Card
         className={`bg-white/5 backdrop-blur-sm border-2 ${borderColor} ${glowColor} transition-all duration-300 h-full flex flex-col ${
           highlighted
@@ -175,6 +188,9 @@ export default function PricingCard({
           <div className="mt-4">
             <span className="text-4xl font-bold">{price}</span>
             <span className="text-muted-foreground text-lg">{period}</span>
+            {originalPrice && (
+              <span className="ml-2 text-lg text-muted-foreground/50 line-through">{originalPrice}</span>
+            )}
           </div>
           {freeTrial && (
             <Badge

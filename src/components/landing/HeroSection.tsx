@@ -134,7 +134,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-medium text-purple-400">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>The Operating System for AI Visibility</span>
+            <span>The AI Visibility Intelligence Platform</span>
           </div>
         </motion.div>
 

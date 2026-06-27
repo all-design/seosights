@@ -5,9 +5,9 @@ import PricingPageClient from './pricing-page-client'
 const SITE_URL = 'https://seosights.com'
 
 export const metadata: Metadata = {
-  title: 'Pricing — seosights | SEO · AEO · GEO Plans from $19/mo',
+  title: 'Pricing — seosights | SEO · AEO · GEO Plans from $9.90/mo',
   description:
-    'Simple pricing for seosights. Starter $19/mo, Pro $79/mo, Agency $199/mo, Enterprise custom. 14-day free trial, no credit card required. All Three Sights included on every plan.',
+    'Simple pricing for seosights. Starter $9.90/mo (50% off 6 months, then $19/mo), Pro $79/mo, Agency $199/mo, Enterprise custom. 14-day free trial, no credit card required. All Three Sights included on every plan.',
   keywords: [
     'seosights pricing',
     'seo pricing',
@@ -18,17 +18,17 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: '/pricing' },
   openGraph: {
-    title: 'Pricing — seosights | SEO · AEO · GEO Plans from $19/mo',
+    title: 'Pricing — seosights | SEO · AEO · GEO Plans from $9.90/mo',
     description:
-      'Starter $19, Pro $79, Agency $199, Enterprise custom. 14-day free trial, no credit card required.',
+      'Starter $9.90 (promo), Pro $79, Agency $199, Enterprise custom. 14-day free trial, no credit card required.',
     url: `${SITE_URL}/pricing`,
     type: 'website',
     images: [{ url: '/og-image.png', width: 1344, height: 768, alt: 'seosights Pricing' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'seosights Pricing — Plans from $19/mo',
-    description: 'Starter $19, Pro $79, Agency $199, Enterprise custom. 14-day free trial.',
+    title: 'seosights Pricing — Plans from $9.90/mo',
+    description: 'Starter $9.90 (promo), Pro $79, Agency $199, Enterprise custom. 14-day free trial.',
     images: ['/og-image.png'],
   },
 }
@@ -45,7 +45,7 @@ const offersJsonLd = {
       item: {
         '@type': 'Offer',
         name: 'Starter',
-        price: '19',
+        price: '9.90',
         priceCurrency: 'USD',
         description: 'For website owners, bloggers, and small businesses.',
         url: `${SITE_URL}/pricing#starter`,

@@ -1858,7 +1858,7 @@ function SettingsTab() {
             <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal ml-4">
               <li>Create a Stripe account at <span className="text-foreground">stripe.com</span></li>
               <li>Get your <span className="text-foreground">Secret Key</span> from Dashboard → Developers → API keys</li>
-              <li>Create Products &amp; Prices in Stripe Dashboard for each plan (Starter $5/mo, Pro $79/mo)</li>
+              <li>Create Products &amp; Prices in Stripe Dashboard for each plan (Starter $9.90/mo promo, then $19/mo; Pro $79/mo)</li>
               <li>Copy each <span className="text-foreground">Price ID</span> (price_...) into the fields above</li>
               <li>Set up a <span className="text-foreground">Webhook endpoint</span> pointing to <code className="text-foreground">https://seosights.com/api/webhooks/stripe</code></li>
               <li>Copy the <span className="text-foreground">Webhook Secret</span> (whsec_...) into the field above</li>

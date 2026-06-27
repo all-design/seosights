@@ -39,9 +39,11 @@ const plans = [
   {
     name: 'Starter',
     subtitle: 'For website owners & bloggers',
-    price: '$19',
+    price: '$9.90',
     period: '/month',
-    freeTrial: '14-day free trial',
+    freeTrial: '6 months at 50% off, then $19/mo',
+    promoNote: 'Launch Special: 50% off first 6 months',
+    originalPrice: '$19',
     description:
       'For website owners, bloggers, and small businesses who want insight into their AI and SEO visibility.',
     features: [
@@ -141,7 +143,7 @@ const plans = [
     period: '/month',
     freeTrial: '14-day free trial',
     description:
-      'For SEO agencies generating reports for clients. Save $5,000/month vs hiring. Full white-label.',
+      'For SEO agencies generating reports for clients. Full white-label.',
     features: [
       {
         icon: Check,
@@ -301,6 +303,8 @@ export default function PricingSection({ onStartFree, onAgencyRegister, onTierSe
                 userId={userId}
                 onStartFree={onStartFree}
                 onTierSelect={onTierSelect}
+                promoNote={'promoNote' in plan ? (plan as Record<string, unknown>).promoNote as string : undefined}
+                originalPrice={'originalPrice' in plan ? (plan as Record<string, unknown>).originalPrice as string : undefined}
               />
             </motion.div>
           ))}

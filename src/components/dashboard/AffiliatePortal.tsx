@@ -164,16 +164,16 @@ export default function AffiliatePortal({ userId, onClose }: AffiliatePortalProp
   const referralTableData = useMemo(() => {
     const packages = [
       { name: 'Pro ($79)', earning: '$15.80/mo' },
-      { name: 'Starter ($29)', earning: '$5.80/mo' },
+      { name: 'Starter ($9.90→$19)', earning: '$4.95/mo' },
       { name: 'Pro ($79)', earning: '$15.80/mo' },
-      { name: 'Managed ($299)', earning: '$59.80/mo' },
-      { name: 'Starter ($29)', earning: '$5.80/mo' },
+      { name: 'Agency ($199)', earning: '$59.80/mo' },
+      { name: 'Starter ($9.90→$19)', earning: '$4.95/mo' },
       { name: 'Pro ($79)', earning: '$15.80/mo' },
       { name: 'Pro ($79)', earning: '$15.80/mo' },
-      { name: 'Starter ($29)', earning: '$2.90/mo' },
-      { name: 'Managed ($299)', earning: '$89.70/mo' },
+      { name: 'Starter ($9.90→$19)', earning: '$4.95/mo' },
+      { name: 'Agency ($199)', earning: '$89.70/mo' },
       { name: 'Pro ($79)', earning: '$15.80/mo' },
-      { name: 'Starter ($29)', earning: '$5.80/mo' },
+      { name: 'Starter ($9.90→$19)', earning: '$4.95/mo' },
       { name: 'Pro ($79)', earning: '$31.60/mo' },
     ]
     const statuses: ('Active' | 'Trial' | 'Churned')[] = [

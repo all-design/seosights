@@ -25,12 +25,12 @@ export default function SiteFooter() {
                 seosights
               </span>
               <span className="text-[7px] tracking-[0.15em] text-purple-400/60 uppercase leading-none mt-0.5">
-                Multiple pillars, one unified AI engine
+                AI Visibility Intelligence Platform
               </span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-              The operating system for AI search. Three Sights — SEO, AEO, GEO — powered by 8 AI
-              agents that audit, strategize, and auto-execute.
+              The AI Visibility Intelligence Platform. Track, measure, and improve how AI engines
+              recommend your business — every day.
             </p>
           </div>
 
@@ -85,6 +85,14 @@ export default function SiteFooter() {
                   </Link>
                 </li>
               ))}
+              <li>
+                <Link
+                  href="/prompt-library"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Prompt Library
+                </Link>
+              </li>
             </ul>
           </div>
 

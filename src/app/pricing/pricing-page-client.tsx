@@ -53,9 +53,11 @@ const plans: Plan[] = [
     id: 'starter',
     name: 'Starter',
     subtitle: 'For website owners & bloggers',
-    price: '$19',
+    price: '$9.90',
     period: '/month',
-    freeTrial: '14-day free trial',
+    freeTrial: '6 months at 50% off, then $19/mo',
+    promoNote: 'Launch Special: 50% off first 6 months',
+    originalPrice: '$19',
     description:
       'For website owners, bloggers, and small businesses who want insight into their AI and SEO visibility.',
     features: [
@@ -106,7 +108,7 @@ const plans: Plan[] = [
     period: '/month',
     freeTrial: '14-day free trial',
     description:
-      'For SEO agencies generating reports for clients. Save $5,000/month vs hiring. Full white-label.',
+      'For SEO agencies generating reports for clients. Full white-label.',
     features: [
       { icon: Check, title: 'Everything in Pro, plus:', description: '' },
       { icon: Palette, title: 'White-Label Reports', description: 'Generate complete SEO/AEO/GEO audits with your logo and agency branding.' },
@@ -242,6 +244,14 @@ export default function PricingPageClient() {
                       </Badge>
                     </div>
                   )}
+                  {'promoNote' in plan && (plan as Record<string, unknown>).promoNote && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <Badge className="bg-emerald-500 text-white border-0 px-3 py-1 flex items-center gap-1 uppercase text-[10px] tracking-wider font-bold">
+                        <Sparkles className="w-3 h-3" />
+                        Launch Special — 50% Off
+                      </Badge>
+                    </div>
+                  )}
                   <CardContent className="p-6 flex flex-col h-full">
                     <div className="mb-4">
                       <h3 className={`text-xl font-bold ${plan.iconColor}`}>{plan.name}</h3>
@@ -252,6 +262,9 @@ export default function PricingPageClient() {
                         <span className="text-4xl font-bold">{plan.price}</span>
                         {plan.period && (
                           <span className="text-sm text-muted-foreground">{plan.period}</span>
+                        )}
+                        {'originalPrice' in plan && (plan as Record<string, unknown>).originalPrice && (
+                          <span className="text-sm text-muted-foreground/50 line-through ml-1">{(plan as Record<string, unknown>).originalPrice as string}{plan.period}</span>
                         )}
                       </div>
                       {plan.freeTrial && (

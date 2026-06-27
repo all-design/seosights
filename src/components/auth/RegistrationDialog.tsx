@@ -47,8 +47,8 @@ const TIER_CONFIG: Record<RegistrationTier, {
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/20',
     borderColor: 'border-emerald-500/30',
-    description: '1 month free trial · $5/month after',
-    badgeText: '1 Month Free Trial',
+    description: '14-day free trial · $9.90/mo for 6 months, then $19/mo',
+    badgeText: 'Launch Special · 50% Off',
   },
   pro: {
     label: 'Pro Agency',
@@ -377,7 +377,7 @@ export default function RegistrationDialog({
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
                 <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
                   <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                  {tier === 'managed' ? 'Custom Timeline' : '1 Month Free Trial'}
+                  {tier === 'managed' ? 'Custom Timeline' : '14-Day Free Trial'}
                 </div>
                 <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
