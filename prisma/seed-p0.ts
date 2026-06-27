@@ -3,7 +3,7 @@ import { db } from '../src/lib/db'
 async function main() {
   console.log('🌱 Seeding P0 demo data...')
 
-  const domain = 'example.com'
+  const domain = 'seosights.com'
   const userId = 'demo-user-pro'
   const now = new Date()
   const oneHour = 3600000

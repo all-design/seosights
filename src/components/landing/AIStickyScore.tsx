@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Eye,
   Gauge,
+  Loader2,
   Minus,
   Monitor,
   Pin,
@@ -25,10 +26,44 @@ interface AIStickyScoreProps {
   onStartFree?: () => void
 }
 
-// ── Mock Data ─────────────────────────────────────────────────
-const SCORE = { current: 71, yesterday: 68, delta: 3 }
+interface MissionControlResponse {
+  score: {
+    overall: number
+    trust: number
+    freshness: number
+    authority: number
+  }
+  engines: Array<{
+    name: string
+    indexed: boolean
+    citations: number
+    lastCrawled: string | null
+  }>
+  recentActivity: Array<{
+    id: string
+    type: string
+    title: string
+    description: string
+    engine: string | null
+    delta: number
+    severity: string
+    createdAt: string
+  }>
+  opportunities: number
+  alerts: number
+  _meta: {
+    status: 'live' | 'estimated' | 'simulation'
+    source: string
+  }
+}
 
-const SPARKLINE_DATA = [62, 64, 63, 66, 65, 68, 67, 69, 71]
+// ── Fallback Data ─────────────────────────────────────────────
+const FALLBACK_SCORE = { current: 71, delta: 3 }
+const FALLBACK_SPARKLINE = [62, 64, 63, 66, 65, 68, 67, 69, 71]
+
+const ENGINE_ICON_MAP: Record<string, typeof Gauge> = {
+  default: Gauge,
+}
 
 // Mock dashboard sections to simulate scrolling
 const DASHBOARD_SECTIONS = [
@@ -40,6 +75,8 @@ const DASHBOARD_SECTIONS = [
 
 // ── Sparkline Component ───────────────────────────────────────
 function MiniSparkline({ data, width = 80, height = 28 }: { data: number[]; width?: number; height?: number }) {
+  if (data.length === 0) return null
+
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
@@ -82,7 +119,19 @@ function MiniSparkline({ data, width = 80, height = 28 }: { data: number[]; widt
 }
 
 // ── Sticky Widget Component ───────────────────────────────────
-function StickyWidget({ visible }: { visible: boolean }) {
+function StickyWidget({
+  visible,
+  score,
+  delta,
+  sparklineData,
+  isLoading,
+}: {
+  visible: boolean
+  score: number
+  delta: number
+  sparklineData: number[]
+  isLoading: boolean
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8, y: 10 }}
@@ -95,20 +144,35 @@ function StickyWidget({ visible }: { visible: boolean }) {
           <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">AI Visibility</span>
           <Pin className="h-3 w-3 text-emerald-400" />
         </div>
-        <div className="flex items-end gap-2">
-          <span className="text-2xl font-bold font-mono text-emerald-400">{SCORE.current}</span>
-          <span className="text-xs font-mono text-white/30 mb-1">/100</span>
-        </div>
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-emerald-400">
-            <TrendingUp className="h-2.5 w-2.5" />
-            +{SCORE.delta}
-          </span>
-          <span className="text-[9px] text-white/30">vs yesterday</span>
-        </div>
-        <div className="mt-2">
-          <MiniSparkline data={SPARKLINE_DATA} width={160} height={24} />
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-10">
+            <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
+          </div>
+        ) : (
+          <>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-bold font-mono text-emerald-400">{score}</span>
+              <span className="text-xs font-mono text-white/30 mb-1">/100</span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              {delta >= 0 ? (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-emerald-400">
+                  <TrendingUp className="h-2.5 w-2.5" />
+                  +{delta}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-red-400">
+                  <Minus className="h-2.5 w-2.5" />
+                  {delta}
+                </span>
+              )}
+              <span className="text-[9px] text-white/30">vs yesterday</span>
+            </div>
+            <div className="mt-2">
+              <MiniSparkline data={sparklineData} width={160} height={24} />
+            </div>
+          </>
+        )}
       </div>
     </motion.div>
   )
@@ -121,7 +185,55 @@ export default function AIStickyScore({ onStartFree }: AIStickyScoreProps) {
   const [activeSection, setActiveSection] = useState(0)
   const [widgetVisible, setWidgetVisible] = useState(false)
 
-  // Simulate scrolling through dashboard sections
+  // ── API State ─────────────────────────────────────────────
+  const [data, setData] = useState<MissionControlResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // ── Derived display values with fallback ──────────────────
+  const displayScore = data?.score.overall ?? FALLBACK_SCORE.current
+  const displayDelta = data
+    ? data.recentActivity.reduce((sum, a) => sum + a.delta, 0)
+    : FALLBACK_SCORE.delta
+  const displaySparkline = data
+    ? (() => {
+        // Build sparkline from recentActivity deltas: accumulate from base score
+        const activities = [...data.recentActivity].reverse() // oldest first
+        if (activities.length === 0) return FALLBACK_SPARKLINE
+        let running = data.score.overall - activities.reduce((s, a) => s + a.delta, 0)
+        return activities.map(a => {
+          running += a.delta
+          return Math.max(0, Math.min(100, running))
+        })
+      })()
+    : FALLBACK_SPARKLINE
+
+  // ── Fetch function ────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(prev => data === null ? true : prev) // only show loading on first fetch
+      const res = await fetch('/api/ai/mission-control?domain=seosights.com')
+      if (!res.ok) throw new Error(`API returned ${res.status}`)
+      const json: MissionControlResponse = await res.json()
+      setData(json)
+      setError(null)
+    } catch (err) {
+      console.error('Failed to fetch mission control data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch data')
+      // Keep existing data as fallback (or fallback defaults if never loaded)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [data])
+
+  // ── Initial fetch + auto-refresh every 60s ────────────────
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 60_000)
+    return () => clearInterval(interval)
+  }, [fetchData])
+
+  // ── Simulate scrolling through dashboard sections ─────────
   useEffect(() => {
     if (!isInView) return
 
@@ -249,20 +361,61 @@ export default function AIStickyScore({ onStartFree }: AIStickyScoreProps) {
                         </span>
                       </div>
 
-                      {/* Mock content blocks */}
+                      {/* Content blocks — show real engine data when available */}
                       <div className="space-y-3">
                         <div className="h-20 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                          <span className="text-xs text-white/20 font-mono">Chart Area</span>
+                          {data && data.engines.length > 0 ? (
+                            <div className="flex items-center gap-4">
+                              {data.engines.slice(0, 4).map(engine => (
+                                <div key={engine.name} className="flex items-center gap-1.5">
+                                  <div className={`w-2 h-2 rounded-full ${engine.indexed ? 'bg-emerald-400' : 'bg-white/20'}`} />
+                                  <span className="text-[10px] font-mono text-white/40">{engine.name}</span>
+                                  <span className="text-[10px] font-mono text-white/20">({engine.citations})</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-white/20 font-mono">Chart Area</span>
+                          )}
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {[1, 2, 3].map(n => (
-                            <div key={n} className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                              <span className="text-[10px] text-white/15 font-mono">Metric {n}</span>
-                            </div>
-                          ))}
+                          {data ? (
+                            <>
+                              <div className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
+                                <span className="text-[10px] text-white/30 font-mono">Trust {data.score.trust}</span>
+                              </div>
+                              <div className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
+                                <span className="text-[10px] text-white/30 font-mono">Fresh {data.score.freshness}</span>
+                              </div>
+                              <div className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
+                                <span className="text-[10px] text-white/30 font-mono">Auth {data.score.authority}</span>
+                              </div>
+                            </>
+                          ) : (
+                            [1, 2, 3].map(n => (
+                              <div key={n} className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
+                                <span className="text-[10px] text-white/15 font-mono">Metric {n}</span>
+                              </div>
+                            ))
+                          )}
                         </div>
                         <div className="h-24 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                          <span className="text-xs text-white/20 font-mono">Data Table</span>
+                          {data && data.recentActivity.length > 0 ? (
+                            <div className="flex items-center gap-3 overflow-hidden px-2">
+                              {data.recentActivity.slice(0, 3).map(activity => (
+                                <div key={activity.id} className="flex items-center gap-1 shrink-0">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${
+                                    activity.severity === 'positive' ? 'bg-emerald-400' :
+                                    activity.severity === 'negative' ? 'bg-red-400' :
+                                    'bg-amber-400'
+                                  }`} />
+                                  <span className="text-[9px] text-white/30 font-mono max-w-[100px] truncate">{activity.title}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-white/20 font-mono">Data Table</span>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -270,7 +423,13 @@ export default function AIStickyScore({ onStartFree }: AIStickyScoreProps) {
                 </div>
 
                 {/* Sticky Widget — the star of the show */}
-                <StickyWidget visible={widgetVisible} />
+                <StickyWidget
+                  visible={widgetVisible}
+                  score={displayScore}
+                  delta={displayDelta}
+                  sparklineData={displaySparkline}
+                  isLoading={isLoading}
+                />
               </div>
             </CardContent>
           </Card>
@@ -335,23 +494,47 @@ export default function AIStickyScore({ onStartFree }: AIStickyScoreProps) {
           <div className="rounded-2xl border border-emerald-500/20 bg-[#0d1117]/80 backdrop-blur-xl shadow-xl shadow-black/30 p-4 w-full max-w-xs">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Widget Preview</span>
-              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5 py-0">
-                LIVE
+              <Badge className={`text-[10px] px-1.5 py-0 ${
+                data?._meta.status === 'live'
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                  : data?._meta.status === 'estimated'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                    : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+              }`}>
+                {isLoading ? 'LOADING' : data?._meta.status?.toUpperCase() ?? 'LIVE'}
               </Badge>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <div className="flex items-end gap-1.5">
-                  <span className="text-3xl font-bold font-mono text-emerald-400">{SCORE.current}</span>
-                  <span className="text-sm font-mono text-white/30 mb-1">/100</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <Plus className="h-3 w-3 text-emerald-400" />
-                  <span className="text-xs font-mono text-emerald-400">{SCORE.delta} from yesterday</span>
-                </div>
+            {isLoading && !data ? (
+              <div className="flex items-center justify-center h-16">
+                <Loader2 className="h-5 w-5 text-emerald-400 animate-spin" />
               </div>
-              <MiniSparkline data={SPARKLINE_DATA} width={100} height={32} />
-            </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-end gap-1.5">
+                    <span className="text-3xl font-bold font-mono text-emerald-400">{displayScore}</span>
+                    <span className="text-sm font-mono text-white/30 mb-1">/100</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {displayDelta >= 0 ? (
+                      <>
+                        <Plus className="h-3 w-3 text-emerald-400" />
+                        <span className="text-xs font-mono text-emerald-400">{displayDelta} from yesterday</span>
+                      </>
+                    ) : (
+                      <>
+                        <Minus className="h-3 w-3 text-red-400" />
+                        <span className="text-xs font-mono text-red-400">{Math.abs(displayDelta)} from yesterday</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <MiniSparkline data={displaySparkline} width={100} height={32} />
+              </div>
+            )}
+            {error && (
+              <p className="mt-2 text-[10px] text-white/30 text-center">Using fallback data — API unavailable</p>
+            )}
           </div>
         </motion.div>
 

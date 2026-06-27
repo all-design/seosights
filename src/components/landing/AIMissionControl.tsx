@@ -1,11 +1,12 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Activity,
   ArrowRight,
@@ -20,6 +21,9 @@ import {
   TrendingUp,
   CheckCircle2,
   AlertCircle,
+  RefreshCw,
+  Target,
+  Bell,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -27,30 +31,58 @@ interface AIMissionControlProps {
   onStartFree?: () => void
 }
 
-// ── Mock Data ─────────────────────────────────────────────────
-const SCORE_DATA = {
-  score: 71,
-  max: 100,
-  yesterday: 68,
-  delta: 3,
-  verdict: 'Competitive' as const,
+interface MissionControlResponse {
+  score: {
+    overall: number
+    trust: number
+    freshness: number
+    authority: number
+  }
+  engines: Array<{
+    name: string
+    indexed: boolean
+    citations: number
+    lastCrawled: string | null
+  }>
+  recentActivity: Array<{
+    id: string
+    type: string
+    title: string
+    description: string
+    engine: string | null
+    delta: number
+    severity: string
+    createdAt: string
+  }>
+  opportunities: number
+  alerts: number
+  _meta: {
+    status: 'live' | 'estimated' | 'simulation'
+    source: string
+  }
 }
 
 type Verdict = 'Critical' | 'Developing' | 'Competitive' | 'Dominant'
 
-const ENGINE_DATA = [
-  { engine: 'ChatGPT', indexed: true, citations: 24, color: 'emerald' as const },
-  { engine: 'Claude', indexed: true, citations: 18, color: 'amber' as const },
-  { engine: 'Gemini', indexed: true, citations: 12, color: 'purple' as const },
-  { engine: 'Perplexity', indexed: false, citations: 0, color: 'cyan' as const },
-  { engine: 'Copilot', indexed: true, citations: 8, color: 'blue' as const },
-]
-
-const ACTIVITY_FEED = [
-  { id: '1', time: '2m ago', text: 'ChatGPT cited your FAQ page', type: 'citation' as const },
-  { id: '2', time: '18m ago', text: 'Score increased +3 points', type: 'score' as const },
-  { id: '3', time: '1h ago', text: 'GPTBot crawled /pricing', type: 'crawl' as const },
-]
+// ── Fallback Mock Data ────────────────────────────────────────
+const FALLBACK_DATA: MissionControlResponse = {
+  score: { overall: 71, trust: 68, freshness: 74, authority: 70 },
+  engines: [
+    { name: 'ChatGPT', indexed: true, citations: 24, lastCrawled: '2025-01-14T10:30:00Z' },
+    { name: 'Claude', indexed: true, citations: 18, lastCrawled: '2025-01-14T09:15:00Z' },
+    { name: 'Gemini', indexed: true, citations: 12, lastCrawled: '2025-01-13T22:00:00Z' },
+    { name: 'Perplexity', indexed: false, citations: 0, lastCrawled: null },
+    { name: 'Copilot', indexed: true, citations: 8, lastCrawled: '2025-01-14T07:45:00Z' },
+  ],
+  recentActivity: [
+    { id: '1', type: 'citation', title: 'ChatGPT cited your FAQ page', description: 'Your FAQ was referenced in a ChatGPT response', engine: 'ChatGPT', delta: 0, severity: 'info', createdAt: new Date(Date.now() - 120000).toISOString() },
+    { id: '2', type: 'score', title: 'Score increased +3 points', description: 'Overall visibility score improved', engine: null, delta: 3, severity: 'positive', createdAt: new Date(Date.now() - 1080000).toISOString() },
+    { id: '3', type: 'crawl', title: 'GPTBot crawled /pricing', description: 'GPTBot visited your pricing page', engine: 'ChatGPT', delta: 0, severity: 'info', createdAt: new Date(Date.now() - 3600000).toISOString() },
+  ],
+  opportunities: 5,
+  alerts: 1,
+  _meta: { status: 'simulation', source: 'fallback' },
+}
 
 const QUICK_ACTIONS = [
   { label: 'Run Scan', icon: Search, variant: 'default' as const },
@@ -59,6 +91,13 @@ const QUICK_ACTIONS = [
 ]
 
 // ── Helpers ───────────────────────────────────────────────────
+function getVerdict(score: number): Verdict {
+  if (score < 30) return 'Critical'
+  if (score < 55) return 'Developing'
+  if (score < 80) return 'Competitive'
+  return 'Dominant'
+}
+
 const verdictConfig: Record<Verdict, { bg: string; text: string; icon: typeof Zap }> = {
   Critical: { bg: 'bg-red-500/20 border-red-500/30', text: 'text-red-400', icon: AlertCircle },
   Developing: { bg: 'bg-amber-500/20 border-amber-500/30', text: 'text-amber-400', icon: Clock },
@@ -66,27 +105,15 @@ const verdictConfig: Record<Verdict, { bg: string; text: string; icon: typeof Za
   Dominant: { bg: 'bg-emerald-400/20 border-emerald-400/30', text: 'text-emerald-300', icon: Zap },
 }
 
-function getEngineColor(color: string) {
-  const map: Record<string, string> = {
-    emerald: 'text-emerald-400',
-    amber: 'text-amber-400',
-    purple: 'text-purple-400',
-    cyan: 'text-cyan-400',
-    blue: 'text-blue-400',
+function getEngineColorClass(name: string): { text: string; dot: string } {
+  const map: Record<string, { text: string; dot: string }> = {
+    'ChatGPT': { text: 'text-emerald-400', dot: 'bg-emerald-400' },
+    'Claude': { text: 'text-amber-400', dot: 'bg-amber-400' },
+    'Gemini': { text: 'text-purple-400', dot: 'bg-purple-400' },
+    'Perplexity': { text: 'text-cyan-400', dot: 'bg-cyan-400' },
+    'Copilot': { text: 'text-blue-400', dot: 'bg-blue-400' },
   }
-  return map[color] || 'text-white/60'
-}
-
-function getEngineDot(color: string, indexed: boolean) {
-  if (!indexed) return 'bg-white/20'
-  const map: Record<string, string> = {
-    emerald: 'bg-emerald-400',
-    amber: 'bg-amber-400',
-    purple: 'bg-purple-400',
-    cyan: 'bg-cyan-400',
-    blue: 'bg-blue-400',
-  }
-  return map[color] || 'bg-white/40'
+  return map[name] || { text: 'text-white/60', dot: 'bg-white/40' }
 }
 
 function getFeedIcon(type: string) {
@@ -94,7 +121,31 @@ function getFeedIcon(type: string) {
     case 'citation': return <Eye className="h-3.5 w-3.5 text-emerald-400" />
     case 'score': return <TrendingUp className="h-3.5 w-3.5 text-amber-400" />
     case 'crawl': return <Activity className="h-3.5 w-3.5 text-purple-400" />
+    case 'alert': return <AlertCircle className="h-3.5 w-3.5 text-red-400" />
     default: return <Radio className="h-3.5 w-3.5 text-white/50" />
+  }
+}
+
+function timeAgo(dateString: string): string {
+  const now = Date.now()
+  const then = new Date(dateString).getTime()
+  const diff = Math.max(0, now - then)
+  const seconds = Math.floor(diff / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function getSeverityColor(severity: string): string {
+  switch (severity) {
+    case 'positive': return 'text-emerald-400'
+    case 'negative': return 'text-red-400'
+    case 'warning': return 'text-amber-400'
+    default: return 'text-white/50'
   }
 }
 
@@ -147,14 +198,104 @@ function ScoreGauge({ score, isInView }: { score: number; isInView: boolean }) {
   )
 }
 
+// ── Skeleton Loader Components ────────────────────────────────
+function ScoreGaugeSkeleton() {
+  return (
+    <div className="relative w-44 h-44 mx-auto">
+      <div className="w-full h-full rounded-full bg-white/5 animate-pulse flex items-center justify-center">
+        <div className="text-center">
+          <Skeleton className="h-10 w-12 mx-auto bg-white/10" />
+          <Skeleton className="h-3 w-8 mx-auto mt-1 bg-white/10" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EngineStatusSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5">
+          <Skeleton className="h-2.5 w-2.5 rounded-full bg-white/10" />
+          <div className="flex-1 space-y-1">
+            <Skeleton className="h-3.5 w-16 bg-white/10" />
+            <Skeleton className="h-2.5 w-12 bg-white/10" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ActivityFeedSkeleton() {
+  return (
+    <div className="space-y-1.5">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5">
+          <Skeleton className="h-3.5 w-3.5 rounded bg-white/10" />
+          <Skeleton className="flex-1 h-3.5 bg-white/10" />
+          <Skeleton className="h-2.5 w-10 bg-white/10" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Component ─────────────────────────────────────────────────
 export default function AIMissionControl({ onStartFree }: AIMissionControlProps) {
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: '-80px' })
 
-  const indexedCount = ENGINE_DATA.filter(e => e.indexed).length
-  const vc = verdictConfig[SCORE_DATA.verdict]
+  const [data, setData] = useState<MissionControlResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const fetchData = useCallback(async (showRefreshSpinner = false) => {
+    if (showRefreshSpinner) setIsRefreshing(true)
+    try {
+      const res = await fetch('/api/ai/mission-control?domain=seosights.com')
+      if (!res.ok) throw new Error(`API returned ${res.status}`)
+      const json: MissionControlResponse = await res.json()
+      setData(json)
+      setError(null)
+      setLastRefreshed(new Date())
+    } catch (err) {
+      console.error('Failed to fetch mission control data:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch')
+      // Fallback to hardcoded data if no data yet
+      if (!data) {
+        setData(FALLBACK_DATA)
+      }
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [data])
+
+  // Initial fetch
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData(true)
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [fetchData])
+
+  // Derived values
+  const displayData = data || FALLBACK_DATA
+  const overallScore = displayData.score.overall
+  const verdict = getVerdict(overallScore)
+  const vc = verdictConfig[verdict]
   const VerdictIcon = vc.icon
+  const indexedCount = displayData.engines.filter(e => e.indexed).length
+  const totalCitations = displayData.engines.reduce((sum, e) => sum + e.citations, 0)
 
   return (
     <section ref={ref} className="relative w-full py-16 md:py-24 overflow-hidden bg-[#0a0a0f]">
@@ -185,7 +326,10 @@ export default function AIMissionControl({ onStartFree }: AIMissionControlProps)
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
             </span>
-            LIVE DASHBOARD
+            {displayData._meta.status === 'live' ? 'LIVE DASHBOARD' : displayData._meta.status === 'estimated' ? 'ESTIMATED DASHBOARD' : 'SIMULATED DASHBOARD'}
+            {error && (
+              <span className="text-amber-400/70 ml-1" title={`API error: ${error}. Using fallback data.`}>(offline)</span>
+            )}
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white">
             AI Mission{' '}
@@ -196,6 +340,19 @@ export default function AIMissionControl({ onStartFree }: AIMissionControlProps)
           <p className="mt-3 text-sm sm:text-base text-white/50 max-w-xl mx-auto">
             Your unified command center. See your AI Visibility Score, engine status, and activity — all in one glance.
           </p>
+          {/* Last refreshed indicator */}
+          {lastRefreshed && !isLoading && (
+            <div className="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-white/25">
+              <button
+                onClick={() => fetchData(true)}
+                className="inline-flex items-center gap-1 hover:text-white/40 transition-colors"
+                aria-label="Refresh data"
+              >
+                <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Updated {timeAgo(lastRefreshed.toISOString())}
+              </button>
+            </div>
+          )}
         </motion.div>
 
         {/* Main Dashboard Grid */}
@@ -213,32 +370,79 @@ export default function AIMissionControl({ onStartFree }: AIMissionControlProps)
                   <span className="text-xs font-semibold uppercase tracking-widest text-white/50">
                     AI Visibility Score
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-mono text-emerald-400">
-                    <TrendingUp className="h-3 w-3" />
-                    +{SCORE_DATA.delta}
-                  </span>
+                  {isLoading ? (
+                    <Skeleton className="h-4 w-12 bg-white/10" />
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-mono text-emerald-400">
+                      <TrendingUp className="h-3 w-3" />
+                      {displayData.score.overall}/100
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-4 pt-2">
-                <ScoreGauge score={SCORE_DATA.score} isInView={isInView} />
+                {isLoading ? (
+                  <ScoreGaugeSkeleton />
+                ) : (
+                  <ScoreGauge score={displayData.score.overall} isInView={isInView} />
+                )}
 
                 {/* Verdict badge */}
-                <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${vc.bg} ${vc.text}`}>
-                  <VerdictIcon className="h-3.5 w-3.5" />
-                  {SCORE_DATA.verdict}
-                </span>
+                {isLoading ? (
+                  <Skeleton className="h-7 w-28 rounded-md bg-white/10" />
+                ) : (
+                  <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${vc.bg} ${vc.text}`}>
+                    <VerdictIcon className="h-3.5 w-3.5" />
+                    {verdict}
+                  </span>
+                )}
 
-                <div className="text-center">
-                  <span className="text-xs text-white/40">Yesterday: {SCORE_DATA.yesterday}</span>
-                </div>
+                {/* Sub-scores */}
+                {!isLoading && (
+                  <div className="w-full grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-md border border-white/5 bg-white/[0.02] px-2 py-1.5">
+                      <div className="text-sm font-mono font-semibold text-purple-400">{displayData.score.trust}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-white/30">Trust</div>
+                    </div>
+                    <div className="rounded-md border border-white/5 bg-white/[0.02] px-2 py-1.5">
+                      <div className="text-sm font-mono font-semibold text-amber-400">{displayData.score.freshness}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-white/30">Fresh</div>
+                    </div>
+                    <div className="rounded-md border border-white/5 bg-white/[0.02] px-2 py-1.5">
+                      <div className="text-sm font-mono font-semibold text-cyan-400">{displayData.score.authority}</div>
+                      <div className="text-[9px] uppercase tracking-wider text-white/30">Auth</div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Progress bar as secondary indicator */}
                 <div className="w-full">
-                  <Progress
-                    value={SCORE_DATA.score}
-                    className="h-2 rounded-full bg-white/10 [&>div]:bg-emerald-400"
-                  />
+                  {isLoading ? (
+                    <Skeleton className="h-2 w-full rounded-full bg-white/10" />
+                  ) : (
+                    <Progress
+                      value={displayData.score.overall}
+                      className="h-2 rounded-full bg-white/10 [&>div]:bg-emerald-400"
+                    />
+                  )}
                 </div>
+
+                {/* Summary stats row */}
+                {!isLoading && (
+                  <div className="w-full flex items-center justify-between text-[10px] text-white/30 border-t border-white/5 pt-3">
+                    <span className="inline-flex items-center gap-1">
+                      <Target className="h-3 w-3 text-emerald-400/60" />
+                      {displayData.opportunities} opportunities
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Bell className="h-3 w-3 text-amber-400/60" />
+                      {displayData.alerts} alert{displayData.alerts !== 1 ? 's' : ''}
+                    </span>
+                    <span className="font-mono">
+                      {totalCitations} citations
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -259,49 +463,56 @@ export default function AIMissionControl({ onStartFree }: AIMissionControlProps)
                       Engine Status
                     </span>
                     <Badge className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] px-2">
-                      {indexedCount}/5 Indexed
+                      {isLoading ? '...' : `${indexedCount}/${displayData.engines.length} Indexed`}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-                    {ENGINE_DATA.map((eng, i) => (
-                      <motion.div
-                        key={eng.engine}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={isInView ? { opacity: 1, y: 0 } : {}}
-                        transition={{ duration: 0.4, delay: 0.35 + i * 0.07 }}
-                        className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5"
-                      >
-                        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${getEngineDot(eng.color, eng.indexed)} ${eng.indexed ? 'animate-pulse' : ''}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-sm font-medium truncate ${getEngineColor(eng.color)}`}>
-                              {eng.engine}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            {eng.indexed ? (
-                              <>
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                                <span className="text-[10px] text-emerald-400">Indexed</span>
-                              </>
-                            ) : (
-                              <>
-                                <AlertCircle className="h-3 w-3 text-white/30" />
-                                <span className="text-[10px] text-white/30">Not Indexed</span>
-                              </>
+                  {isLoading ? (
+                    <EngineStatusSkeleton />
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                      {displayData.engines.map((eng, i) => {
+                        const colors = getEngineColorClass(eng.name)
+                        return (
+                          <motion.div
+                            key={eng.name}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={isInView ? { opacity: 1, y: 0 } : {}}
+                            transition={{ duration: 0.4, delay: 0.35 + i * 0.07 }}
+                            className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5"
+                          >
+                            <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${eng.indexed ? colors.dot : 'bg-white/20'} ${eng.indexed ? 'animate-pulse' : ''}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-sm font-medium truncate ${eng.indexed ? colors.text : 'text-white/30'}`}>
+                                  {eng.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {eng.indexed ? (
+                                  <>
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                    <span className="text-[10px] text-emerald-400">Indexed</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertCircle className="h-3 w-3 text-white/30" />
+                                    <span className="text-[10px] text-white/30">Not Indexed</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            {eng.citations > 0 && (
+                              <span className="text-[10px] font-mono text-white/40 shrink-0">
+                                {eng.citations} cit.
+                              </span>
                             )}
-                          </div>
-                        </div>
-                        {eng.citations > 0 && (
-                          <span className="text-[10px] font-mono text-white/40 shrink-0">
-                            {eng.citations} cit.
-                          </span>
-                        )}
-                      </motion.div>
-                    ))}
-                  </div>
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -351,21 +562,49 @@ export default function AIMissionControl({ onStartFree }: AIMissionControlProps)
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
                     </span>
+                    {/* Status badge */}
+                    {!isLoading && (
+                      <Badge
+                        className={`ml-auto text-[9px] px-1.5 py-0 border ${
+                          displayData._meta.status === 'live'
+                            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                            : displayData._meta.status === 'estimated'
+                            ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
+                            : 'bg-white/10 border-white/10 text-white/40'
+                        }`}
+                      >
+                        {displayData._meta.status}
+                      </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="space-y-1.5">
-                    {ACTIVITY_FEED.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5"
-                      >
-                        <div className="shrink-0">{getFeedIcon(item.type)}</div>
-                        <p className="flex-1 text-sm text-white/80 truncate">{item.text}</p>
-                        <span className="shrink-0 text-[10px] font-mono text-white/30">{item.time}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {isLoading ? (
+                    <ActivityFeedSkeleton />
+                  ) : (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar">
+                      {displayData.recentActivity.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5"
+                        >
+                          <div className="shrink-0">{getFeedIcon(item.type)}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white/80 truncate">{item.title}</p>
+                            {item.description && item.description !== item.title && (
+                              <p className="text-[10px] text-white/30 truncate">{item.description}</p>
+                            )}
+                          </div>
+                          {item.delta !== 0 && (
+                            <span className={`shrink-0 text-[10px] font-mono font-semibold ${item.delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {item.delta > 0 ? '+' : ''}{item.delta}
+                            </span>
+                          )}
+                          <span className="shrink-0 text-[10px] font-mono text-white/30">{timeAgo(item.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
