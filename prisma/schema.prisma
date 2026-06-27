@@ -609,3 +609,50 @@ model EmailDigest {
   @@index([status])
   @@index([createdAt])
 }
+
+// ─── Superadmin: Event Tracking ─────────────────────────────────────
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  event       String   // started_audit | completed_audit | viewed_replay | opened_diff | connected_wordpress | executed_fix | opened_digest | clicked_upgrade | connected_gsc | registered | activated | paid
+  domain      String?
+  metadata    String?  // JSON with extra context
+  userAgent   String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([event])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([event, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ─── Superadmin: Daily Metrics Snapshot ────────────────────────────
+
+model DailyMetric {
+  id                  String   @id @default(cuid())
+  date                DateTime // the day this record is for
+  visitors            Int      @default(0)
+  freeAudits          Int      @default(0)
+  registrations       Int      @default(0)
+  completedAudits     Int      @default(0)
+  activatedUsers      Int      @default(0)
+  paidUsers           Int      @default(0)
+  mrr                 Float    @default(0)
+  // Retention
+  d1Retention         Float    @default(0) // percentage
+  d7Retention         Float    @default(0)
+  d30Retention        Float    @default(0)
+  // Activation funnel
+  auditStarted        Int      @default(0)
+  gscConnected        Int      @default(0)
+  fixExecuted         Int      @default(0)
+  returnedNextDay     Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([date])
+  @@index([date])
+}
