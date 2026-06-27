@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -120,6 +120,41 @@ export default function AICompetitorWarRoom({ onStartFree }: { onStartFree: () =
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
   const [activeId, setActiveId] = useState<string>('notion')
+  const [isLive, setIsLive] = useState(false)
+
+  // Fetch real API data
+  useEffect(() => {
+    fetch('/api/ai/competitor-war-room', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand: 'Acme Inc', competitors: ['Notion', 'Monday.com', 'ClickUp'] }),
+    }).then(r => r.json()).then(data => {
+      if (data?.matrix && data?.competitors) {
+        const cNames = data.competitors.map((c: { name: string }) => c.name)
+        const engineKeys = ['chatgpt','claude','gemini','perplexity'] as const
+        for (let ci = 0; ci < Math.min(cNames.length, 3); ci++) {
+          const comp = COMPETITORS[ci]
+          if (!comp || !cNames[ci]) continue
+          comp.name = cNames[ci]
+          for (let ei = 0; ei < 4; ei++) {
+            const m = data.matrix[engineKeys[ei]]
+            if (m) {
+              comp.rows[ei].you = m.you ?? comp.rows[ei].you
+              comp.rows[ei].competitor = m.competitor?.[ci] ?? comp.rows[ei].competitor
+              comp.rows[ei].topReason = m.topReason?.[ci] ?? comp.rows[ei].topReason
+            }
+          }
+        }
+        if (Array.isArray(data.reasons)) {
+          for (const r of data.reasons) {
+            const existing = COMPETITORS[0]?.reasons.find(er => er.label.toLowerCase().includes(r.reason?.toLowerCase().split(' ')[0] ?? ''))
+            if (existing) { existing.detail = r.youValue + ' vs ' + r.competitorValue; existing.severity = (r.severity ?? 5) * 10 }
+          }
+        }
+        setIsLive(true)
+      }
+    }).catch(() => {})
+  }, [])
+
   const active = COMPETITORS.find((c) => c.id === activeId)!
 
   return (
@@ -136,7 +171,7 @@ export default function AICompetitorWarRoom({ onStartFree }: { onStartFree: () =
           transition={{ duration: 0.6 }}
         >
           <Badge className="bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/20 mb-4">
-            <Swords className="w-3 h-3 mr-1" /> Competitive Intelligence
+            <Swords className="w-3 h-3 mr-1" /> Competitive Intelligence{isLive && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full">Live AI</span>}
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
             Head-to-head. Engine by engine.{' '}

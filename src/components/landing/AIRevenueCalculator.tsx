@@ -1,17 +1,17 @@
 'use client'
 
 import { motion, useInView, useMotionValue, animate, AnimatePresence } from 'framer-motion'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
 import { Users, Eye, MousePointerClick, Wallet, ArrowRight, ArrowDown, Calculator, Target, TrendingUp } from 'lucide-react'
 
-// ── Mock math constants ──────────────────────────────────────────────────
-const ACHIEVABLE_VIS = 41 // %, target benchmark
-const LEAD_CONVERSION = 0.0145 // 1.45%
-const LEAD_VALUE = 180 // $ per lead
+// ── Mock math constants (fallback) ────────────────────────────────────────
+const FALLBACK_ACHIEVABLE_VIS = 41 // %, target benchmark
+const FALLBACK_LEAD_CONVERSION = 0.0145 // 1.45%
+const FALLBACK_LEAD_VALUE = 180 // $ per lead
 
 // ── Count-up hook (starts on inView, re-animates on target change) ────────
 function useCountUp(target: number, active: boolean, duration = 0.7) {
@@ -56,6 +56,39 @@ export default function AIRevenueCalculator({
   // Inputs
   const [visitors, setVisitors] = useState(50000)
   const [currentVis, setCurrentVis] = useState(12)
+  const [isLive, setIsLive] = useState(false)
+  // API-driven values (null = use fallback math)
+  const [apiVis, setApiVis] = useState<number | null>(null)
+  const [apiConv, setApiConv] = useState<number | null>(null)
+  const [apiLeadVal, setApiLeadVal] = useState<number | null>(null)
+
+  // Debounced API fetch
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const fetchRevenue = useCallback((v: number, cv: number) => {
+    fetch('/api/ai/revenue-calculator', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visitors: v, currentVisibility: cv }),
+    }).then(r => r.json()).then(data => {
+      if (data?.achievableVisibility != null) {
+        setApiVis(data.achievableVisibility)
+        setApiConv(data.conversionRate ?? null)
+        setApiLeadVal(data.avgLeadValue ?? null)
+        setIsLive(true)
+      }
+    }).catch(() => {})
+  }, [])
+
+  // Initial fetch + debounced slider changes
+  useEffect(() => { fetchRevenue(visitors, currentVis) }, [fetchRevenue]) // mount-only initial
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => fetchRevenue(visitors, currentVis), 600)
+    return () => clearTimeout(debounceRef.current)
+  }, [visitors, currentVis, fetchRevenue])
+
+  const ACHIEVABLE_VIS = apiVis ?? FALLBACK_ACHIEVABLE_VIS
+  const LEAD_CONVERSION = apiConv ?? FALLBACK_LEAD_CONVERSION
+  const LEAD_VALUE = apiLeadVal ?? FALLBACK_LEAD_VALUE
 
   // Computed funnel
   const calc = useMemo(() => {
@@ -145,7 +178,7 @@ export default function AIRevenueCalculator({
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-purple-500/50 text-purple-300 bg-purple-500/10 backdrop-blur-sm mb-6"
           >
             <Calculator className="w-3.5 h-3.5" />
-            The CEO Math
+            The CEO Math{isLive ? <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full">Live AI</span> : <span className="ml-2 text-[10px] bg-white/10 text-muted-foreground px-1.5 py-0.5 rounded-full">Demo</span>}
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
             Turn{' '}

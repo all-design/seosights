@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, useInView } from 'framer-motion'
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,11 +25,20 @@ interface EngineRow {
   insight: string
 }
 
+// Default per-engine scores (mock fallback)
+const DEFAULT_SCORES: Record<EngineKey, number> = {
+  chatgpt: 82,
+  claude: 61,
+  gemini: 91,
+  perplexity: 53,
+  copilot: 74,
+}
+
 const ENGINES: EngineRow[] = [
   {
     key: 'chatgpt',
     name: 'ChatGPT',
-    score: 82,
+    score: DEFAULT_SCORES.chatgpt,
     dotColor: '#10b981',
     dotGlow: 'rgba(16,185,129,0.55)',
     insight: "Cited in 8 of 10 startup-CRM prompts.",
@@ -37,7 +46,7 @@ const ENGINES: EngineRow[] = [
   {
     key: 'claude',
     name: 'Claude',
-    score: 61,
+    score: DEFAULT_SCORES.claude,
     dotColor: '#f59e0b',
     dotGlow: 'rgba(245,158,11,0.55)',
     insight: "Claude relies on Wikipedia — you don't have an article.",
@@ -45,7 +54,7 @@ const ENGINES: EngineRow[] = [
   {
     key: 'gemini',
     name: 'Gemini',
-    score: 91,
+    score: DEFAULT_SCORES.gemini,
     dotColor: '#8b5cf6',
     dotGlow: 'rgba(139,92,246,0.6)',
     insight: "Strong entity match in Google's Knowledge Graph.",
@@ -53,7 +62,7 @@ const ENGINES: EngineRow[] = [
   {
     key: 'perplexity',
     name: 'Perplexity',
-    score: 53,
+    score: DEFAULT_SCORES.perplexity,
     dotColor: '#06b6d4',
     dotGlow: 'rgba(6,182,212,0.55)',
     insight: 'Sparse mentions across crawled sources.',
@@ -61,16 +70,12 @@ const ENGINES: EngineRow[] = [
   {
     key: 'copilot',
     name: 'Copilot',
-    score: 74,
+    score: DEFAULT_SCORES.copilot,
     dotColor: '#3b82f6',
     dotGlow: 'rgba(59,130,246,0.55)',
     insight: 'Recently surfaced via Bing entity card.',
   },
 ]
-
-const OVERALL = Math.round(
-  ENGINES.reduce((sum, e) => sum + e.score, 0) / ENGINES.length
-) // → 72
 
 // ─── Score → bar state ───────────────────────────────────────────────────
 interface BarState {
@@ -98,6 +103,48 @@ export default function AIVisibilityMap({
 }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
+
+  // API-driven state (initialised to mock so component renders immediately)
+  const [engineScores, setEngineScores] = useState<Record<EngineKey, number>>(DEFAULT_SCORES)
+  const [isLive, setIsLive] = useState(false)
+
+  // Merge live scores into ENGINES template
+  const displayEngines = ENGINES.map((e) => ({ ...e, score: engineScores[e.key] }))
+  const OVERALL = Math.round(
+    displayEngines.reduce((sum, e) => sum + e.score, 0) / displayEngines.length
+  )
+
+  useEffect(() => {
+    if (!isInView) return
+    let cancelled = false
+    fetch('/api/ai/visibility-score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://acme.com', brand: 'Acme Inc' }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        if (data.perEngine) {
+          const pe = data.perEngine as Record<string, number>
+          setEngineScores({
+            chatgpt: pe.chatgpt ?? DEFAULT_SCORES.chatgpt,
+            claude: pe.claude ?? DEFAULT_SCORES.claude,
+            gemini: pe.gemini ?? DEFAULT_SCORES.gemini,
+            perplexity: pe.perplexity ?? DEFAULT_SCORES.perplexity,
+            copilot: pe.copilot ?? DEFAULT_SCORES.copilot,
+          })
+          setIsLive(true)
+        }
+      })
+      .catch(() => {
+        // Keep mock data — demo always works
+      })
+    return () => { cancelled = true }
+  }, [isInView])
 
   return (
     <section className="py-24 relative" ref={ref} id="visibility-map">
@@ -141,7 +188,7 @@ export default function AIVisibilityMap({
         >
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-6 sm:p-8 shadow-[0_0_40px_rgba(168,85,247,0.08)]">
             <div className="space-y-6">
-              {ENGINES.map((eng, i) => {
+              {displayEngines.map((eng, i) => {
                 const state = barState(eng.score)
                 const StatusIcon = state.Icon
                 return (
@@ -202,7 +249,7 @@ export default function AIVisibilityMap({
             </div>
 
             {/* Aggregate callout */}
-            <div className="mt-8 pt-6 border-t border-white/10">
+                  <div className="mt-8 pt-6 border-t border-white/10">
               <div className="flex items-end justify-between flex-wrap gap-4">
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
@@ -217,9 +264,15 @@ export default function AIVisibilityMap({
                     </span>
                   </div>
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-semibold font-mono">
-                  <ArrowUpRight className="w-4 h-4" />
-                  ↑ 4 since last week
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${isLive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-muted-foreground'}`}>
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-muted-foreground/50'}`} />
+                    {isLive ? 'Live AI analysis' : 'Demo data'}
+                  </span>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-semibold font-mono">
+                    <ArrowUpRight className="w-4 h-4" />
+                    ↑ 4 since last week
+                  </div>
                 </div>
               </div>
             </div>

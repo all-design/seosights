@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, useInView, AnimatePresence } from 'framer-motion'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,13 +22,11 @@ const N_POINTS = 4
 const xFor = (i: number) => PAD_L + (i * CHART_W) / (N_POINTS - 1)
 const yFor = (v: number) => PAD_T + CHART_H - (v / 100) * CHART_H
 
-// ── Projection model ──────────────────────────────────────────────────────
-// Each completed task adds a projected point gain at each milestone.
-// At 16/20 tasks: 30d=61, 60d=79, 90d=91 (matches headline scenario).
-const TODAY_SCORE = 44
-const GAIN_30 = 1.0625 // 16 → +17
-const GAIN_60 = 2.1875 // 16 → +35
-const GAIN_90 = 2.9375 // 16 → +47
+// ── Projection model (fallback) ──────────────────────────────────────────────
+const FALLBACK_TODAY_SCORE = 44
+const GAIN_30 = 1.0625
+const GAIN_60 = 2.1875
+const GAIN_90 = 2.9375
 
 const X_LABELS = ['Today', '30d', '60d', '90d'] as const
 
@@ -92,6 +90,29 @@ export default function AIVisibilityForecast({
   const [done, setDone] = useState<boolean[]>(() =>
     TASK_LABELS.map((_, i) => i < DEFAULT_CHECKED)
   )
+  const [isLive, setIsLive] = useState(false)
+  const [apiTasks, setApiTasks] = useState<string[] | null>(null)
+  const [apiProjection, setApiProjection] = useState<number[] | null>(null)
+
+  // Fetch API data on mount
+  useEffect(() => {
+    fetch('/api/ai/forecast', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand: 'Acme Inc', currentScore: 44 }),
+    }).then(r => r.json()).then(data => {
+      if (data?.projections) {
+        setApiProjection(data.projections.map((p: { score: number }) => Math.min(99, Math.max(1, p.score ?? 44))))
+        setIsLive(true)
+      }
+      if (Array.isArray(data?.tasks)) {
+        setApiTasks(data.tasks.map((t: { label: string }) => t.label))
+      }
+    }).catch(() => {})
+  }, [])
+
+  const taskLabels = apiTasks ?? TASK_LABELS
+
+  const TODAY_SCORE = apiProjection?.[0] ?? FALLBACK_TODAY_SCORE
 
   const completedCount = useMemo(
     () => done.filter(Boolean).length,
@@ -99,14 +120,15 @@ export default function AIVisibilityForecast({
   )
 
   const trajectory = useMemo(() => {
+    if (apiProjection && apiProjection.length >= 4) return apiProjection as readonly [number, number, number, number]
     const s30 = Math.min(100, Math.round(TODAY_SCORE + completedCount * GAIN_30))
     const s60 = Math.min(100, Math.round(TODAY_SCORE + completedCount * GAIN_60))
     const s90 = Math.min(100, Math.round(TODAY_SCORE + completedCount * GAIN_90))
     return [TODAY_SCORE, s30, s60, s90] as const
-  }, [completedCount])
+  }, [completedCount, TODAY_SCORE, apiProjection])
 
   const finalScore = trajectory[3]
-  const progressPct = (completedCount / TASK_LABELS.length) * 100
+  const progressPct = (completedCount / taskLabels.length) * 100
 
   const toggleTask = (i: number) =>
     setDone((prev) => prev.map((v, idx) => (idx === i ? !v : v)))
@@ -133,7 +155,7 @@ export default function AIVisibilityForecast({
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-purple-500/50 text-purple-300 bg-purple-500/10 backdrop-blur-sm mb-6"
           >
             <Calendar className="w-3.5 h-3.5" />
-            Your 90-Day Trajectory
+            Your 90-Day Trajectory{isLive && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full">Live AI</span>}
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
             See your{' '}
@@ -165,13 +187,13 @@ export default function AIVisibilityForecast({
                       Tasks Remaining
                     </h3>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {completedCount}/{TASK_LABELS.length} done
+                        {completedCount}/{taskLabels.length} done
                     </span>
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-black/20 p-3 max-h-[340px] overflow-y-auto custom-scroll">
                     <ul className="space-y-1">
-                      {TASK_LABELS.map((label, i) => {
+                      {taskLabels.map((label, i) => {
                         const isDone = done[i]
                         return (
                           <motion.li
@@ -358,7 +380,7 @@ export default function AIVisibilityForecast({
                     <p className="text-sm text-purple-100/90 leading-relaxed">
                       If you complete{' '}
                       <span className="font-bold text-purple-200 tabular-nums">
-                        {completedCount} of {TASK_LABELS.length}
+                        {completedCount} of {taskLabels.length}
                       </span>{' '}
                       tasks, your AI Visibility Score reaches{' '}
                       <AnimatePresence mode="popLayout">

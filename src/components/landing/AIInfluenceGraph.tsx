@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -173,6 +173,36 @@ export default function AIInfluenceGraph({ onStartFree }: { onStartFree: () => v
   const isInView = useInView(ref, { once: true, margin: '-100px' })
   // Default to Wikipedia so the punchline ("#1 reason Claude doesn't cite you") is front-and-center.
   const [selectedId, setSelectedId] = useState<string | null>('wikipedia')
+  const [isLive, setIsLive] = useState(false)
+
+  // Fetch API data and update node descriptions/status when available
+  useEffect(() => {
+    fetch('/api/ai/influence-graph', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand: 'Acme Inc' }),
+    }).then(r => r.json()).then(data => {
+      if (data?.nodes && Array.isArray(data.nodes)) {
+        for (const apiNode of data.nodes) {
+          const existing = NODES.find(n => n.id === apiNode.id || n.label.toLowerCase().includes(apiNode.label?.toLowerCase()?.split(' ')[0] ?? ''))
+          if (existing) {
+            existing.description = apiNode.description || existing.description
+            existing.fix = apiNode.fixAction || existing.fix
+            if (apiNode.authority === 'strong') existing.status = 'strong'
+            else if (apiNode.authority === 'broken') existing.status = 'weak'
+            else if (apiNode.authority === 'missing') existing.status = 'missing'
+          }
+        }
+        // Update edge broken state from API
+        if (Array.isArray(data.edges)) {
+          for (const apiEdge of data.edges) {
+            const existing = EDGES.find(e => (e.from === apiEdge.from && e.to === apiEdge.to) || (e.to === apiEdge.from && e.from === apiEdge.to))
+            if (existing) existing.broken = apiEdge.strength === 'broken'
+          }
+        }
+        setIsLive(true)
+      }
+    }).catch(() => {})
+  }, [])
 
   const selected = NODES.find((n) => n.id === selectedId) || null
   const isEdgeActive = (e: GraphEdge) => selectedId === e.from || selectedId === e.to
@@ -194,7 +224,7 @@ export default function AIInfluenceGraph({ onStartFree }: { onStartFree: () => v
           transition={{ duration: 0.6 }}
         >
           <Badge className="bg-purple-500/15 text-purple-300 border-purple-500/30 hover:bg-purple-500/20 mb-4">
-            <Network className="w-3 h-3 mr-1" /> The Authority Map
+            <Network className="w-3 h-3 mr-1" /> The Authority Map{isLive && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full">Live AI</span>}
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
             See the exact chain of authority that makes{' '}

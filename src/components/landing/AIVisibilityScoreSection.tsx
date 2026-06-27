@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, useInView } from 'framer-motion'
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -63,6 +63,8 @@ const factors: ScoreFactor[] = [
     icon: Share2,
   },
 ]
+
+const DEMO_FACTORS = factors.map((f) => f.value)
 
 // ── Circular score gauge (hand-coded SVG, 270° arc) ──────────────────────
 function ScoreGauge({ score, inView }: { score: number; inView: boolean }) {
@@ -186,6 +188,43 @@ export default function AIVisibilityScoreSection({
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
 
+  // API-driven state (initialised to mock so component renders immediately)
+  const [score, setScore] = useState(DEMO_SCORE)
+  const [factorValues, setFactorValues] = useState<number[]>(DEMO_FACTORS)
+  const [isLive, setIsLive] = useState(false)
+
+  useEffect(() => {
+    if (!isInView) return
+    let cancelled = false
+    fetch('/api/ai/visibility-score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://acme.com', brand: 'Acme Inc' }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data) => {
+        if (cancelled) return
+        if (typeof data.overallScore === 'number') {
+          setScore(data.overallScore)
+          const dims = data.dimensions ?? {}
+          setFactorValues([
+            dims.citationFrequency ?? DEMO_FACTORS[0],
+            dims.entityAuthority ?? DEMO_FACTORS[1],
+            dims.contentAccessibility ?? DEMO_FACTORS[2],
+            dims.sourceDiversity ?? DEMO_FACTORS[3],
+          ])
+          setIsLive(true)
+        }
+      })
+      .catch(() => {
+        // Keep mock data — demo always works
+      })
+    return () => { cancelled = true }
+  }, [isInView])
+
   return (
     <section
       id="ai-visibility-score"
@@ -229,7 +268,7 @@ export default function AIVisibilityScoreSection({
           animate={isInView ? { opacity: 1, scale: 1 } : {}}
           transition={{ duration: 0.7, delay: 0.1 }}
         >
-          <ScoreGauge score={DEMO_SCORE} inView={isInView} />
+          <ScoreGauge score={score} inView={isInView} />
         </motion.div>
 
         {/* Comparison row */}
@@ -335,16 +374,18 @@ export default function AIVisibilityScoreSection({
                       </div>
                     </div>
                   </div>
-                  <span className="text-lg font-bold tabular-nums text-foreground shrink-0">
-                    {f.value}
-                    <span className="text-xs text-muted-foreground ml-0.5">/100</span>
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-lg font-bold tabular-nums text-foreground">
+                      {factorValues[i]}
+                      <span className="text-xs text-muted-foreground ml-0.5">/100</span>
+                    </span>
+                  </div>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
                   <motion.div
                     className="h-full rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-500"
                     initial={{ width: 0 }}
-                    animate={isInView ? { width: `${f.value}%` } : {}}
+                    animate={isInView ? { width: `${factorValues[i]}%` } : {}}
                     transition={{ duration: 1.2, delay: 0.8 + i * 0.1, ease: 'easeOut' }}
                   />
                 </div>
@@ -360,12 +401,18 @@ export default function AIVisibilityScoreSection({
           animate={isInView ? { opacity: 1 } : {}}
           transition={{ duration: 0.6, delay: 1 }}
         >
-          <p className="text-sm text-muted-foreground mb-6">
-            Tracked across{' '}
-            <span className="text-foreground font-medium">5 AI engines</span>.{' '}
-            <span className="text-foreground font-medium">40+ signals</span>. Updated
-            every <span className="text-foreground font-medium">24 hours</span>.
-          </p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-muted-foreground">
+              Tracked across{' '}
+              <span className="text-foreground font-medium">5 AI engines</span>.{' '}
+              <span className="text-foreground font-medium">40+ signals</span>. Updated
+              every <span className="text-foreground font-medium">24 hours</span>.
+            </p>
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${isLive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-muted-foreground'}`}>
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-muted-foreground/50'}`} />
+              {isLive ? 'Live AI analysis' : 'Demo data'}
+            </span>
+          </div>
           <Button
             onClick={onStartFree}
             size="lg"

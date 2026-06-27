@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -132,6 +132,30 @@ export default function AIOpportunityFinder({
 }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
+  const [isLive, setIsLive] = useState(false)
+  // Dynamic data from API (defaults to hardcoded)
+  const [apiData, setApiData] = useState<{ brandMentions: number; competitorMentions: number; gap: number; apiSources: typeof missingSources; impact: string } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/ai/opportunity-finder', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand: 'Acme Inc', competitor: 'Notion' }),
+    }).then(r => r.json()).then(data => {
+      if (data?.missingSources) {
+        setApiData({
+          brandMentions: data.brand?.mentions ?? 11, competitorMentions: data.competitor?.mentions ?? 162,
+          gap: data.gap ?? 151, apiSources: missingSources, // keep visual structure
+          impact: `Closing 4 of these gaps could add ~${data.projectedImpact?.newCitations ?? 48} AI citations and raise your AI Visibility Score by ~${data.projectedImpact?.scoreIncrease ?? 14} points.`,
+        })
+        setIsLive(true)
+      }
+    }).catch(() => {})
+  }, [])
+
+  const brandMentions = apiData?.brandMentions ?? 11
+  const competitorMentions = apiData?.competitorMentions ?? 162
+  const gap = apiData?.gap ?? 151
+  const impactText = apiData?.impact ?? 'Closing 4 of these gaps could add ~48 AI citations and raise your AI Visibility Score by ~14 points.'
 
   return (
     <section
@@ -157,14 +181,14 @@ export default function AIOpportunityFinder({
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-purple-500/50 text-purple-400 bg-purple-500/10 backdrop-blur-sm mb-6"
           >
             <Target className="w-3.5 h-3.5" />
-            Where You&apos;re Losing
+            Where You&apos;re Losing{isLive && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full">Live AI</span>}
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
             Your competitor is mentioned{' '}
             <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent">
-              162 times.
+              {competitorMentions} times.
             </span>{' '}
-            <span className="text-rose-400">You: 11.</span>
+            <span className="text-rose-400">You: {brandMentions}.</span>
           </h2>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
             The Opportunity Finder shows the exact gap — and the exact sources
@@ -187,7 +211,7 @@ export default function AIOpportunityFinder({
                 You · Acme CRM
               </div>
               <div className="text-6xl sm:text-7xl font-bold text-rose-400 leading-none mb-2">
-                11
+                {brandMentions}
               </div>
               <div className="text-sm text-muted-foreground">
                 mentions across 4 AI engines
@@ -201,7 +225,7 @@ export default function AIOpportunityFinder({
               Citation Gap
             </div>
             <div className="text-3xl sm:text-4xl font-bold text-rose-500 leading-none">
-              −151
+              −{gap}
             </div>
             <div className="hidden md:block h-px w-12 bg-rose-500/30 my-2" />
             <div className="text-xs text-muted-foreground text-center max-w-[140px]">
@@ -217,7 +241,7 @@ export default function AIOpportunityFinder({
                 Top Competitor · Notion
               </div>
               <div className="text-6xl sm:text-7xl font-bold text-emerald-400 leading-none mb-2">
-                162
+                {competitorMentions}
               </div>
               <div className="text-sm text-muted-foreground">
                 mentions across 4 AI engines
@@ -355,16 +379,7 @@ export default function AIOpportunityFinder({
                   Projected impact
                 </div>
                 <p className="text-base sm:text-lg text-foreground/90 leading-relaxed">
-                  Closing{' '}
-                  <span className="font-bold text-purple-300">4 of these gaps</span>{' '}
-                  could add{' '}
-                  <span className="font-bold text-emerald-400">~48 AI citations</span>{' '}
-                  and raise your{' '}
-                  <span className="font-bold text-purple-300">
-                    AI Visibility Score
-                  </span>{' '}
-                  by{' '}
-                  <span className="font-bold text-emerald-400">~14 points</span>.
+                  {impactText}
                 </p>
               </div>
             </div>

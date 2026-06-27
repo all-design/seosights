@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence, useInView } from 'framer-motion'
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -152,20 +152,54 @@ export default function AIRecommendationSimulator({
   const [isSimulating, setIsSimulating] = useState(false)
   const [hasResults, setHasResults] = useState(false)
   const [whyOpen, setWhyOpen] = useState(false)
+  const [isLive, setIsLive] = useState(false)
+
+  // Live data overrides mock SCENARIOS when API succeeds
+  const [liveResults, setLiveResults] = useState<EngineResult[] | null>(null)
+  const [liveReasons, setLiveReasons] = useState<{ title: string; detail: string }[] | null>(null)
 
   const scenario = getScenario(currentPrompt)
+  const displayResults = liveResults ?? scenario.results
+  const displayReasons = liveReasons ?? scenario.reasons
 
-  const run = (prompt: string) => {
+  const run = useCallback((prompt: string) => {
     if (isSimulating) return
     setCurrentPrompt(prompt)
     setIsSimulating(true)
     setHasResults(false)
     setWhyOpen(false)
-    window.setTimeout(() => {
-      setIsSimulating(false)
-      setHasResults(true)
-    }, 1800)
-  }
+    setLiveResults(null)
+    setLiveReasons(null)
+    setIsLive(false)
+
+    // Fire API call — UI shows loading animation while waiting
+    const controller = new AbortController()
+    fetch('/api/ai/recommendation-simulator', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, brand: 'Acme Inc' }),
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then((data) => {
+        if (data.results && Array.isArray(data.results)) {
+          setLiveResults(data.results)
+          setLiveReasons(data.reasons ?? null)
+          setIsLive(true)
+        }
+      })
+      .catch(() => {
+        // Fallback to mock data — demo always works
+        setIsLive(false)
+      })
+      .finally(() => {
+        setIsSimulating(false)
+        setHasResults(true)
+      })
+  }, [isSimulating])
 
   const handleRun = () => run(currentPrompt)
   const handleQuickPrompt = (p: string) => {
@@ -319,9 +353,17 @@ export default function AIRecommendationSimulator({
                   >
                     {/* 2x2 grid of engine results */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                      {scenario.results.map((r, i) => (
+                      {displayResults.map((r, i) => (
                         <EngineResultCard key={r.engine} result={r} index={i} />
                       ))}
+                    </div>
+
+                    {/* Live / Demo badge */}
+                    <div className="flex justify-center">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${isLive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-muted-foreground'}`}>
+                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-muted-foreground/50'}`} />
+                        {isLive ? 'Live AI analysis' : 'Demo data'}
+                      </span>
                     </div>
 
                     {/* Why panel */}
@@ -355,7 +397,7 @@ export default function AIRecommendationSimulator({
                             className="overflow-hidden"
                           >
                             <ul className="px-4 pb-4 space-y-3">
-                              {scenario.reasons.map((reason) => (
+                              {displayReasons.map((reason) => (
                                 <li
                                   key={reason.title}
                                   className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4 py-2 border-t border-white/5 first:border-t-0"

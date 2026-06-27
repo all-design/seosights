@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -130,6 +130,34 @@ export default function AICitationExplorer({
   const isInView = useInView(ref, { once: true, margin: '-100px' })
   const [activeEngine, setActiveEngine] = useState<EngineKey>('chatgpt')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [isLive, setIsLive] = useState(false)
+
+  // Fetch real API data on mount
+  useEffect(() => {
+    fetch('/api/ai/citation-explorer', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brand: 'Acme Inc' }),
+    }).then(r => r.json()).then(data => {
+      if (data?.engines) {
+        for (const key of ['chatgpt','claude','gemini','perplexity'] as EngineKey[]) {
+          const eng = data.engines[key]
+          if (eng) {
+            const meta = engines.find(e => e.key === key)!
+            meta.count = eng.mentionCount ?? meta.count
+            for (const src of (eng.sources || [])) {
+              const existing = sources.find(s => s.engine === key && s.source === src.name)
+              if (existing) {
+                existing.mentions = src.mentions ?? existing.mentions
+                existing.snippet = src.snippet || existing.snippet
+                existing.lastSeen = src.lastSeen || existing.lastSeen
+              }
+            }
+          }
+        }
+        setIsLive(true)
+      }
+    }).catch(() => {})
+  }, [])
 
   const engineMeta = engines.find((e) => e.key === activeEngine)!
   const engineSources = sources.filter((s) => s.engine === activeEngine)
@@ -155,7 +183,7 @@ export default function AICitationExplorer({
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-purple-500/50 text-purple-400 bg-purple-500/10 backdrop-blur-sm mb-6"
           >
             <Target className="w-3.5 h-3.5" />
-            The AI Backlink Checker
+            The AI Backlink Checker{isLive && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full">Live AI</span>}
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
             Every place AI engines learned about you.{' '}
