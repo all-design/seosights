@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,20 +38,20 @@ export async function GET(request: NextRequest) {
     if (event) where.event = event
     if (userId) where.userId = userId
 
-    // Fetch events
+    // Fetch events (safe — AnalyticsEvent table may not exist on Turso)
     const [events, total] = await Promise.all([
-      db.analyticsEvent.findMany({
+      safeQuery(() => db.analyticsEvent.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         take: limit,
-      }),
-      db.analyticsEvent.count({ where }),
+      }), [] as typeof events),
+      safeQuery(() => db.analyticsEvent.count({ where }), 0),
     ])
 
     // Count by event type
-    const allEvents = await db.analyticsEvent.findMany({
+    const allEvents = await safeQuery(() => db.analyticsEvent.findMany({
       select: { event: true },
-    })
+    }), [] as { event: string }[])
 
     const countMap: Record<string, number> = {}
     for (const evt of allEvents) {

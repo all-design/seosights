@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,8 +21,8 @@ export async function GET() {
       totalReplaySessions,
       recentReplaySessions,
     ] = await Promise.all([
-      db.replaySession.count(),
-      db.replaySession.findMany({
+      safeQuery(() => db.replaySession.count(), 0),
+      safeQuery(() => db.replaySession.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -34,15 +35,15 @@ export async function GET() {
           endDate: true,
           createdAt: true,
         },
-      }),
+      }), []),
     ])
 
     // Calculate avg score change from recent snapshots
-    const recentSnapshots = await db.visibilitySnapshot.findMany({
+    const recentSnapshots = await safeQuery(() => db.visibilitySnapshot.findMany({
       take: 100,
       orderBy: { capturedAt: 'desc' },
       select: { overallScore: true, domain: true },
-    })
+    }), [])
 
     let avgScoreChange = 0
     if (recentSnapshots.length >= 2) {
@@ -69,10 +70,10 @@ export async function GET() {
       criticalChanges,
       recentDiffs,
     ] = await Promise.all([
-      db.recommendationSnapshot.count(),
-      db.recommendationDiff.count(),
-      db.recommendationDiff.count({ where: { severity: 'critical' } }),
-      db.recommendationDiff.findMany({
+      safeQuery(() => db.recommendationSnapshot.count(), 0),
+      safeQuery(() => db.recommendationDiff.count(), 0),
+      safeQuery(() => db.recommendationDiff.count({ where: { severity: 'critical' } }), 0),
+      safeQuery(() => db.recommendationDiff.findMany({
         take: 5,
         orderBy: { capturedAt: 'desc' },
         select: {
@@ -83,7 +84,7 @@ export async function GET() {
           summary: true,
           capturedAt: true,
         },
-      }),
+      }), []),
     ])
 
     // ── Auto Execute™ ────────────────────────────────────────────
@@ -93,10 +94,10 @@ export async function GET() {
       pendingExecCount,
       recentExecutions,
     ] = await Promise.all([
-      db.autoExecution.count(),
-      db.autoExecution.count({ where: { status: 'success' } }),
-      db.autoExecution.count({ where: { status: 'pending' } }),
-      db.autoExecution.findMany({
+      safeQuery(() => db.autoExecution.count(), 0),
+      safeQuery(() => db.autoExecution.count({ where: { status: 'success' } }), 0),
+      safeQuery(() => db.autoExecution.count({ where: { status: 'pending' } }), 0),
+      safeQuery(() => db.autoExecution.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -107,7 +108,7 @@ export async function GET() {
           status: true,
           createdAt: true,
         },
-      }),
+      }), []),
     ])
 
     const successRate = totalExecutions > 0
@@ -120,9 +121,9 @@ export async function GET() {
       pendingQueueItems,
       topQueueItems,
     ] = await Promise.all([
-      db.actionItem.count(),
-      db.actionItem.count({ where: { status: { in: ['pending', 'queued'] } } }),
-      db.actionItem.findMany({
+      safeQuery(() => db.actionItem.count(), 0),
+      safeQuery(() => db.actionItem.count({ where: { status: { in: ['pending', 'queued'] } } }), 0),
+      safeQuery(() => db.actionItem.findMany({
         take: 5,
         orderBy: { roiScore: 'desc' },
         where: { status: { in: ['pending', 'queued'] } },
@@ -137,13 +138,13 @@ export async function GET() {
           status: true,
           createdAt: true,
         },
-      }),
+      }), []),
     ])
 
-    const totalEstimatedGainResult = await db.actionItem.aggregate({
+    const totalEstimatedGainResult = await safeQuery(() => db.actionItem.aggregate({
       _sum: { estimatedScoreGain: true },
       where: { status: { in: ['pending', 'queued'] } },
-    })
+    }), { _sum: { estimatedScoreGain: 0 } })
     const totalEstimatedGain = totalEstimatedGainResult._sum.estimatedScoreGain || 0
 
     // ── Email Digest ─────────────────────────────────────────────
@@ -152,9 +153,9 @@ export async function GET() {
       pendingDigests,
       recentDigests,
     ] = await Promise.all([
-      db.emailDigest.count({ where: { status: 'sent' } }),
-      db.emailDigest.count({ where: { status: 'pending' } }),
-      db.emailDigest.findMany({
+      safeQuery(() => db.emailDigest.count({ where: { status: 'sent' } }), 0),
+      safeQuery(() => db.emailDigest.count({ where: { status: 'pending' } }), 0),
+      safeQuery(() => db.emailDigest.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -166,14 +167,14 @@ export async function GET() {
           status: true,
           createdAt: true,
         },
-      }),
+      }), []),
     ])
 
     // Calculate avg score delta
-    const avgDeltaResult = await db.emailDigest.aggregate({
+    const avgDeltaResult = await safeQuery(() => db.emailDigest.aggregate({
       _avg: { scoreDelta: true },
       where: { status: 'sent' },
-    })
+    }), { _avg: { scoreDelta: null } })
     const avgScoreDelta = avgDeltaResult._avg.scoreDelta
       ? Math.round(avgDeltaResult._avg.scoreDelta * 10) / 10
       : 0

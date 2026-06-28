@@ -6,6 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,10 +49,10 @@ export async function GET() {
       totalUsers,
       totalPaidUsers,
     ] = await Promise.all([
-      // Visitors: AnalyticsEvent page_view today
-      db.analyticsEvent.count({
+      // Visitors: AnalyticsEvent page_view today (safe — table may not exist on Turso)
+      safeQuery(() => db.analyticsEvent.count({
         where: { event: 'page_view', createdAt: { gte: today, lte: todayEnd } },
-      }),
+      }), 0),
       // Free audits: Analysis without userId today
       db.analysis.count({
         where: { userId: null, createdAt: { gte: today, lte: todayEnd } },
@@ -97,9 +98,9 @@ export async function GET() {
       activatedYesterday,
       paidYesterday,
     ] = await Promise.all([
-      db.analyticsEvent.count({
+      safeQuery(() => db.analyticsEvent.count({
         where: { event: 'page_view', createdAt: { gte: yesterday, lte: yesterdayEnd } },
-      }),
+      }), 0),
       db.analysis.count({
         where: { userId: null, createdAt: { gte: yesterday, lte: yesterdayEnd } },
       }),
@@ -225,9 +226,9 @@ export async function GET() {
       // Lightweight approach: use aggregate counts for last 7 days in a single batch
       const weekStart = startOfDay(new Date(Date.now() - 6 * 86400000))
       const [weekVisitors, weekRegistrations, weekCompleted] = await Promise.all([
-        db.analyticsEvent.count({
+        safeQuery(() => db.analyticsEvent.count({
           where: { event: 'page_view', createdAt: { gte: weekStart } },
-        }),
+        }), 0),
         db.user.count({
           where: { createdAt: { gte: weekStart } },
         }),
