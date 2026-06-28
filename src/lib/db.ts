@@ -16,12 +16,12 @@ function createPrismaClient(): PrismaClient {
     }
     const adapter = new PrismaLibSql(adapterConfig as ConstructorParameters<typeof PrismaLibSql>[0])
     console.log('[db] Using Turso cloud database')
-    return new PrismaClient({ adapter: adapter as ConstructorParameters<typeof PrismaClient>[0] extends { adapter?: infer A } ? A : never, log: ['query'] })
+    return new PrismaClient({ adapter: adapter as ConstructorParameters<typeof PrismaClient>[0] extends { adapter?: infer A } ? A : never })
   }
 
   // Local SQLite (development)
   console.log('[db] Using local SQLite')
-  return new PrismaClient({ log: ['query'] })
+  return new PrismaClient()
 }
 
 export const db = globalForPrisma.prisma ?? createPrismaClient()
