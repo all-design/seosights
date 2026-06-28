@@ -4,12 +4,15 @@
  * GET /api/live/activity
  *
  * Returns recent agent activity for the "Build in Public" section.
- * Pulls real data from the database (content queue + outreach logs)
- * and formats it as a timeline feed.
+ * FIXED: No longer queries non-existent models (internalContentQueue, outreachLog, cMSPublishLog).
+ * Uses real data from existing models (analysis, agentLog) with simulated fallback.
+ * Status indicators show data source (live/estimated/simulated).
  */
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery, type DataStatus } from '@/lib/safe-query'
+import { logFallback } from '@/lib/fallback-logger'
 
 interface ActivityItem {
   id: string
@@ -22,170 +25,148 @@ interface ActivityItem {
   type: 'content' | 'outreach' | 'technical' | 'analysis'
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
+  const api = '/api/live/activity'
+
   try {
-    // Find Client Zero projects
-    const clientZeroProjects = await db.project.findMany({
-      where: { isInternalAutopilot: true },
-      select: { id: true, domain: true },
-    })
+    // ── Try to get real data from existing tables ──────────────────────
+    const [recentAnalyses, recentAgentLogs] = await Promise.all([
+      safeQuery(() => db.analysis.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          domain: true,
+          status: true,
+          mode: true,
+          createdAt: true,
+        },
+      }), [], { api }),
+      safeQuery(() => db.agentLog.findMany({
+        take: 15,
+        orderBy: { startedAt: 'desc' },
+        select: {
+          id: true,
+          agentId: true,
+          agentName: true,
+          action: true,
+          status: true,
+          startedAt: true,
+          completedAt: true,
+        },
+      }), [], { api }),
+    ])
 
-    if (clientZeroProjects.length === 0) {
-      return NextResponse.json({
-        activities: getSimulatedActivities(),
-        source: 'simulated',
-      })
-    }
-
-    const projectIds = clientZeroProjects.map((p) => p.id)
-    const domainMap = new Map(clientZeroProjects.map((p) => [p.id, p.domain]))
-
-    // Fetch recent content queue activity
-    const recentContent = await db.internalContentQueue.findMany({
-      where: {
-        projectId: { in: projectIds },
-        status: { in: ['published', 'generating', 'failed'] },
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 15,
-    })
-
-    // Fetch recent outreach activity
-    const recentOutreach = await db.outreachLog.findMany({
-      where: {
-        projectId: { in: projectIds },
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 10,
-    })
-
-    // Fetch recent CMS publish logs
-    const recentPublishes = await db.cMSPublishLog.findMany({
-      where: {
-        projectId: { in: projectIds },
-        status: { in: ['published', 'failed'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    })
-
-    // Combine and format activities
     const activities: ActivityItem[] = []
+    let hasLiveData = false
 
-    for (const content of recentContent) {
-      const domain = domainMap.get(content.projectId) || 'unknown'
-      if (content.status === 'published') {
+    // ── Build activities from real agent logs ──────────────────────────
+    if (recentAgentLogs.data.length > 0) {
+      hasLiveData = true
+      for (const log of recentAgentLogs.data) {
+        const emoji = getAgentEmoji(log.agentId)
         activities.push({
-          id: `content-${content.id}`,
-          emoji: '🏗️',
-          agentName: 'Content Architect',
-          text: `Published "${content.suggestedTitle}" on ${domain}`,
-          time: formatTimeAgo(content.publishedAt || content.updatedAt),
-          timestamp: (content.publishedAt || content.updatedAt).toISOString(),
-          status: 'completed',
-          type: 'content',
-        })
-      } else if (content.status === 'generating') {
-        activities.push({
-          id: `content-${content.id}`,
-          emoji: '📝',
-          agentName: 'Content Architect',
-          text: `Generating article: "${content.suggestedTitle}" for ${domain}`,
-          time: 'just now',
-          timestamp: content.updatedAt.toISOString(),
-          status: 'in-progress',
-          type: 'content',
+          id: `agent-${log.id}`,
+          emoji,
+          agentName: log.agentName,
+          text: log.action || `${log.agentName} processing...`,
+          time: formatTimeAgo(log.startedAt),
+          timestamp: log.startedAt.toISOString(),
+          status: log.status === 'completed' ? 'completed' : log.status === 'failed' ? 'failed' : 'in-progress',
+          type: getAgentType(log.agentId),
         })
       }
     }
 
-    for (const outreach of recentOutreach) {
-      const domain = domainMap.get(outreach.projectId) || 'unknown'
-      if (outreach.status === 'sent') {
+    // ── Build activities from real analyses ────────────────────────────
+    if (recentAnalyses.data.length > 0) {
+      hasLiveData = true
+      for (const analysis of recentAnalyses.data) {
         activities.push({
-          id: `outreach-${outreach.id}`,
-          emoji: '🤝',
-          agentName: 'Backlink Prospector',
-          text: `Sent outreach email to ${outreach.targetSite} for ${domain}`,
-          time: formatTimeAgo(outreach.sentAt || outreach.updatedAt),
-          timestamp: (outreach.sentAt || outreach.updatedAt).toISOString(),
-          status: 'completed',
-          type: 'outreach',
-        })
-      } else if (outreach.status === 'link_acquired') {
-        activities.push({
-          id: `outreach-${outreach.id}`,
-          emoji: '🔗',
-          agentName: 'Link Strategist',
-          text: `Backlink acquired from ${outreach.targetSite}! Anchor: "${outreach.anchorText || 'N/A'}"`,
-          time: formatTimeAgo(outreach.linkAcquiredAt || outreach.updatedAt),
-          timestamp: (outreach.linkAcquiredAt || outreach.updatedAt).toISOString(),
-          status: 'completed',
-          type: 'outreach',
-        })
-      } else if (outreach.status === 'replied') {
-        activities.push({
-          id: `outreach-${outreach.id}`,
-          emoji: '📨',
-          agentName: 'Backlink Prospector',
-          text: `Got a reply from ${outreach.targetSite} regarding guest post`,
-          time: formatTimeAgo(outreach.repliedAt || outreach.updatedAt),
-          timestamp: (outreach.repliedAt || outreach.updatedAt).toISOString(),
-          status: 'completed',
-          type: 'outreach',
-        })
-      } else if (outreach.status === 'pending') {
-        activities.push({
-          id: `outreach-${outreach.id}`,
-          emoji: '📧',
-          agentName: 'Link Strategist',
-          text: `Preparing outreach email for ${outreach.targetSite}`,
-          time: formatTimeAgo(outreach.createdAt),
-          timestamp: outreach.createdAt.toISOString(),
-          status: 'in-progress',
-          type: 'outreach',
+          id: `analysis-${analysis.id}`,
+          emoji: '🔍',
+          agentName: 'Master Director',
+          text: `${analysis.status === 'completed' ? 'Completed' : 'Started'} audit for ${analysis.domain}`,
+          time: formatTimeAgo(analysis.createdAt),
+          timestamp: analysis.createdAt.toISOString(),
+          status: analysis.status === 'completed' ? 'completed' : 'in-progress',
+          type: 'analysis',
         })
       }
     }
 
-    for (const publish of recentPublishes) {
-      if (publish.status === 'published' && publish.contentType !== 'blog_post') {
-        activities.push({
-          id: `cms-${publish.id}`,
-          emoji: '⚙️',
-          agentName: 'Tech & Schema Auditor',
-          text: `Updated ${publish.contentType} on ${publish.title}`,
-          time: formatTimeAgo(publish.publishedAt || publish.createdAt),
-          timestamp: (publish.publishedAt || publish.createdAt).toISOString(),
-          status: 'completed',
-          type: 'technical',
-        })
-      }
-    }
-
-    // Sort by timestamp descending
+    // ── Sort by timestamp and supplement if needed ─────────────────────
     activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-    // If we have very few real activities, supplement with simulated ones
-    if (activities.length < 5) {
+    let source: DataStatus = 'live'
+    if (!hasLiveData) {
+      source = 'simulated'
+      logFallback({
+        api,
+        reason: 'No real activity data — using simulated feed',
+        category: 'db_query',
+        confidence: 0,
+      })
+    } else if (activities.length < 5) {
+      source = 'estimated'
+      // Supplement with simulated
       const simulated = getSimulatedActivities()
       activities.push(...simulated.slice(0, 5 - activities.length))
     }
 
+    // Always ensure we have some content
+    if (activities.length === 0) {
+      activities.push(...getSimulatedActivities().slice(0, 8))
+      source = 'simulated'
+    }
+
     return NextResponse.json({
       activities: activities.slice(0, 20),
-      source: activities.length > 5 ? 'live' : 'mixed',
+      source,
+      confidence: source === 'live' ? 100 : source === 'estimated' ? 50 : 0,
     })
   } catch (error) {
     console.error('[Live Activity API] GET error:', error)
+    logFallback({
+      api,
+      reason: `Top-level error: ${error instanceof Error ? error.message : 'Unknown'}`,
+      category: 'unknown',
+      confidence: 0,
+      error,
+    })
+
     return NextResponse.json({
       activities: getSimulatedActivities(),
-      source: 'simulated',
+      source: 'simulated' as DataStatus,
+      confidence: 0,
     })
   }
 }
 
-// ── Time Formatting ────────────────────────────────────────────────────────
+// ── Helper Functions ──────────────────────────────────────────────────────
+
+function getAgentEmoji(agentId: string): string {
+  const emojiMap: Record<string, string> = {
+    'master-director': '🎯',
+    'keyword-researcher': '🔑',
+    'content-analyst': '📝',
+    'technical-seo': '⚙️',
+    'competitor-analyst': '🕵️',
+    'backlink-prospector': '🔗',
+    'local-seo': '📍',
+    'schema-specialist': '📊',
+  }
+  return emojiMap[agentId] || '🤖'
+}
+
+function getAgentType(agentId: string): ActivityItem['type'] {
+  if (agentId.includes('content') || agentId.includes('keyword')) return 'content'
+  if (agentId.includes('backlink') || agentId.includes('outreach')) return 'outreach'
+  if (agentId.includes('technical') || agentId.includes('schema')) return 'technical'
+  return 'analysis'
+}
 
 function formatTimeAgo(date: Date): string {
   const now = new Date()
@@ -201,7 +182,7 @@ function formatTimeAgo(date: Date): string {
   return new Date(date).toLocaleDateString()
 }
 
-// ── Simulated Activities (fallback) ────────────────────────────────────────
+// ── Simulated Activities (fallback) ──────────────────────────────────────
 
 function getSimulatedActivities(): ActivityItem[] {
   const now = new Date()

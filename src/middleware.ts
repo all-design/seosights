@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { generateCorrelationId } from '@/lib/correlation'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-minute rate limiting via in-memory store (production would use Redis)
@@ -63,24 +64,36 @@ function getClientIP(request: NextRequest): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function middleware(request: NextRequest) {
-  // Only rate-limit API routes
+  // Only process API routes
   if (!request.nextUrl.pathname.startsWith('/api/')) {
     return NextResponse.next()
   }
 
+  // ── Correlation ID ──────────────────────────────────────────────────────
+  // Every API request gets a unique x-request-id for tracing.
+  // If the client sends one, we preserve it; otherwise, we generate one.
+  const existingCorrelationId = request.headers.get('x-request-id')
+  const correlationId = existingCorrelationId || generateCorrelationId()
+
   // Skip webhooks (they have their own auth via signatures)
   if (request.nextUrl.pathname.startsWith('/api/webhooks/')) {
-    return NextResponse.next()
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', correlationId)
+    return response
   }
 
   // Skip auth routes (login/register should not be rate-limited aggressively)
   if (request.nextUrl.pathname.startsWith('/api/auth/')) {
-    return NextResponse.next()
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', correlationId)
+    return response
   }
 
   // Skip health checks
-  if (request.nextUrl.pathname === '/api/route') {
-    return NextResponse.next()
+  if (request.nextUrl.pathname === '/api/route' || request.nextUrl.pathname === '/api/system/status') {
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', correlationId)
+    return response
   }
 
   // ── Client identification ──────────────────────────────────────────────────
@@ -91,8 +104,6 @@ export function middleware(request: NextRequest) {
   const clientId = sessionToken || ip
 
   // ── Determine tier from session cookie ─────────────────────────────────────
-  // Tier is stored in a separate cookie set by the auth system.
-  // Format: plain string like "pro", "starter", etc.
   const tierCookie = request.cookies.get('seosights_tier')?.value
   const limit = getRateLimit(tierCookie)
 
@@ -109,11 +120,12 @@ export function middleware(request: NextRequest) {
     response.headers.set('X-RateLimit-Limit', String(limit))
     response.headers.set('X-RateLimit-Remaining', String(limit - 1))
     response.headers.set('X-RateLimit-Reset', String(Math.ceil((now + windowMs) / 1000)))
+    response.headers.set('x-request-id', correlationId)
     return applyDailyAuditCheck(request, ip, sessionToken, response)
   }
 
   if (entry.count >= limit) {
-    return NextResponse.json(
+    const rateLimitResponse = NextResponse.json(
       { error: 'Rate limit exceeded. Please slow down.', code: 'RATE_LIMITED' },
       {
         status: 429,
@@ -122,9 +134,11 @@ export function middleware(request: NextRequest) {
           'X-RateLimit-Limit': String(limit),
           'X-RateLimit-Remaining': '0',
           'X-RateLimit-Reset': String(Math.ceil(entry.resetAt / 1000)),
+          'x-request-id': correlationId,
         },
       },
     )
+    return rateLimitResponse
   }
 
   entry.count++
@@ -133,6 +147,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-RateLimit-Limit', String(limit))
   response.headers.set('X-RateLimit-Remaining', String(limit - entry.count))
   response.headers.set('X-RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)))
+  response.headers.set('x-request-id', correlationId)
 
   return applyDailyAuditCheck(request, ip, sessionToken, response)
 }

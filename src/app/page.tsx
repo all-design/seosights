@@ -30,6 +30,7 @@ import AnalysisDashboard from '@/components/landing/AnalysisDashboard'
 import SuperadminPanel from '@/components/superadmin/SuperadminPanel'
 import WebhooksPanel from '@/components/dashboard/WebhooksPanel'
 import AffiliatePortal from '@/components/dashboard/AffiliatePortal'
+import OperationsCenter from '@/components/ops/OperationsCenter'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useAppStore } from '@/lib/store'
 
@@ -38,6 +39,7 @@ export default function Home() {
   const [isAdminOpen, setIsAdminOpen] = useState(false)
   const [isWebhooksOpen, setIsWebhooksOpen] = useState(false)
   const [isAffiliateOpen, setIsAffiliateOpen] = useState(false)
+  const [isOpsOpen, setIsOpsOpen] = useState(false)
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [loginDefaultTab, setLoginDefaultTab] = useState<'login' | 'register'>('register')
 
@@ -77,15 +79,20 @@ export default function Home() {
         e.preventDefault()
         setIsAffiliateOpen(true)
       }
+      if (e.ctrlKey && e.shiftKey && e.key === 'O') {
+        e.preventDefault()
+        setIsOpsOpen(true)
+      }
       if (e.key === 'Escape') {
         if (isAdminOpen) setIsAdminOpen(false)
         if (isWebhooksOpen) setIsWebhooksOpen(false)
         if (isAffiliateOpen) setIsAffiliateOpen(false)
+        if (isOpsOpen) setIsOpsOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isAdminOpen, isWebhooksOpen])
+  }, [isAdminOpen, isWebhooksOpen, isOpsOpen])
 
   // Logo 5-click handler (exposed globally)
   useEffect(() => {
@@ -135,6 +142,7 @@ export default function Home() {
         <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
         <SuperadminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
         <WebhooksPanel isOpen={isWebhooksOpen} onClose={() => setIsWebhooksOpen(false)} userId={webhookUserId} />
+        <OperationsCenter isOpen={isOpsOpen} onClose={() => setIsOpsOpen(false)} />
         <Dialog open={isAffiliateOpen} onOpenChange={setIsAffiliateOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background border-white/10">
             <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
@@ -151,6 +159,7 @@ export default function Home() {
         <URLInputModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
         <SuperadminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
         <WebhooksPanel isOpen={isWebhooksOpen} onClose={() => setIsWebhooksOpen(false)} userId={webhookUserId} />
+        <OperationsCenter isOpen={isOpsOpen} onClose={() => setIsOpsOpen(false)} />
         <Dialog open={isAffiliateOpen} onOpenChange={setIsAffiliateOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background border-white/10">
             <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
@@ -198,6 +207,7 @@ export default function Home() {
       />
       <SuperadminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
       <WebhooksPanel isOpen={isWebhooksOpen} onClose={() => setIsWebhooksOpen(false)} userId={webhookUserId} />
+      <OperationsCenter isOpen={isOpsOpen} onClose={() => setIsOpsOpen(false)} />
       <Dialog open={isAffiliateOpen} onOpenChange={setIsAffiliateOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-background border-white/10">
           <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
