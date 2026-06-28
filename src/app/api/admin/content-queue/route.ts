@@ -46,10 +46,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ entries, total })
   } catch (error) {
     console.error('[Admin Content Queue API] GET error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch content queue entries' },
-      { status: 500 }
-    )
+    return NextResponse.json({ entries: [], total: 0 })
   }
 }
 
@@ -138,9 +135,6 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
   } catch (error) {
     console.error('[Admin Content Queue API] POST error:', error)
-    return NextResponse.json(
-      { error: 'Failed to generate content topics' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to generate content topics', count: 0 })
   }
 }

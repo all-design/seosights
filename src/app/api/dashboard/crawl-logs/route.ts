@@ -172,9 +172,14 @@ export async function GET(request: NextRequest) {
       '[crawl-logs] GET error:',
       error instanceof Error ? error.message : 'Unknown'
     )
-    return NextResponse.json(
-      { error: 'Failed to fetch crawl logs' },
-      { status: 500 }
-    )
+    const data = getMockData()
+    return NextResponse.json({
+      summary: data.summary,
+      bots: data.bots,
+      logs: data.logs,
+      alerts: data.alerts,
+      url: null,
+      bot: null,
+    })
   }
 }

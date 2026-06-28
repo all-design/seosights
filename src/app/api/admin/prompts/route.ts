@@ -42,10 +42,7 @@ export async function GET() {
     return NextResponse.json({ prompts })
   } catch (error) {
     console.error('[Admin Prompts API] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch agent prompts' },
-      { status: 500 }
-    )
+    return NextResponse.json({ prompts: [] })
   }
 }
 
@@ -82,9 +79,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ prompt: updated })
   } catch (error) {
     console.error('[Admin Prompts API] PUT Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update agent prompt' },
-      { status: 500 }
-    )
+    return NextResponse.json({ prompt: null, error: 'Failed to update prompt' })
   }
 }

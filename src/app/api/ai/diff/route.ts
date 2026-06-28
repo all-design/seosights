@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -197,22 +198,28 @@ export async function GET(req: NextRequest) {
     const snapshotWhereBase: Record<string, unknown> = { domain }
     if (userId) snapshotWhereBase.userId = userId
 
-    const beforeSnapshot = await db.visibilitySnapshot.findFirst({
-      where: {
-        ...snapshotWhereBase,
-        capturedAt: { lte: beforeDate },
-      },
-      orderBy: { capturedAt: 'desc' },
-    })
+    const beforeSnapshot = await safeQuery(
+      (d) => d.visibilitySnapshot.findFirst({
+        where: {
+          ...snapshotWhereBase,
+          capturedAt: { lte: beforeDate },
+        },
+        orderBy: { capturedAt: 'desc' },
+      }),
+      null
+    )
 
     // ── Fetch "after" snapshot (closest to afterDate) ────────────
-    const afterSnapshot = await db.visibilitySnapshot.findFirst({
-      where: {
-        ...snapshotWhereBase,
-        capturedAt: { lte: afterDate },
-      },
-      orderBy: { capturedAt: 'desc' },
-    })
+    const afterSnapshot = await safeQuery(
+      (d) => d.visibilitySnapshot.findFirst({
+        where: {
+          ...snapshotWhereBase,
+          capturedAt: { lte: afterDate },
+        },
+        orderBy: { capturedAt: 'desc' },
+      }),
+      null
+    )
 
     // ── If both snapshots missing, fall back to mock ─────────────
     if (!beforeSnapshot && !afterSnapshot) {
@@ -250,21 +257,27 @@ export async function GET(req: NextRequest) {
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const beforeCitations = await db.citationEvent.findMany({
-      where: {
-        ...citationWhere,
-        createdAt: { gte: new Date(beforeDate.getTime() - 7 * 24 * 3600000), lte: beforeDate },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const beforeCitations = await safeQuery(
+      (d) => d.citationEvent.findMany({
+        where: {
+          ...citationWhere,
+          createdAt: { gte: new Date(beforeDate.getTime() - 7 * 24 * 3600000), lte: beforeDate },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      []
+    )
 
-    const afterCitations = await db.citationEvent.findMany({
-      where: {
-        ...citationWhere,
-        createdAt: { gte: new Date(afterDate.getTime() - 7 * 24 * 3600000), lte: afterDate },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const afterCitations = await safeQuery(
+      (d) => d.citationEvent.findMany({
+        where: {
+          ...citationWhere,
+          createdAt: { gte: new Date(afterDate.getTime() - 7 * 24 * 3600000), lte: afterDate },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      []
+    )
 
     const gained = afterCitations
       .filter((e) => e.eventType === 'cited' || e.eventType === 'first_mention' || e.eventType === 'rank_up')

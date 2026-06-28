@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { routeLLM, type DataStatus } from '@/lib/ai-router'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +17,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Try to get feed items from database first
-    const existingItems = await db.feedItem.findMany({
-      where: { domain },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    })
+    const existingItems = await safeQuery(
+      (d) => d.feedItem.findMany({
+        where: { domain },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+      []
+    )
 
     if (existingItems.length > 0) {
       return NextResponse.json({

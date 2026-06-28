@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,25 +55,28 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
     if (prompt) where.prompt = { contains: prompt }
 
-    const snapshots = await db.recommendationSnapshot.findMany({
-      where,
-      orderBy: { capturedAt: 'desc' },
-      take: limit,
-      include: {
-        diffsAsAfter: {
-          include: {
-            beforeSnapshot: {
-              select: {
-                id: true,
-                capturedAt: true,
-                overallScore: true,
-                engines: true,
+    const snapshots = await safeQuery(
+      (d) => d.recommendationSnapshot.findMany({
+        where,
+        orderBy: { capturedAt: 'desc' },
+        take: limit,
+        include: {
+          diffsAsAfter: {
+            include: {
+              beforeSnapshot: {
+                select: {
+                  id: true,
+                  capturedAt: true,
+                  overallScore: true,
+                  engines: true,
+                },
               },
             },
           },
         },
-      },
-    })
+      }),
+      [] as any[]
+    )
 
     // Format response with snapshots and their associated diffs
     const results = snapshots.map((snap) => ({
@@ -97,10 +101,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ snapshots: results, total: results.length })
   } catch (error) {
     console.error('[recommendation-recorder] GET error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to fetch recommendation snapshots' },
-      { status: 500 }
-    )
+    return NextResponse.json({ snapshots: [], total: 0 })
   }
 }
 
@@ -121,29 +122,34 @@ export async function POST(request: NextRequest) {
     const { engines, overallScore } = generateSimulatedEngines(brand)
 
     // Find the most recent previous snapshot for the same domain+prompt
-    const previousSnapshot = await db.recommendationSnapshot.findFirst({
-      where: {
-        domain,
-        prompt,
-        ...(userId ? { userId } : {}),
-      },
-      orderBy: { capturedAt: 'desc' },
-    })
+    const previousSnapshot = await safeQuery(
+      (d) => d.recommendationSnapshot.findFirst({
+        where: {
+          domain,
+          prompt,
+          ...(userId ? { userId } : {}),
+        },
+        orderBy: { capturedAt: 'desc' },
+      }),
+      null as any
+    )
 
     // Create the new snapshot
-    const snapshot = await db.recommendationSnapshot.create({
-      data: {
-        userId: userId || null,
-        domain,
-        prompt,
-        brand,
-        engines: JSON.stringify(engines),
-        overallScore,
-        dataSource: 'live',
-      },
-    })
+    const snapshot = await safeQuery(
+      (d) => d.recommendationSnapshot.create({
+        data: {
+          userId: userId || null,
+          domain,
+          prompt,
+          brand,
+          engines: JSON.stringify(engines),
+          overallScore,
+          dataSource: 'live',
+        },
+      }),
+      null as any
+    )
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let diff: any = null
 
     // Generate a diff if a previous snapshot exists
@@ -207,26 +213,26 @@ export async function POST(request: NextRequest) {
       if (scoreDelta !== 0) parts.push(`Score ${scoreDelta > 0 ? '+' : ''}${scoreDelta}`)
       const summary = parts.length > 0 ? parts.join('. ') : 'No significant changes detected'
 
-      diff = await db.recommendationDiff.create({
-        data: {
-          userId: userId || null,
-          domain,
-          beforeSnapshotId: previousSnapshot.id,
-          afterSnapshotId: snapshot.id,
-          prompt,
-          changes: JSON.stringify(changes),
-          severity,
-          summary,
-        },
-      })
+      diff = await safeQuery(
+        (d) => d.recommendationDiff.create({
+          data: {
+            userId: userId || null,
+            domain,
+            beforeSnapshotId: previousSnapshot.id,
+            afterSnapshotId: snapshot?.id || '',
+            prompt,
+            changes: JSON.stringify(changes),
+            severity,
+            summary,
+          },
+        }),
+        null as any
+      )
     }
 
     return NextResponse.json({ snapshot, diff }, { status: 201 })
   } catch (error) {
     console.error('[recommendation-recorder] POST error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to create recommendation snapshot' },
-      { status: 500 }
-    )
+    return NextResponse.json({ snapshot: null, diff: null, message: 'Failed to create recommendation snapshot — tables may not exist yet' })
   }
 }

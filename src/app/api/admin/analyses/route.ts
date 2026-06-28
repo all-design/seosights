@@ -47,9 +47,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ analyses, total })
   } catch (error) {
     console.error('[Admin Analyses API] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch analyses' },
-      { status: 500 }
-    )
+    return NextResponse.json({ analyses: [], total: 0 })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,20 +85,26 @@ export async function GET(req: NextRequest) {
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const citationEvents = await db.citationEvent.findMany({
-      where: citationWhere,
-      orderBy: { createdAt: 'desc' },
-      take: 1000,
-    })
+    const citationEvents = await safeQuery(
+      (d) => d.citationEvent.findMany({
+        where: citationWhere,
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+      }),
+      []
+    )
 
     // ── Fetch latest VisibilitySnapshot for per-engine data ──────
     const snapshotWhere: Record<string, unknown> = { domain }
     if (userId) snapshotWhere.userId = userId
 
-    const latestSnapshot = await db.visibilitySnapshot.findFirst({
-      where: snapshotWhere,
-      orderBy: { capturedAt: 'desc' },
-    })
+    const latestSnapshot = await safeQuery(
+      (d) => d.visibilitySnapshot.findFirst({
+        where: snapshotWhere,
+        orderBy: { capturedAt: 'desc' },
+      }),
+      null
+    )
 
     // ── If no data at all, fall back to mock ─────────────────────
     if (citationEvents.length === 0 && !latestSnapshot) {

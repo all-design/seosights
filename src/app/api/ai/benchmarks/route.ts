@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { routeLLM, type DataStatus } from '@/lib/ai-router'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,10 @@ export async function GET(req: NextRequest) {
 
     // Try database first
     if (industryId) {
-      const existing = await db.industryBenchmark.findUnique({ where: { industry: industryId } })
+      const existing = await safeQuery(
+        (d) => d.industryBenchmark.findUnique({ where: { industry: industryId } }),
+        null
+      )
       if (existing) {
         return NextResponse.json({
           industry: existing,
@@ -43,7 +47,10 @@ export async function GET(req: NextRequest) {
         })
       }
     } else {
-      const all = await db.industryBenchmark.findMany({ orderBy: { avgAIVisibility: 'desc' } })
+      const all = await safeQuery(
+        (d) => d.industryBenchmark.findMany({ orderBy: { avgAIVisibility: 'desc' } }),
+        []
+      )
       if (all.length > 0) {
         return NextResponse.json({
           industries: all,

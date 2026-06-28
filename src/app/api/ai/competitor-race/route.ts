@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,10 +61,13 @@ export async function GET(req: NextRequest) {
     const snapshotWhere: Record<string, unknown> = { domain }
     if (userId) snapshotWhere.userId = userId
 
-    const yourSnapshot = await db.visibilitySnapshot.findFirst({
-      where: snapshotWhere,
-      orderBy: { capturedAt: 'desc' },
-    })
+    const yourSnapshot = await safeQuery(
+      (d) => d.visibilitySnapshot.findFirst({
+        where: snapshotWhere,
+        orderBy: { capturedAt: 'desc' },
+      }),
+      null
+    )
 
     // ── Fetch IndustryBenchmark for competitor context ───────────
     let benchmark: {
@@ -75,23 +79,29 @@ export async function GET(req: NextRequest) {
     } | null = null
 
     if (industry) {
-      benchmark = await db.industryBenchmark.findUnique({
-        where: { industry },
-      })
+      benchmark = await safeQuery(
+        (d) => d.industryBenchmark.findUnique({
+          where: { industry },
+        }),
+        null
+      )
     }
 
     // ── Fetch competitor domains from CitationEvent ──────────────
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const competitorEvents = await db.citationEvent.findMany({
-      where: {
-        ...citationWhere,
-        competitor: { not: null },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
+    const competitorEvents = await safeQuery(
+      (d) => d.citationEvent.findMany({
+        where: {
+          ...citationWhere,
+          competitor: { not: null },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      []
+    )
 
     // ── Gather unique competitor domains ─────────────────────────
     const competitorDomains = [...new Set(
@@ -102,13 +112,16 @@ export async function GET(req: NextRequest) {
 
     // ── Fetch snapshots for each competitor ──────────────────────
     const competitorSnapshots = competitorDomains.length > 0
-      ? await db.visibilitySnapshot.findMany({
-          where: {
-            domain: { in: competitorDomains },
-          },
-          orderBy: { capturedAt: 'desc' },
-          distinct: ['domain'],
-        })
+      ? await safeQuery(
+          (d) => d.visibilitySnapshot.findMany({
+            where: {
+              domain: { in: competitorDomains },
+            },
+            orderBy: { capturedAt: 'desc' },
+            distinct: ['domain'],
+          }),
+          []
+        )
       : []
 
     // ── Build rankings ───────────────────────────────────────────

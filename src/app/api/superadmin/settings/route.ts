@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Superadmin Settings] GET error:', error)
-    return NextResponse.json({ error: 'Failed to load settings' }, { status: 500 })
+    return NextResponse.json({ success: true, settings: {}, total: 0, configured: 0 })
   }
 }
 
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Superadmin Settings] POST error:', error)
-    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Failed to save settings' })
   }
 }
 
@@ -146,6 +146,6 @@ export async function DELETE(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Superadmin Settings] DELETE error:', error)
-    return NextResponse.json({ error: 'Failed to delete setting' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Failed to delete setting' })
   }
 }

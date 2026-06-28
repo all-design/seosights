@@ -143,9 +143,16 @@ export async function GET(request: NextRequest) {
       '[entity-graph] GET error:',
       error instanceof Error ? error.message : 'Unknown'
     )
-    return NextResponse.json(
-      { error: 'Failed to build entity graph' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      brand: 'unknown',
+      centerNode: {
+        id: 'brand',
+        label: 'unknown',
+        description: 'Entity graph data is currently unavailable.',
+      },
+      entities: [],
+      authorityScore: 0,
+      summary: 'Entity graph data is currently unavailable. Please try again later.',
+    })
   }
 }

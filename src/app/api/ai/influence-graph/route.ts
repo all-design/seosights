@@ -157,6 +157,10 @@ Return ONLY the JSON object — no markdown, no commentary.`
     return NextResponse.json(graph)
   } catch (error) {
     console.error('[influence-graph] Unhandled error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json({ error: 'Influence graph analysis failed' }, { status: 500 })
+    const fallback = fallbackGraph('Unknown')
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }

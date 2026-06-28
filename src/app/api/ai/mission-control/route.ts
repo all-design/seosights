@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,43 +89,58 @@ export async function GET(req: NextRequest) {
     const snapshotWhere: Record<string, unknown> = { domain }
     if (userId) snapshotWhere.userId = userId
 
-    const latestSnapshot = await db.visibilitySnapshot.findFirst({
-      where: snapshotWhere,
-      orderBy: { capturedAt: 'desc' },
-    })
+    const latestSnapshot = await safeQuery(
+      (d) => d.visibilitySnapshot.findFirst({
+        where: snapshotWhere,
+        orderBy: { capturedAt: 'desc' },
+      }),
+      null
+    )
 
     // ── Fetch CitationEvent counts per engine ────────────────────
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const citationEvents = await db.citationEvent.findMany({
-      where: citationWhere,
-      orderBy: { createdAt: 'desc' },
-      take: 500,
-    })
+    const citationEvents = await safeQuery(
+      (d) => d.citationEvent.findMany({
+        where: citationWhere,
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }),
+      []
+    )
 
     // ── Fetch recent FeedItem activity ───────────────────────────
     const feedWhere: Record<string, unknown> = { domain }
     if (userId) feedWhere.userId = userId
 
-    const recentFeedItems = await db.feedItem.findMany({
-      where: feedWhere,
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    })
+    const recentFeedItems = await safeQuery(
+      (d) => d.feedItem.findMany({
+        where: feedWhere,
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      []
+    )
 
     // ── Fetch alert counts ───────────────────────────────────────
-    const unreadAlerts = await db.visibilityAlert.count({
-      where: { domain, isRead: false },
-    })
+    const unreadAlerts = await safeQuery(
+      (d) => d.visibilityAlert.count({
+        where: { domain, isRead: false },
+      }),
+      0
+    )
 
     // ── Count opportunities (pending ActionItems) ────────────────
     const opportunityWhere: Record<string, unknown> = { domain, status: 'pending' }
     if (userId) opportunityWhere.userId = userId
 
-    const opportunityCount = await db.actionItem.count({
-      where: opportunityWhere,
-    })
+    const opportunityCount = await safeQuery(
+      (d) => d.actionItem.count({
+        where: opportunityWhere,
+      }),
+      0
+    )
 
     // ── If no snapshot and no citation data, fall back to mock ──
     if (!latestSnapshot && citationEvents.length === 0 && recentFeedItems.length === 0) {

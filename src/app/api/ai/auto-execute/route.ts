@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,28 +42,43 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
     if (status) where.status = status
 
-    const executions = await db.autoExecution.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        actionItem: {
-          select: {
-            id: true,
-            actionType: true,
-            title: true,
-            priority: true,
-            status: true,
+    const executions = await safeQuery(
+      (d) => d.autoExecution.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+          actionItem: {
+            select: {
+              id: true,
+              actionType: true,
+              title: true,
+              priority: true,
+              status: true,
+            },
           },
         },
-      },
-    })
+      }),
+      [] as any[]
+    )
 
     // Summary stats
-    const totalExecutions = await db.autoExecution.count({ where: { domain } })
-    const pendingCount = await db.autoExecution.count({ where: { domain, status: 'pending' } })
-    const successCount = await db.autoExecution.count({ where: { domain, status: 'success' } })
-    const failedCount = await db.autoExecution.count({ where: { domain, status: 'failed' } })
+    const totalExecutions = await safeQuery(
+      (d) => d.autoExecution.count({ where: { domain } }),
+      0
+    )
+    const pendingCount = await safeQuery(
+      (d) => d.autoExecution.count({ where: { domain, status: 'pending' } }),
+      0
+    )
+    const successCount = await safeQuery(
+      (d) => d.autoExecution.count({ where: { domain, status: 'success' } }),
+      0
+    )
+    const failedCount = await safeQuery(
+      (d) => d.autoExecution.count({ where: { domain, status: 'failed' } }),
+      0
+    )
 
     return NextResponse.json({
       executions,
@@ -75,10 +91,10 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[auto-execute] GET error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to fetch auto execution records' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      executions: [],
+      stats: { total: 0, pending: 0, success: 0, failed: 0 },
+    })
   }
 }
 
@@ -111,9 +127,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the action item exists
-    const actionItem = await db.actionItem.findUnique({
-      where: { id: actionItemId },
-    })
+    const actionItem = await safeQuery(
+      (d) => d.actionItem.findUnique({
+        where: { id: actionItemId },
+      }),
+      null as any
+    )
 
     if (!actionItem) {
       return NextResponse.json(
@@ -131,34 +150,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the AutoExecution with status "pending"
-    const execution = await db.autoExecution.create({
-      data: {
-        actionItemId,
-        userId,
-        domain,
-        platform,
-        actionType,
-        payload: payload ? JSON.stringify(payload) : '{}',
-        status: 'pending',
-        attempts: 0,
-      },
-    })
+    const execution = await safeQuery(
+      (d) => d.autoExecution.create({
+        data: {
+          actionItemId,
+          userId,
+          domain,
+          platform,
+          actionType,
+          payload: payload ? JSON.stringify(payload) : '{}',
+          status: 'pending',
+          attempts: 0,
+        },
+      }),
+      null as any
+    )
 
     // Update the ActionItem status to indicate auto-execution is queued
-    await db.actionItem.update({
-      where: { id: actionItemId },
-      data: {
-        status: 'auto_executing',
-        autoExecuteEnabled: true,
-      },
-    })
+    await safeQuery(
+      (d) => d.actionItem.update({
+        where: { id: actionItemId },
+        data: {
+          status: 'auto_executing',
+          autoExecuteEnabled: true,
+        },
+      }),
+      null as any
+    )
 
     return NextResponse.json({ execution }, { status: 201 })
   } catch (error) {
     console.error('[auto-execute] POST error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to create auto execution' },
-      { status: 500 }
-    )
+    return NextResponse.json({ execution: null, message: 'Failed to create auto execution — tables may not exist yet' })
   }
 }

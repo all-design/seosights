@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { routeLLM, type DataStatus } from '@/lib/ai-router'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,10 +16,13 @@ export async function GET(req: NextRequest) {
     }
 
     // Check database for existing actions
-    const existing = await db.actionItem.findMany({
-      where: { domain, status: 'pending' },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-    })
+    const existing = await safeQuery(
+      (d) => d.actionItem.findMany({
+        where: { domain, status: 'pending' },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+      }),
+      [] as any[]
+    )
 
     if (existing.length > 0) {
       return NextResponse.json({
@@ -117,15 +121,18 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    const updated = await db.actionItem.update({
-      where: { id: actionId },
-      data: { status, completedAt: status === 'completed' ? new Date() : null },
-    })
+    const updated = await safeQuery(
+      (d) => d.actionItem.update({
+        where: { id: actionId },
+        data: { status, completedAt: status === 'completed' ? new Date() : null },
+      }),
+      null as any
+    )
 
     return NextResponse.json({ action: updated })
   } catch (err) {
     console.error('[ai/action-center] PUT Error:', err instanceof Error ? err.message : 'Unknown')
-    return NextResponse.json({ error: 'Failed to update action' }, { status: 500 })
+    return NextResponse.json({ action: null })
   }
 }
 

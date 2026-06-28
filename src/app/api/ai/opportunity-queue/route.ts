@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,10 +61,13 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status
 
     // Fetch items — we'll sort by roiScore in-memory since we may need to recalculate
-    const items = await db.actionItem.findMany({
-      where,
-      orderBy: { roiScore: 'desc' },
-    })
+    const items = await safeQuery(
+      (d) => d.actionItem.findMany({
+        where,
+        orderBy: { roiScore: 'desc' },
+      }),
+      [] as any[]
+    )
 
     // Calculate ROI on-the-fly if missing (roiScore === 0)
     const enrichedItems = items.map((item) => {
@@ -105,10 +109,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[opportunity-queue] GET error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to fetch opportunity queue' },
-      { status: 500 }
-    )
+    return NextResponse.json({ items: [], totalItems: 0, totalEstimatedGain: 0 })
   }
 }
 
@@ -126,13 +127,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch all pending items for this user+domain
-    const pendingItems = await db.actionItem.findMany({
-      where: {
-        domain,
-        userId,
-        status: { in: ['pending', 'queued'] },
-      },
-    })
+    const pendingItems = await safeQuery(
+      (d) => d.actionItem.findMany({
+        where: {
+          domain,
+          userId,
+          status: { in: ['pending', 'queued'] },
+        },
+      }),
+      [] as any[]
+    )
 
     if (pendingItems.length === 0) {
       return NextResponse.json({
@@ -158,21 +162,17 @@ export async function POST(request: NextRequest) {
     let updatedCount = 0
     for (let i = 0; i < itemsWithRoi.length; i++) {
       const item = itemsWithRoi[i]
-      try {
-        await db.actionItem.update({
+      const updateResult = await safeQuery(
+        (d) => d.actionItem.update({
           where: { id: item.id },
           data: {
             roiScore: Math.round(item.roiScore * 100) / 100,
             queuePosition: i + 1,
           },
-        })
-        updatedCount++
-      } catch (updateError) {
-        console.error(
-          `[opportunity-queue] Failed to update item ${item.id}:`,
-          updateError instanceof Error ? updateError.message : 'Unknown'
-        )
-      }
+        }),
+        null as any
+      )
+      if (updateResult) updatedCount++
     }
 
     return NextResponse.json({
@@ -182,9 +182,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('[opportunity-queue] POST error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to recalculate ROI scores' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'Failed to recalculate ROI scores', updatedCount: 0 })
   }
 }

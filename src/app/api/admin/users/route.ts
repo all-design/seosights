@@ -45,9 +45,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ users: usersWithPlan, total })
   } catch (error) {
     console.error('[Admin Users API] Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch users' },
-      { status: 500 }
-    )
+    return NextResponse.json({ users: [], total: 0 })
   }
 }

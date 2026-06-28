@@ -155,6 +155,10 @@ Return ONLY the JSON object — no markdown, no commentary.`
     return NextResponse.json(forecast)
   } catch (error) {
     console.error('[forecast] Unhandled error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json({ error: 'Forecast generation failed' }, { status: 500 })
+    const fallback = fallbackForecast('Unknown', 28)
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }

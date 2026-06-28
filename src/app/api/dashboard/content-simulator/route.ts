@@ -245,9 +245,19 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Content simulation failed' },
-      { status: 500 }
+    console.error(
+      '[content-simulator] POST error:',
+      error instanceof Error ? error.message : 'Unknown'
     )
+    return NextResponse.json({
+      models: {
+        chatgpt: { summary: 'Content simulation unavailable.', entities: [], citationLikelihood: 0, sentiment: 'neutral' as const, snippet: '' },
+        claude: { summary: 'Content simulation unavailable.', entities: [], citationLikelihood: 0, sentiment: 'neutral' as const, snippet: '' },
+        gemini: { summary: 'Content simulation unavailable.', entities: [], citationLikelihood: 0, sentiment: 'neutral' as const, snippet: '' },
+        perplexity: { summary: 'Content simulation unavailable.', entities: [], citationLikelihood: 0, sentiment: 'neutral' as const, snippet: '' },
+      },
+      suggestions: [],
+      contentStats: { wordCount: 0, readingTime: 0, entityCount: 0 },
+    })
   }
 }

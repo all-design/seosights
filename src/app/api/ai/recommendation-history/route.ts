@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { routeLLM, type DataStatus } from '@/lib/ai-router'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,10 +19,13 @@ export async function GET(req: NextRequest) {
 
     // Check database for existing snapshots
     const since = new Date(Date.now() - days * 86400000)
-    const existing = await db.recommendationSnapshot.findMany({
-      where: { domain, capturedAt: { gte: since } },
-      orderBy: { capturedAt: 'desc' },
-    })
+    const existing = await safeQuery(
+      (d) => d.recommendationSnapshot.findMany({
+        where: { domain, capturedAt: { gte: since } },
+        orderBy: { capturedAt: 'desc' },
+      }),
+      []
+    )
 
     if (existing.length >= 3) {
       return NextResponse.json({

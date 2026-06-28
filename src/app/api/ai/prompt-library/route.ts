@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { type DataStatus } from '@/lib/ai-router'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,11 +71,14 @@ export async function GET(req: NextRequest) {
     if (industry) dbFilter.industry = industry
     if (category) dbFilter.category = category
 
-    const dbPrompts = await db.promptTemplate.findMany({
-      where: dbFilter,
-      orderBy: { usageCount: 'desc' },
-      take: 100,
-    })
+    const dbPrompts = await safeQuery(
+      (d) => d.promptTemplate.findMany({
+        where: dbFilter,
+        orderBy: { usageCount: 'desc' },
+        take: 100,
+      }),
+      []
+    )
 
     if (dbPrompts.length > 0) {
       return NextResponse.json({

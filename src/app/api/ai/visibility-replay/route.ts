@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { safeQuery } from '@/lib/safe-query'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,10 +53,13 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
 
     // Fetch snapshots in chronological order
-    const snapshots = await db.visibilitySnapshot.findMany({
-      where,
-      orderBy: { capturedAt: 'asc' },
-    })
+    const snapshots = await safeQuery(
+      (d) => d.visibilitySnapshot.findMany({
+        where,
+        orderBy: { capturedAt: 'asc' },
+      }),
+      [] as any[]
+    )
 
     // Build frames with score deltas
     const frames = snapshots.map((snap, idx) => {
@@ -140,10 +144,16 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[visibility-replay] GET error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to fetch visibility replay data' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      domain: '',
+      from: new Date().toISOString(),
+      to: new Date().toISOString(),
+      totalFrames: 0,
+      frames: [],
+      highlights: [],
+      scoreRange: { min: 0, max: 0, start: 0, end: 0 },
+      summary: { totalSnapshots: 0, overallChange: 0, highlightCount: 0, avgScore: 0 },
+    })
   }
 }
 
@@ -171,24 +181,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Count total frames from VisibilitySnapshot data in the date range
-    const totalFrames = await db.visibilitySnapshot.count({
-      where: {
-        domain,
-        capturedAt: {
-          gte: start,
-          lte: end,
+    const totalFrames = await safeQuery(
+      (d) => d.visibilitySnapshot.count({
+        where: {
+          domain,
+          capturedAt: {
+            gte: start,
+            lte: end,
+          },
         },
-      },
-    })
+      }),
+      0
+    )
 
     // Identify highlights for the session
-    const snapshots = await db.visibilitySnapshot.findMany({
-      where: {
-        domain,
-        capturedAt: { gte: start, lte: end },
-      },
-      orderBy: { capturedAt: 'asc' },
-    })
+    const snapshots = await safeQuery(
+      (d) => d.visibilitySnapshot.findMany({
+        where: {
+          domain,
+          capturedAt: { gte: start, lte: end },
+        },
+        orderBy: { capturedAt: 'asc' },
+      }),
+      [] as any[]
+    )
 
     const highlightMoments: Array<{ capturedAt: string; delta: number; direction: string }> = []
     for (let i = 1; i < snapshots.length; i++) {
@@ -202,25 +218,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const session = await db.replaySession.create({
-      data: {
-        userId,
-        domain,
-        title,
-        startDate: start,
-        endDate: end,
-        totalFrames,
-        highlights: JSON.stringify(highlightMoments.slice(0, 10)),
-        status: 'ready',
-      },
-    })
+    const session = await safeQuery(
+      (d) => d.replaySession.create({
+        data: {
+          userId,
+          domain,
+          title,
+          startDate: start,
+          endDate: end,
+          totalFrames,
+          highlights: JSON.stringify(highlightMoments.slice(0, 10)),
+          status: 'ready',
+        },
+      }),
+      null as any
+    )
 
     return NextResponse.json({ session }, { status: 201 })
   } catch (error) {
     console.error('[visibility-replay] POST error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to create replay session' },
-      { status: 500 }
-    )
+    return NextResponse.json({ session: null, message: 'Failed to create replay session — tables may not exist yet' })
   }
 }

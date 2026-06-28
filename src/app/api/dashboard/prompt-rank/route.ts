@@ -149,9 +149,9 @@ export async function GET(request: NextRequest) {
       '[prompt-rank] GET error:',
       error instanceof Error ? error.message : 'Unknown'
     )
-    return NextResponse.json(
-      { error: 'Failed to fetch prompt rank data' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      prompts: [],
+      summary: { avgRank: 0, mentionRate: 0, trend: [null, null, null, null] },
+    })
   }
 }

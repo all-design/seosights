@@ -181,9 +181,10 @@ Return ONLY the JSON object — no markdown, no commentary.`
       '[revenue-calculator] Unhandled error:',
       error instanceof Error ? error.message : 'Unknown',
     )
-    return NextResponse.json(
-      { error: 'Revenue calculation failed' },
-      { status: 500 },
-    )
+    const fallback = fallbackProjection({ visitors: 10000, currentVisibility: 30 })
+    return NextResponse.json({
+      ...fallback,
+      _meta: { status: 'simulation' as DataStatus, model: 'simulation', provider: 'simulation', latencyMs: 0 },
+    })
   }
 }
