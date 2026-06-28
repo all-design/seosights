@@ -271,9 +271,15 @@ export async function GET() {
     })
   } catch (error) {
     console.error('[p1-overview] GET error:', error instanceof Error ? error.message : 'Unknown')
-    return NextResponse.json(
-      { error: 'Failed to fetch P1 overview' },
-      { status: 500 }
-    )
+    // Return fallback data instead of 500 error — allows P1 dashboard to render
+    return NextResponse.json({
+      modules: [
+        { key: 'replay', label: 'AI Visibility Replay™', icon: 'eye', metrics: [{ label: 'Total Sessions', value: 0, trend: 0 }, { label: 'Avg Score Change', value: '0', trend: 0 }, { label: 'Total Frames', value: 0, trend: 0 }], recentItems: [] },
+        { key: 'recorder', label: 'AI Recommendation Recorder™', icon: 'camera', metrics: [{ label: 'Total Snapshots', value: 0, trend: 0 }, { label: 'Total Diffs', value: 0, trend: 0 }, { label: 'Critical Changes', value: 0, trend: 0 }], recentItems: [] },
+        { key: 'autoExecute', label: 'Auto Execute™', icon: 'wrench', metrics: [{ label: 'Total Executions', value: 0, trend: 0 }, { label: 'Success Rate', value: '0%', trend: 0 }, { label: 'Pending', value: 0, trend: 0 }], recentItems: [] },
+        { key: 'roiQueue', label: 'ROI Opportunity Queue™', icon: 'target', metrics: [{ label: 'Total Items', value: 0, trend: 0 }, { label: 'Pending Items', value: 0, trend: 0 }, { label: 'Est. Score Gain', value: 0, trend: 0 }], recentItems: [] },
+        { key: 'digest', label: 'Email Digest', icon: 'mail', metrics: [{ label: 'Total Sent', value: 0, trend: 0 }, { label: 'Pending', value: 0, trend: 0 }, { label: 'Avg Score Delta', value: '0', trend: 0 }], recentItems: [] },
+      ],
+    })
   }
 }

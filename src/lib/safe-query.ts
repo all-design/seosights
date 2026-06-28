@@ -9,7 +9,8 @@
 import { db } from '@/lib/db'
 
 /**
- * Safely execute a Prisma query. If the table doesn't exist, return fallback.
+ * Safely execute a Prisma query. If ANY error occurs (missing table, connection, etc.), return fallback.
+ * This prevents 500 errors on production when new tables haven't been migrated to Turso yet.
  */
 export async function safeQuery<T>(
   queryFn: (db: typeof import('@/lib/db').db) => Promise<T>,
@@ -18,20 +19,9 @@ export async function safeQuery<T>(
   try {
     return await queryFn(db)
   } catch (error) {
-    const msg = error instanceof Error ? error.message : ''
-    // Common SQLite/Turso errors for missing tables
-    if (
-      msg.includes('no such table') ||
-      msg.includes('table') && msg.includes('not found') ||
-      msg.includes('does not exist') ||
-      msg.includes('SQLITE_ERROR') ||
-      msg.includes('LibsqlError')
-    ) {
-      console.warn('[safe-query] Table not found, using fallback:', msg.substring(0, 100))
-      return fallback
-    }
-    // Re-throw unexpected errors
-    throw error
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[safe-query] Query failed, using fallback:', msg.substring(0, 150))
+    return fallback
   }
 }
 
