@@ -206,10 +206,10 @@ export async function GET() {
 
     // ── 7-day trend data (from DailyMetric table if available, else simplified) ──
     const sevenDaysAgo = startOfDay(new Date(Date.now() - 6 * 86400000))
-    const dailyMetrics = await db.dailyMetric.findMany({
+    const dailyMetrics = await safeQuery(() => db.dailyMetric.findMany({
       where: { date: { gte: sevenDaysAgo } },
       orderBy: { date: 'asc' },
-    })
+    }), [])
 
     let dailyTrend: Array<{ date: string; visitors: number; registrations: number; completedAudits: number; paidUsers: number }>
 
