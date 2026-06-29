@@ -14,6 +14,12 @@ import { createChatCompletion } from '@/lib/zai'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
+// ── In-memory cache (5 min TTL) ───────────────────────────────────────────
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+let cachedResponse: Record<string, unknown> | null = null
+let cachedAt = 0
+let cachedDomain = ''
+
 // ── Time-aware greeting ──────────────────────────────────────────────────
 
 function getTimeGreeting(): string {
@@ -36,6 +42,20 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const domain = searchParams.get('domain') || DEFAULT_DOMAIN
+
+    // ── Return cached response if still fresh ──────────────────────────────
+    if (
+      cachedResponse &&
+      cachedDomain === domain &&
+      Date.now() - cachedAt < CACHE_TTL_MS
+    ) {
+      return NextResponse.json(cachedResponse, {
+        headers: {
+          'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+          'X-Cache': 'HIT',
+        },
+      })
+    }
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -332,7 +352,7 @@ Generate exactly 3 missions, ordered by impact.`
 
     // ── Assemble final response ─────────────────────────────────────────
 
-    return NextResponse.json({
+    const response = {
       // ── New conversational fields (primary) ──
       greeting: aiResult.greeting || getTimeGreeting(),
       scoreSummary: aiResult.scoreSummary,
@@ -367,6 +387,18 @@ Generate exactly 3 missions, ordered by impact.`
           effortMinutes: r.effortMinutes,
           status: r.status,
         })),
+      },
+    }
+
+    // ── Update cache ────────────────────────────────────────────────────
+    cachedResponse = response
+    cachedAt = Date.now()
+    cachedDomain = domain
+
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+        'X-Cache': 'MISS',
       },
     })
   } catch (error) {

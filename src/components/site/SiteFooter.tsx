@@ -21,10 +21,10 @@ export default function SiteFooter() {
           {/* Brand column */}
           <div className="col-span-2 md:col-span-4 lg:col-span-2">
             <Link href="/" className="flex flex-col items-start cursor-pointer select-none group mb-3">
-              <span className="font-bold text-lg tracking-tight leading-none bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400 bg-clip-text text-transparent">
+              <span className="font-bold text-lg tracking-tight leading-none bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
                 seosights
               </span>
-              <span className="text-[7px] tracking-[0.15em] text-purple-400/60 uppercase leading-none mt-0.5">
+              <span className="text-[7px] tracking-[0.15em] text-emerald-400/60 uppercase leading-none mt-0.5">
                 AI Visibility Intelligence Platform
               </span>
             </Link>
@@ -53,7 +53,7 @@ export default function SiteFooter() {
               <li>
                 <Link
                   href="/free-ai-seo-tools"
-                  className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium"
+                  className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
                 >
                   View all →
                 </Link>
@@ -135,6 +135,14 @@ export default function SiteFooter() {
                 </Link>
               </li>
               <li>
+                <Link
+                  href="/status"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  System Status
+                </Link>
+              </li>
+              <li>
                 <a
                   href="mailto:hello@seosights.com"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -155,18 +163,18 @@ export default function SiteFooter() {
           <div className="flex items-center gap-6">
             <a
               href="#"
-              className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
+              className="text-sm text-muted-foreground hover:text-emerald-400 transition-colors"
             >
               Privacy
             </a>
             <a
               href="#"
-              className="text-sm text-muted-foreground hover:text-purple-400 transition-colors"
+              className="text-sm text-muted-foreground hover:text-emerald-400 transition-colors"
             >
               Terms
             </a>
             <span className="text-sm text-muted-foreground/50 flex items-center gap-1.5">
-              Built with <span className="text-purple-400 font-medium">seosights</span>
+              Built with <span className="text-emerald-400 font-medium">seosights</span>
             </span>
           </div>
         </div>

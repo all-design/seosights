@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Navbar from '@/components/landing/Navbar'
 import HeroSection from '@/components/landing/HeroSection'
 import SocialProofSection from '@/components/landing/SocialProofSection'
@@ -35,6 +35,10 @@ import AffiliatePortal from '@/components/dashboard/AffiliatePortal'
 import OperationsCenter from '@/components/ops/OperationsCenter'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useAppStore } from '@/lib/store'
+import FloatingAIAssistant from '@/components/delight/FloatingAIAssistant'
+import SpotlightSearch from '@/components/delight/SpotlightSearch'
+import KeyboardShortcutsOverlay from '@/components/delight/KeyboardShortcutsOverlay'
+import { useKeyboardShortcuts } from '@/components/delight/useKeyboardShortcuts'
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -53,6 +57,20 @@ export default function Home() {
   const { view } = useAppStore()
   const logoClickCount = useRef(0)
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Delight Sprint: shortcuts state
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false)
+
+  const toggleShortcutsHelp = useCallback(() => {
+    setIsShortcutsHelpOpen(prev => !prev)
+  }, [])
+
+  useKeyboardShortcuts({
+    onToggleShortcutsHelp: toggleShortcutsHelp,
+    onCloseAll: () => {
+      setIsShortcutsHelpOpen(false)
+    },
+  })
 
   const openModal = () => setIsModalOpen(true)
 
@@ -150,6 +168,9 @@ export default function Home() {
             <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
           </DialogContent>
         </Dialog>
+        <FloatingAIAssistant />
+        <SpotlightSearch />
+        <KeyboardShortcutsOverlay isOpen={isShortcutsHelpOpen} onClose={() => setIsShortcutsHelpOpen(false)} />
       </>
     )
   }
@@ -167,6 +188,9 @@ export default function Home() {
             <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
           </DialogContent>
         </Dialog>
+        <FloatingAIAssistant />
+        <SpotlightSearch />
+        <KeyboardShortcutsOverlay isOpen={isShortcutsHelpOpen} onClose={() => setIsShortcutsHelpOpen(false)} />
       </>
     )
   }
@@ -217,6 +241,9 @@ export default function Home() {
           <AffiliatePortal userId={webhookUserId} onClose={() => setIsAffiliateOpen(false)} />
         </DialogContent>
       </Dialog>
+      <FloatingAIAssistant />
+      <SpotlightSearch />
+      <KeyboardShortcutsOverlay isOpen={isShortcutsHelpOpen} onClose={() => setIsShortcutsHelpOpen(false)} />
     </div>
   )
 }
