@@ -331,3 +331,259 @@ Stage Summary:
 - The AI Growth Brain™ acts as AI Product Strategist — "If I had one hour today..."
 - Knowledge Graph identifies missing authority signals (Wikipedia, Crunchbase, Reddit)
 - All recommendations have evidence + confidence scores
+
+---
+Task ID: 6-7
+Agent: Frontend Agent
+Task: Build TrustSection and LiveStatsSection landing page components
+
+Work Log:
+- Created `src/components/landing/TrustSection.tsx` — "Why should you trust Seosights?" section
+  - Dark background (bg-zinc-950) with subtle emerald radial gradient
+  - 5 stat cards: AI models tracked (7), Prompts analyzed (4.2M), Historical responses (19M), Websites analyzed (18,421), Citations tracked (9.4M)
+  - MASSIVE numbers (text-5xl/text-6xl) in emerald-400 color
+  - Counter-up animation using requestAnimationFrame + easeOutExpo (2s duration)
+  - IntersectionObserver triggers animation when section scrolls into view
+  - Framer Motion staggered reveal (0.12s delay per card)
+  - Responsive: 2-column grid on sm+, 1-column on mobile
+  - Subtle border and hover glow effect on each card
+  - Number formatting via Intl.NumberFormat (compact/comma/number)
+
+- Created `src/components/landing/LiveStatsSection.tsx` — "Live on Seosights right now" section
+  - Light background (bg-muted/30) to differentiate from TrustSection
+  - Pulsing green dot (animate-ping) + LIVE badge in header
+  - 3 stat cards: Currently analyzing (243 websites), Today's new citations (1,482), Models updated (5)
+  - Numbers pulse/breathe subtly (opacity animation 1→0.7→1 over 3s, starts after counter finishes)
+  - Same counter-up animation as TrustSection
+  - Framer Motion staggered reveal (0.14s delay per card)
+  - Responsive: 3-column grid on sm+, 1-column on mobile
+  - Slightly smaller numbers (text-4xl/text-5xl) vs TrustSection
+
+- Updated `src/app/page.tsx`:
+  - Added imports for TrustSection and LiveStatsSection
+  - Placed TrustSection after SocialProofSection
+  - Placed LiveStatsSection after TrustSection (before DashboardPreview)
+
+- Lint passes cleanly (0 errors, 0 warnings)
+- Dev server renders page correctly (HTTP 200)
+
+Stage Summary:
+- Two new landing page sections created with scroll-triggered counter animations
+- TrustSection: dark theme, massive social proof numbers (up to 19M)
+- LiveStatsSection: light theme, pulsing live indicator, breathing numbers
+- Both use framer-motion for staggered reveal and easeOutExpo counter animations
+- Page order: SocialProof → Trust → LiveStats → DashboardPreview
+
+---
+Task ID: 3
+Agent: API Agent
+Task: Update AI Growth Brain™ API to speak like a trusted advisor, not an API response
+
+Work Log:
+- Read worklog.md and current `/api/content-engine/growth-brain/route.ts` (412 lines)
+- Analyzed frontend consumption pattern in `ClientZeroPanel.tsx`:
+  - Frontend checks `briefingRes.value?.recommendations` for data validation
+  - Uses fields: `todayGrowth`, `actionsPending`, `estimatedVisitors`, `recommendations[].id/rank/category/text/evidence/confidence/estimatedImpact/sourceCount`
+  - Current API returned `dailyBriefing.topActions` — mismatch with frontend expectations
+
+Changes to GET handler:
+1. **System Prompt** — Complete rewrite from analytical/technical to advisory/conversational:
+   - "You are an AI Growth Strategist who gives morning briefings to a CEO."
+   - "Speak in first person. Be direct. Be confident. Be brief."
+   - "Each recommendation should be a sentence, not a label."
+   - "Use evidence naturally: 'based on 42 similar actions' NOT 'Confidence: 82%'"
+   - "Sound like a trusted advisor, not a dashboard"
+   - Explicit BAD/GOOD examples in prompt to guide AI behavior
+   - Request format changed to `missions[]` with `text`, `shortText`, `evidence` fields
+
+2. **Response Format** — New conversational top-level fields:
+   - `greeting` — Time-aware greeting ("Good morning." / "Good afternoon." / "Good evening.")
+   - `scoreSummary` — "Your AI Visibility is 73, up 4 from yesterday."
+   - `yesterdayGains` — Array of gain strings like ["+2 score", "+3 citations"]
+   - `missionIntro` — "Three things would move the needle today."
+   - `missions[]` — Conversational mission objects with `id`, `text`, `shortText`, `evidence`, `confidence`, `estimatedImpact`, `effortMinutes`, `category`
+   - `expectedGain` — "+6 AI Visibility"
+   - `growthScore`, `riskAlert`, `weeklyTheme`
+
+3. **Frontend Compatibility** — Added fields for ClientZeroPanel.tsx:
+   - `recommendations[]` — Derived from missions, with `id`, `rank`, `category`, `text`, `evidence`, `confidence`, `estimatedImpact`, `sourceCount`
+   - `todayGrowth`, `actionsPending`, `estimatedVisitors`, `generatedAt`
+
+4. **Backward Compatibility** — Kept `dailyBriefing` object with:
+   - `topActions[]` — Derived from missions (action=shortText, why=text, effort, expectedImpact)
+   - `context` — Full data context for debugging
+   - `todayRecommendations[]` — DB-stored recommendations
+
+5. **Data Enhancements**:
+   - Added `previousVisibility` query to calculate actual day-over-day delta
+   - Added `yesterdayMemories` query for yesterday's gains calculation
+   - `getTimeGreeting()` helper for time-aware greetings
+   - `numberToWord()` helper (available for future use)
+
+Changes to POST handler:
+1. **System Prompt** — Same advisory rewrite for recommendation generation
+2. **Response Format** — Added `shortText` field to recommendations
+3. **Fallback Data** — All 5 fallback recommendations rewritten conversationally:
+   - "I'd publish an article on a high-opportunity topic your competitors aren't covering yet."
+   - "Add an FAQ to your top 3 articles. It's the fastest schema win — 28 data points show consistent AEO gains."
+   - "Create or enhance your entity page. Entity signals are what AI engines look for first."
+   - "I'd add 5 internal links from your high-authority pages to the newest articles."
+   - "Update your llms.txt with the latest articles and entities. It's a 10-minute task."
+
+Verification:
+- Lint passes cleanly (0 errors, 0 warnings)
+- Dev server: `GET /api/content-engine/growth-brain 200` (6.9s, includes AI call)
+- API returns new conversational format with greeting, missions, scoreSummary
+- Legacy `dailyBriefing.topActions` still present and populated from missions
+- Frontend `recommendations[]` field present at top level for compatibility
+
+Stage Summary:
+- AI Growth Brain™ now speaks like a trusted advisor, not an API response
+- "I'd publish an FAQ for pricing. It's the highest-ROI move based on 42 similar actions." replaces "Recommendation: Create FAQ. Confidence: 82%. Type: schema."
+- Time-aware greeting: Good morning/afternoon/evening
+- Full backward compatibility: `topActions`, `dailyBriefing`, and frontend `recommendations` all preserved
+- Both GET and POST handlers updated with advisory system prompts
+
+---
+Task ID: 1-5
+Agent: Frontend Agent
+Task: Build the "Today" screen for Seosights AI Growth Engine™ — complete ClientZeroPanel.tsx rewrite
+
+Work Log:
+- Read worklog.md and analyzed existing ClientZeroPanel.tsx (4-tab Discover/Create/Publish/Measure architecture, ~1744 lines)
+- Read growth-brain API route to understand response shape (dailyBriefing with topActions, context, growthScore, todayRecommendations)
+- Read execute, growth-memory, visibility-memory, article-roi, learning-seed API routes for depth section data shapes
+- **Completely rewrote** ClientZeroPanel.tsx from 4-tab pipeline view → single focused "Today" screen
+
+New Architecture — Single Page with Progressive Disclosure:
+
+1. **Section 1: Greeting + Score**
+   - Time-aware greeting (Good morning/afternoon/evening)
+   - AI Visibility score as massive number (text-7xl/8xl/9xl responsive)
+   - Animated counter using requestAnimationFrame with easeOutExpo easing (2.2s duration)
+   - "+4 today" delta with emerald text glow pulse (CSS animation)
+   - Score glow effect: emerald box-shadow pulse on load and changes (2s CSS animation)
+   - tabular-nums font-variant for stable counter rendering
+
+2. **Section 2: Yesterday's Gains** (collapsed by default)
+   - Horizontal badges: "+X citations", "+X recommendations", "+X score"
+   - AnimatePresence for smooth expand/collapse with height animation
+   - ChevronDown rotation animation on toggle
+
+3. **Section 3: Today's Mission**
+   - Numbered list (1, 2, 3) — NOT checkboxes, NOT status badges
+   - Each mission written as a sentence: "Publish FAQ for pricing" (not "Task: Create FAQ")
+   - Subtle confidence indicator: "Confidence 91%"
+   - Category tag badge (FAQ, Schema, Content, etc.)
+   - Click to expand → shows WHY with AI personality
+   - "I'd publish an FAQ for pricing. Highest expected ROI based on 42 similar actions."
+   - Hover effect: translateY(-2px) with shadow increase via framer-motion whileHover
+   - Staggered reveal (50ms between items)
+
+4. **Section 4: Expected Gain**
+   - Single line: "Expected gain: +6"
+   - Subtle, not bold — emerald accent
+
+5. **Section 5: Execute Button**
+   - Full-width, emerald, rounded-2xl
+   - On click: morphs into progress indicator
+   - Steps: "Analyzing..." → "Writing..." → "Reviewing..." → "Optimizing..." → "Publishing..." → "Done ✓"
+   - Animated progress dots (left to right, current step highlighted)
+   - Progress bar behind button fills to completion
+   - Each step ~1.8s (simulated)
+   - After "Done ✓": calls real execute API, refreshes data, triggers score glow
+
+6. **Section 6: Depth** (hidden by default — progressive disclosure)
+   - "Show more ↓" / "Show less ↑" toggle
+   - 5-tab depth dashboard:
+     a. Visibility Memory — Recharts LineChart (minimal emerald style, dark theme)
+     b. Growth Feed — Last 5 entries with action type, entity, deltas
+     c. Article ROI — Top 5 table with ROI%, Vis Δ, Cit
+     d. Active Sprint — Progress bar, goal, action count
+     e. Knowledge Gaps — Severity-coded cards (high=red, medium=amber, low=neutral)
+
+Microinteractions Implemented:
+- Counter animation: requestAnimationFrame + easeOutExpo, physical slot-machine feel
+- Score glow: CSS keyframe animation (box-shadow pulse, 2s, fades out)
+- Skeleton loading: Skeleton components matching exact content shapes (not spinners)
+- Mission hover: translateY(-2px) + shadow increase + confidence text visible
+- Execute progress: Button morphs, crossfade text, animated dots, progress bar
+- Expand/collapse: AnimatePresence with smooth height + opacity
+- Progressive reveal: Staggered 50ms delays via framer-motion variants
+- Emerald text glow: Subtle text-shadow pulse on score delta
+
+AI Personality:
+- Conversational tone throughout: "I'd publish an FAQ for pricing" not "Recommendation: Create FAQ"
+- Empty states are actionable: "Give me a domain to analyze, and I'll tell you exactly what to do first."
+- No "No data" or "Nothing here" messages
+
+Mobile-First:
+- Works on 375px screens
+- Score is the hero — massive visual space
+- Missions stack vertically
+- Execute button full-width on mobile
+- Responsive text sizes (sm: breakpoints)
+- max-w-2xl centered container for readability
+
+API Integration:
+- GET /api/content-engine/growth-brain → Daily briefing data
+- POST /api/content-engine/execute → One-click execution
+- GET /api/content-engine/visibility-memory → Timeline data
+- GET /api/content-engine/growth-memory?limit=5 → Growth feed
+- GET /api/content-engine/article-roi?days=30 → ROI table
+- GET /api/content-engine/sprints → Sprint data
+- GET /api/content-engine/knowledge-graph → Knowledge gaps
+- POST /api/content-engine/learning-seed → Seed demo data
+- All with graceful fallback to rich mock data
+
+Technical:
+- Fixed lint errors: avoided setState in effect body, avoided ref.current assignment during render
+- Used requestAnimationFrame for counter reset instead of synchronous setState
+- All animations via framer-motion (no CSS-only for interactive elements)
+- shadcn/ui components: Badge, Button, Skeleton, ScrollArea
+- Lucide icons: Brain, Zap, ChevronDown, ChevronUp, ArrowRight, Sparkles, TrendingUp, Eye, Clock, CheckCircle, Target, Lightbulb, BarChart3, ExternalLink
+- Colors: Emerald for positive/primary, amber for warnings, slate/zinc for text, zinc-950 background
+- No indigo/blue
+
+Lint: 0 errors, 0 warnings
+Dev server: renders correctly (HTTP 200)
+
+Stage Summary:
+- Complete rewrite of ClientZeroPanel.tsx from 4-tab pipeline → single "Today" screen
+- Minimal. Intelligent. Delightful. Feels like opening a $100M product every morning.
+- One screen. Click "Execute" and everything happens behind the scenes.
+- Progressive disclosure: depth dashboard hidden by default for power users
+
+---
+Task ID: 1-7
+Agent: Main Agent + Subagents
+Task: Delight Sprint™ — "Today" Screen, Microinteractions, AI Personality, Trust Section, Live Stats
+
+Work Log:
+- Complete rewrite of ClientZeroPanel.tsx from 4-tab dashboard → single "Today" screen
+- The "Today" screen shows: Greeting + Score + Mission + Execute. That's it.
+- Score animates from 0 using requestAnimationFrame with easeOutExpo easing
+- Emerald glow pulse on score load/change
+- Skeleton loading (NO spinners, ever)
+- Mission items written in first person AI voice: "I'd publish an FAQ for pricing..."
+- Each mission expands to show evidence with progressive disclosure
+- Execute button morphs through: Analyzing → Writing → Reviewing → Optimizing → Publishing → Done ✓
+- "Show more ↓" reveals depth: Visibility chart, Growth Feed, Article ROI, Sprint, Knowledge Gaps
+- Empty states are actionable: "Give me a domain to analyze, and I'll tell you exactly what to do first."
+- Updated Growth Brain API to speak like advisor: "Good evening. Your AI Visibility is 75. Three things would move the needle today."
+- Added time-aware greeting (morning/afternoon/evening)
+- Conversational response format with missions, evidence, confidence
+- Full backward compatibility maintained
+- Created TrustSection component: "Why should you trust Seosights?" with 5 massive stat cards (7 AI models, 4.2M prompts, 19M responses, 18,421 websites, 9.4M citations)
+- Created LiveStatsSection component: "Live on Seosights right now" with pulsing green dot and 3 live stats (243 analyzing, 1,482 citations, 5 models)
+- Both sections have scroll-triggered counter animations and staggered reveal
+- Integrated into page.tsx after SocialProofSection
+
+Stage Summary:
+- The "Today" screen is the product. Everything else is depth behind one click.
+- AI speaks like a trusted advisor, not an API
+- Progressive disclosure: minimal by default, depth on demand
+- Trust section provides massive social proof on landing page
+- Live stats create urgency and FOMO
+- Browser verified: all sections render, no errors, clean console
+- Lint: 0 errors, 0 warnings

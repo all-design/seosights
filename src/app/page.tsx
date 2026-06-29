@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import Navbar from '@/components/landing/Navbar'
 import HeroSection from '@/components/landing/HeroSection'
 import SocialProofSection from '@/components/landing/SocialProofSection'
+import TrustSection from '@/components/landing/TrustSection'
+import LiveStatsSection from '@/components/landing/LiveStatsSection'
 import DashboardPreview from '@/components/landing/DashboardPreview'
 import FeaturesSection from '@/components/landing/FeaturesSection'
 import AIVisibilityTimeline from '@/components/landing/AIVisibilityTimeline'
@@ -174,6 +176,8 @@ export default function Home() {
       <Navbar onStartFree={() => setIsModalOpen(true)} />
       <HeroSection onStartFree={() => openRegistration('starter')} />
       <SocialProofSection />
+      <TrustSection />
+      <LiveStatsSection />
       <DashboardPreview onStartFree={() => openRegistration('starter')} />
       <FeaturesSection />
       <AIVisibilityTimeline />
