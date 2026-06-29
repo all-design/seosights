@@ -1089,14 +1089,17 @@ model ObservatoryResponse {
   responseTimeMs  Int?     // How long the model took to respond
   tokensUsed      Int?     // Token count
   metadataJson    String?  // Additional metadata as JSON
+  answerHash      String?  // SHA-256 hash of responseText for quick change detection
   createdAt       DateTime @default(now())
 
   crawl           ObservatoryCrawl @relation(fields: [crawlId], references: [id], onDelete: Cascade)
+  citations       CitationRecord[]
 
   @@index([crawlId])
   @@index([aiModel])
   @@index([promptCategory])
   @@index([createdAt])
+  @@index([answerHash])
 }
 
 // Layer 2: Detected changes between crawls
@@ -1146,6 +1149,13 @@ model ObservatoryReport {
   publishedAt     DateTime?
   wordCount       Int      @default(0)
   readingTimeMin  Int      @default(0)
+  evidenceScore   Float    @default(0)  // 0-100 quality of evidence
+  confidenceScore Float    @default(0)  // 0-100 confidence in findings
+  freshnessScore  Float    @default(0)  // 0-100 how recent the data is
+  sampleSize      Int      @default(0) // Number of prompts/data points
+  researchQualityScore Float @default(0) // 0-100 overall score
+  isBreaking      Boolean  @default(false) // Whether this is Breaking Research
+  breakingAlertId String?  // Link to BreakingResearch
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -1237,4 +1247,82 @@ model AIModelRegistry {
   @@index([modelId])
   @@index([provider])
   @@index([isActive])
+}
+
+// ─── AI Citation Warehouse™ ─────────────────────────────────────────
+
+// Every individual citation from AI model responses — the core dataset
+model CitationRecord {
+  id              String   @id @default(cuid())
+  responseId      String?  // Link to ObservatoryResponse (nullable for manual entries)
+  aiModel         String   // chatgpt | claude | gemini | perplexity | grok | deepseek
+  promptText      String   // The prompt that generated this citation
+  citedUrl        String   // The URL cited by the AI model
+  citedDomain     String   // Extracted domain (e.g., "github.com")
+  citedTitle      String?  // Title of the cited page
+  citedSnippet    String?  // The snippet/quote the AI used from the source
+  citationOrder   Int      @default(0)  // Position in the response (1st, 2nd, etc.)
+  promptCategory  String   // brand_query | industry_query | competitive_query | factual_query | recommendation_query
+  entities        String?  // JSON array of named entities mentioned (e.g., ["SeoSights", "ChatGPT"])
+  answerHash      String?  // SHA-256 hash of the response for change detection
+  confidence      Float    @default(0)  // 0-1 how confident the model was
+  crawlDate       DateTime // When this was collected
+  createdAt       DateTime @default(now())
+
+  response        ObservatoryResponse? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+
+  @@index([responseId])
+  @@index([aiModel])
+  @@index([citedDomain])
+  @@index([promptCategory])
+  @@index([answerHash])
+  @@index([crawlDate])
+  @@index([createdAt])
+}
+
+// Source tracking — aggregated domain statistics over time
+model SourceTracking {
+  id              String   @id @default(cuid())
+  domain          String   // e.g., "github.com", "reddit.com", "wikipedia.org"
+  aiModel         String   // Which AI model
+  period          String   // "2026-06" or "2026-W26" for weekly
+  citationCount   Int      @default(0)  // How many times this domain was cited
+  previousCount   Int      @default(0)  // Previous period count for delta
+  percentChange   Float    @default(0)  // Percentage change
+  avgPosition     Float    @default(0)  // Average citation position (lower = more prominent)
+  categories      String?  // JSON: which prompt categories cite this domain
+  trend           String   @default("stable")  // rising | falling | stable | new
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([domain, aiModel, period])
+  @@index([domain])
+  @@index([aiModel])
+  @@index([period])
+  @@index([trend])
+  @@index([percentChange])
+}
+
+// Breaking Research alerts — real-time notifications of major changes
+model BreakingResearch {
+  id              String   @id @default(cuid())
+  changeId        String?  // Link to ObservatoryChange
+  headline        String   // "Claude stopped citing Reddit"
+  summary         String   // One-sentence data-backed finding
+  aiModel         String   // Which model changed
+  changeType      String   // citation_shift | source_shift | behavior_change | new_capability
+  evidenceCount   Int      @default(0)  // How many prompts support this
+  confidence      Float    @default(0)  // 0-1
+  significance    Float    @default(0)  // 0-1
+  sourceBefore    String?  // What was happening before
+  sourceAfter     String?  // What's happening now
+  isPublished     Boolean  @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([aiModel])
+  @@index([changeType])
+  @@index([isPublished])
+  @@index([significance])
+  @@index([createdAt])
 }

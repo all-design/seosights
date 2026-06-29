@@ -22,6 +22,7 @@ import {
   Radio,
   Satellite,
   Search,
+  Shield,
   Signal,
   Sparkles,
   TrendingUp,
@@ -129,11 +130,11 @@ const FALLBACK_DATA: ObservatoryStatus = {
 // ── Pipeline Steps ────────────────────────────────────────────
 const PIPELINE_STEPS = [
   { icon: Satellite, label: 'Collect', emoji: '📡', description: 'Query AI models across 1000+ prompts daily' },
-  { icon: Search, label: 'Detect', emoji: '🔍', description: 'Identify citation and ranking changes in real-time' },
-  { icon: Brain, label: 'Decide', emoji: '🧠', description: 'Classify changes by severity and impact' },
-  { icon: FileSearch, label: 'Generate', emoji: '📝', description: 'Produce actionable research reports' },
-  { icon: Radio, label: 'Publish', emoji: '📢', description: 'Distribute insights across programmatic SEO' },
-  { icon: TrendingUp, label: 'Learn', emoji: '📈', description: 'Feed outcomes back to improve detection' },
+  { icon: Search, label: 'Detect', emoji: '🔍', description: 'Identify citation, source, and ranking changes' },
+  { icon: Eye, label: 'Evidence', emoji: '👁', description: 'Verify changes have sufficient data backing' },
+  { icon: Shield, label: 'Confidence', emoji: '🛡', description: 'Score statistical weight and reliability' },
+  { icon: FileSearch, label: 'Generate', emoji: '📝', description: 'Produce research only when evidence demands it' },
+  { icon: Radio, label: 'Publish', emoji: '📢', description: 'Signal-driven, never calendar-driven' },
 ]
 
 // ── Count-up hook ─────────────────────────────────────────────
@@ -440,9 +441,10 @@ export default function ObservatorySection() {
             AI Visibility Observatory
             <span className="text-emerald-400">™</span>
           </h2>
-          <p className="text-base sm:text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
-            The world&apos;s first research platform that monitors, detects, and reports
-            changes in how AI models see your brand
+          <p className="text-base sm:text-lg text-gray-400 max-w-3xl mx-auto leading-relaxed">
+            An independent research center that daily analyzes the behavior of leading AI
+            models based on a large set of real queries and publishes only findings with
+            sufficient evidence and statistical weight.
           </p>
         </motion.div>
 
@@ -555,6 +557,59 @@ export default function ObservatorySection() {
           </div>
         </motion.div>
 
+        {/* ── Breaking Research Alerts ──────────────────────── */}
+        <motion.div
+          className="mb-14 sm:mb-20"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.45 }}
+        >
+          <div className="flex items-center gap-2 mb-6">
+            <span className="text-lg">🚨</span>
+            <h3 className="text-lg sm:text-xl font-bold text-white">Breaking Research</h3>
+            <Badge
+              variant="outline"
+              className="border-red-500/30 text-red-400 bg-red-500/10 text-[10px] px-1.5 py-0"
+            >
+              ALERT
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { headline: 'Claude stopped citing Reddit', model: 'Claude', type: 'source_shift', evidence: 142, confidence: 94, time: '2h ago' },
+              { headline: 'ChatGPT increases GitHub citations by 27%', model: 'ChatGPT', type: 'citation_shift', evidence: 89, confidence: 91, time: '5h ago' },
+              { headline: 'Gemini adds .gov domain preference for health', model: 'Gemini', type: 'source_shift', evidence: 67, confidence: 88, time: '8h ago' },
+            ].map((alert, i) => (
+              <motion.div
+                key={alert.headline}
+                initial={{ opacity: 0, y: 12 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.4, delay: 0.5 + i * 0.1 }}
+              >
+                <Card className="bg-gray-900/50 border-red-500/10 hover:border-red-500/20 transition-all duration-300 h-full">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-sm mt-0.5">🚨</span>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-white mb-1.5 leading-snug">{alert.headline}</h4>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="outline" className="border-gray-700 text-gray-300 text-[9px] px-1 py-0 capitalize">{alert.model}</Badge>
+                          <Badge variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/10 text-[9px] px-1 py-0">{alert.type.replace('_', ' ')}</Badge>
+                          <span className="text-[10px] text-gray-500">{alert.evidence} evidence</span>
+                          <span className="text-gray-700">·</span>
+                          <span className="text-[10px] text-gray-500">{alert.confidence}% conf</span>
+                          <span className="text-gray-700">·</span>
+                          <span className="text-[10px] text-gray-500">{alert.time}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
         {/* ── Latest Signals Feed + Research Library ──────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-14 sm:mb-20">
           {/* Signals Feed */}
@@ -623,6 +678,14 @@ export default function ObservatorySection() {
             >
               <Library className="size-4 mr-2" />
               Access Research Library
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 hover:border-emerald-500/50 font-semibold px-8"
+            >
+              <Database className="size-4 mr-2" />
+              Browse Dataset Explorer
             </Button>
           </div>
           <p className="mt-4 text-xs text-gray-500">

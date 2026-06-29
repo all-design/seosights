@@ -1121,3 +1121,105 @@ Stage Summary:
 - Complete Observatory pipeline orchestration: daily → weekly → monthly
 - Each cron builds on the previous: daily collects data, weekly analyzes trends, monthly produces deep reports
 - All routes testable via GET requests in browser
+
+---
+Task ID: 1-3
+Agent: Backend Agent
+Task: Add AI Citation Warehouse™ + Source Tracking to Prisma Schema, Update Pipeline with Confidence Gate, Create API Routes
+
+Work Log:
+- Added 3 new Prisma models: CitationRecord, SourceTracking, BreakingResearch
+- Updated ObservatoryResponse: added answerHash field, citations relation, answerHash index
+- Updated ObservatoryReport: added 7 Observatory Score fields (evidenceScore, confidenceScore, freshnessScore, sampleSize, researchQualityScore, isBreaking, breakingAlertId)
+- Ran `bun run db:push` — database synced successfully
+- Rewrote engine/route.ts with 6-step pipeline: Collect → Detect → Evidence → Confidence → Editorial → Publish
+- Confidence Gate: significanceScore > 0.6 AND evidenceCount >= 10 AND confidence >= 0.7
+- Created 4 new API routes:
+  1. /api/observatory/citations (GET + POST) — Citation warehouse with stats, ranking, trends views + citation extraction
+  2. /api/observatory/sources (GET) — Source tracking with top domains, trends, cross-model comparison
+  3. /api/observatory/breaking (GET + POST) — Breaking research alerts with stats + alert creation
+  4. /api/observatory/score (GET + POST) — Observatory Score calculation with evidence/confidence/freshness/quality breakdown
+- Lint: Passed with zero errors
+- Dev server: Running normally
+
+Stage Summary:
+- AI Citation Warehouse™ fully implemented with 3 new models and 4 API routes
+- Pipeline upgraded from 2-step (Detect + Evaluate) to 6-step (Collect → Detect → Evidence → Confidence → Editorial → Publish)
+- Confidence Gate ensures only high-quality signals proceed to report generation
+- Breaking Research alerts auto-created for high-significance changes
+- Observatory Score system provides evidence/confidence/freshness/quality metrics for reports
+
+---
+Task ID: 4-7
+Agent: Full-Stack Developer
+Task: Build Public Read-Only API and Dataset Explorer UI for AI Visibility Observatory™
+
+Work Log:
+
+### Task 4: Public Read-Only API
+
+Created 8 public API routes under `/src/app/api/public/`:
+
+1. `/api/public/research/route.ts` (GET) — List published research reports with type, limit, offset params
+2. `/api/public/research/[slug]/route.ts` (GET) — Single published report by slug with full content + Observatory Score
+3. `/api/public/models/route.ts` (GET) — List active AI models with capabilities, response counts, known changes
+4. `/api/public/industries/route.ts` (GET) — List industries with AI visibility data, limit/offset pagination
+5. `/api/public/industries/[slug]/route.ts` (GET) — Single industry by slug with rankings and benchmarks
+6. `/api/public/breaking/route.ts` (GET) — List published Breaking Research alerts with confidence and significance
+7. `/api/public/sources/route.ts` (GET) — Source tracking summary with top/rising/falling domains, model and period filters
+8. `/api/public/citations/route.ts` (GET) — Citation statistics with model, domain, category filters
+
+All routes include: CORS headers (Access-Control-Allow-Origin: *), rate limiting headers, success: true JSON, 5-minute cache (revalidate = 300), OPTIONS handler for preflight
+
+### Task 5-6: Dataset Explorer UI
+
+Created `/src/components/landing/ObservatoryExplorer.tsx` (~500 lines):
+- Search bar with suggestions dropdown (industries, domains, AI models)
+- Tab 1: AI Models — Cards with model name, version, provider, responses, changes, top 5 cited domains with trend arrows
+- Tab 2: Sources — Table of top cited domains with trend indicators (🔺 🔻 ➡️), model badges
+- Tab 3: Industries — Grid cards with AI Visibility score, top model, data points
+- Tab 4: Breaking Research — Alert list with 🚨 icons, headlines, evidence, confidence, time ago
+- Observatory Score display (Research Quality: 97, Evidence: 98, Confidence: 91, Freshness: 100, Sample: 4,281)
+- Dark theme (bg-gray-950) with emerald accents, shadcn/ui components, framer-motion animations, responsive, fallback mock data
+
+### Task 7: ObservatorySection Updates
+
+1. Changed subtitle to: "An independent research center that daily analyzes the behavior of leading AI models based on a large set of real queries and publishes only findings with sufficient evidence and statistical weight."
+2. Updated Pipeline: Collect → Detect → Evidence → Confidence → Generate → Publish (with new descriptions)
+3. Added "Browse Dataset Explorer" button in CTA section
+4. Added Breaking Research section (3 alert cards with 🚨) between Pipeline and Signals/Research grid
+
+### Integration
+- Added ObservatoryExplorer to page.tsx after ObservatorySection
+- Lint: 0 errors, 0 warnings
+- All API endpoints tested and returning 200
+
+---
+Task ID: Observatory-v2
+Agent: Main Agent
+Task: Implement AI Visibility Observatory v2 — Citation Warehouse, Confidence Gate, Public API, Dataset Explorer
+
+Work Log:
+- Added 3 new Prisma models: CitationRecord, SourceTracking, BreakingResearch
+- Updated ObservatoryResponse with answerHash and citations relation
+- Updated ObservatoryReport with Observatory Score fields (evidenceScore, confidenceScore, freshnessScore, sampleSize, researchQualityScore, isBreaking, breakingAlertId)
+- Ran db:push successfully
+- Rewrote engine/route.ts with 6-step Confidence Gate pipeline: Collect → Detect → Evidence → Confidence → Generate → Publish
+- Created 4 new internal APIs: /api/observatory/citations, /api/observatory/sources, /api/observatory/breaking, /api/observatory/score
+- Created 8 public read-only APIs: /api/public/research, /api/public/research/[slug], /api/public/models, /api/public/industries, /api/public/industries/[slug], /api/public/breaking, /api/public/sources, /api/public/citations
+- Created ObservatoryExplorer.tsx — interactive Dataset Explorer with 4 tabs (AI Models, Sources, Industries, Breaking Research) + Observatory Score display
+- Updated ObservatorySection.tsx — new subtitle (independent research center positioning), 6-step pipeline with Confidence Gate, Breaking Research section, Browse Dataset Explorer button
+- Updated seed with 12 citation records, 10 source tracking records, 3 breaking research alerts, Observatory Scores
+- All APIs tested and returning 200 with correct data
+- Lint: 0 errors, 0 warnings
+- Browser verification: Observatory section, Breaking Research, Pipeline, Dataset Explorer all visible and rendering correctly. Zero console errors on homepage.
+
+Stage Summary:
+- AI Visibility Observatory v2 is fully implemented and live
+- Key architecture change: Signal-driven, not calendar-driven publishing
+- Confidence Gate requires: significance > 0.6 AND evidence >= 10 prompts AND confidence >= 0.7
+- Citation Warehouse tracks: Prompt → Engine → Sources → Entities → Confidence → Answer Hash
+- Source Tracking tracks: domain trends (rising/falling/stable) per AI model per period
+- Breaking Research alerts for high-significance changes (e.g., "Claude stopped citing Reddit")
+- Observatory Score on every report: Research Quality, Evidence, Confidence, Freshness, Sample Size
+- Public API allows external applications to consume Observatory data

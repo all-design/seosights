@@ -258,8 +258,10 @@ The AI visibility landscape continues to evolve rapidly in Q1 2026.`,
     ]
 
     for (const report of sampleReports) {
-      const created = await db.observatoryReport.create({
-        data: report,
+      const created = await db.observatoryReport.upsert({
+        where: { slug: report.slug },
+        update: report,
+        create: report,
       })
 
       // Create publication for published report
@@ -359,9 +361,118 @@ The AI visibility landscape continues to evolve rapidly in Q1 2026.`,
     }
     results.push(`Created ${sampleIndustries.length} sample industries`)
 
+    // ─── 7. Create Sample Citation Records (AI Citation Warehouse™) ──
+    const sampleCitations = [
+      { aiModel: 'chatgpt', promptText: 'What is SeoSights and what does it do?', citedUrl: 'https://seosights.com', citedDomain: 'seosights.com', citedTitle: 'SeoSights — AI Visibility Platform', citedSnippet: 'SeoSights is an AI visibility monitoring platform', citationOrder: 1, promptCategory: 'brand_query', confidence: 0.92, crawlDate: new Date() },
+      { aiModel: 'chatgpt', promptText: 'What is SeoSights and what does it do?', citedUrl: 'https://github.com/seosights/llms-txt', citedDomain: 'github.com', citedTitle: 'SeoSights llms.txt Generator', citedSnippet: 'Open-source llms.txt generator for AI crawlers', citationOrder: 2, promptCategory: 'brand_query', confidence: 0.85, crawlDate: new Date() },
+      { aiModel: 'claude', promptText: 'What tools help businesses get cited by AI models?', citedUrl: 'https://seosights.com/docs', citedDomain: 'seosights.com', citedTitle: 'SeoSights Documentation', citedSnippet: 'Comprehensive AI visibility optimization guide', citationOrder: 1, promptCategory: 'recommendation_query', confidence: 0.88, crawlDate: new Date() },
+      { aiModel: 'gemini', promptText: 'What are the best AI visibility tools for businesses?', citedUrl: 'https://seosights.com', citedDomain: 'seosights.com', citedTitle: 'SeoSights — AI Visibility Platform', citedSnippet: 'The leading platform for AI visibility monitoring', citationOrder: 1, promptCategory: 'brand_query', confidence: 0.91, crawlDate: new Date() },
+      { aiModel: 'gemini', promptText: 'What are the best AI visibility tools for businesses?', citedUrl: 'https://en.wikipedia.org/wiki/Search_engine_optimization', citedDomain: 'wikipedia.org', citedTitle: 'Search Engine Optimization — Wikipedia', citedSnippet: 'SEO is the process of improving the quality and quantity of website traffic', citationOrder: 2, promptCategory: 'brand_query', confidence: 0.95, crawlDate: new Date() },
+      { aiModel: 'perplexity', promptText: 'How does SeoSights compare to Semrush?', citedUrl: 'https://seocomparison.com/2026', citedDomain: 'seocomparison.com', citedTitle: 'SEO Tool Comparison 2026', citedSnippet: 'Comprehensive comparison of SEO and AI visibility tools', citationOrder: 1, promptCategory: 'competitive_query', confidence: 0.82, crawlDate: new Date() },
+      { aiModel: 'perplexity', promptText: 'How do AI search engines choose which sources to cite?', citedUrl: 'https://ai-search-ranking.com/how-it-works', citedDomain: 'ai-search-ranking.com', citedTitle: 'How AI Search Ranking Works', citedSnippet: 'Factors that influence AI source selection', citationOrder: 1, promptCategory: 'factual_query', confidence: 0.87, crawlDate: new Date() },
+      { aiModel: 'perplexity', promptText: 'How do AI search engines choose which sources to cite?', citedUrl: 'https://developers.google.com/search/docs', citedDomain: 'developers.google.com', citedTitle: 'Google Search Documentation', citedSnippet: 'Official documentation for search optimization', citationOrder: 2, promptCategory: 'factual_query', confidence: 0.94, crawlDate: new Date() },
+      { aiModel: 'grok', promptText: 'What is AI visibility and why does it matter?', citedUrl: 'https://reddit.com/r/SEO/comments/ai-visibility', citedDomain: 'reddit.com', citedTitle: 'r/SEO — AI Visibility Discussion', citedSnippet: 'Community discussion on AI visibility trends', citationOrder: 1, promptCategory: 'factual_query', confidence: 0.72, crawlDate: new Date() },
+      { aiModel: 'chatgpt', promptText: 'Can you recommend a tool to track AI search results?', citedUrl: 'https://seosights.com', citedDomain: 'seosights.com', citedTitle: 'SeoSights — AI Visibility Platform', citedSnippet: 'Dedicated AI visibility tracking tool', citationOrder: 1, promptCategory: 'recommendation_query', confidence: 0.93, crawlDate: new Date() },
+      { aiModel: 'chatgpt', promptText: 'Can you recommend a tool to track AI search results?', citedUrl: 'https://stackoverflow.com/questions/ai-visibility', citedDomain: 'stackoverflow.com', citedTitle: 'Stack Overflow — AI Visibility Tracking', citedSnippet: 'Technical discussion on tracking AI search results', citationOrder: 2, promptCategory: 'recommendation_query', confidence: 0.79, crawlDate: new Date() },
+      { aiModel: 'claude', promptText: 'What is SeoSights and what does it do?', citedUrl: 'https://docs.anthropic.com', citedDomain: 'docs.anthropic.com', citedTitle: 'Anthropic Documentation', citedSnippet: 'Official API documentation for Claude', citationOrder: 1, promptCategory: 'brand_query', confidence: 0.86, crawlDate: new Date() },
+    ]
+
+    for (const citation of sampleCitations) {
+      await db.citationRecord.create({ data: citation })
+    }
+    results.push(`Created ${sampleCitations.length} citation records`)
+
+    // ─── 8. Create Sample Source Tracking ─────────────────────────
+    const currentPeriod = new Date().toISOString().slice(0, 7) // "2026-06"
+    const sampleSources = [
+      { domain: 'github.com', aiModel: 'chatgpt', period: currentPeriod, citationCount: 247, previousCount: 194, percentChange: 27.3, avgPosition: 2.1, categories: JSON.stringify(['factual_query', 'recommendation_query']), trend: 'rising' },
+      { domain: 'github.com', aiModel: 'claude', period: currentPeriod, citationCount: 189, previousCount: 172, percentChange: 9.9, avgPosition: 2.4, categories: JSON.stringify(['factual_query']), trend: 'rising' },
+      { domain: 'wikipedia.org', aiModel: 'chatgpt', period: currentPeriod, citationCount: 891, previousCount: 874, percentChange: 1.9, avgPosition: 1.3, categories: JSON.stringify(['factual_query', 'brand_query']), trend: 'stable' },
+      { domain: 'wikipedia.org', aiModel: 'gemini', period: currentPeriod, citationCount: 1023, previousCount: 998, percentChange: 2.5, avgPosition: 1.1, categories: JSON.stringify(['factual_query', 'brand_query']), trend: 'stable' },
+      { domain: 'reddit.com', aiModel: 'chatgpt', period: currentPeriod, citationCount: 312, previousCount: 367, percentChange: -15.0, avgPosition: 3.2, categories: JSON.stringify(['recommendation_query', 'industry_query']), trend: 'falling' },
+      { domain: 'reddit.com', aiModel: 'grok', period: currentPeriod, citationCount: 445, previousCount: 480, percentChange: -7.3, avgPosition: 2.8, categories: JSON.stringify(['factual_query', 'recommendation_query']), trend: 'falling' },
+      { domain: 'stackoverflow.com', aiModel: 'chatgpt', period: currentPeriod, citationCount: 198, previousCount: 215, percentChange: -7.9, avgPosition: 2.6, categories: JSON.stringify(['factual_query']), trend: 'falling' },
+      { domain: 'developers.google.com', aiModel: 'gemini', period: currentPeriod, citationCount: 534, previousCount: 489, percentChange: 9.2, avgPosition: 1.8, categories: JSON.stringify(['factual_query', 'competitive_query']), trend: 'rising' },
+      { domain: 'arxiv.org', aiModel: 'claude', period: currentPeriod, citationCount: 267, previousCount: 231, percentChange: 15.6, avgPosition: 1.9, categories: JSON.stringify(['factual_query', 'brand_query']), trend: 'rising' },
+      { domain: 'seosights.com', aiModel: 'chatgpt', period: currentPeriod, citationCount: 45, previousCount: 12, percentChange: 275.0, avgPosition: 1.2, categories: JSON.stringify(['brand_query', 'recommendation_query']), trend: 'rising' },
+    ]
+
+    for (const source of sampleSources) {
+      await db.sourceTracking.upsert({
+        where: { domain_aiModel_period: { domain: source.domain, aiModel: source.aiModel, period: source.period } },
+        update: source,
+        create: source,
+      })
+    }
+    results.push(`Created ${sampleSources.length} source tracking records`)
+
+    // ─── 9. Create Sample Breaking Research ──────────────────────
+    const sampleBreaking = [
+      {
+        headline: 'Claude Stopped Citing Reddit for Health Queries',
+        summary: 'Claude reduced Reddit citations by 73% in health-related queries over the past 14 days, shifting to .gov and .edu sources.',
+        aiModel: 'claude',
+        changeType: 'source_shift',
+        evidenceCount: 412,
+        confidence: 0.94,
+        significance: 0.89,
+        sourceBefore: 'Reddit was cited in 34% of health queries',
+        sourceAfter: 'Reddit now cited in only 9% of health queries',
+        isPublished: true,
+        publishedAt: new Date(),
+      },
+      {
+        headline: 'Gemini Now Prefers Official Documentation Over Forums',
+        summary: 'Gemini increased citations to official docs by 27% while decreasing forum citations by 18% over the last 30 days.',
+        aiModel: 'gemini',
+        changeType: 'source_shift',
+        evidenceCount: 1247,
+        confidence: 0.97,
+        significance: 0.82,
+        sourceBefore: 'Forums made up 22% of Gemini citations',
+        sourceAfter: 'Official docs now 34% of citations, forums down to 14%',
+        isPublished: true,
+        publishedAt: new Date(Date.now() - 86400000),
+      },
+      {
+        headline: 'ChatGPT Increased GitHub Citations by 27%',
+        summary: 'ChatGPT now cites GitHub repositories 27% more frequently in technical queries compared to 30 days ago.',
+        aiModel: 'chatgpt',
+        changeType: 'citation_shift',
+        evidenceCount: 891,
+        confidence: 0.91,
+        significance: 0.78,
+        sourceBefore: 'GitHub cited in 19% of technical queries',
+        sourceAfter: 'GitHub now cited in 24% of technical queries',
+        isPublished: true,
+        publishedAt: new Date(Date.now() - 172800000),
+      },
+    ]
+
+    for (const brk of sampleBreaking) {
+      await db.breakingResearch.create({ data: brk })
+    }
+    results.push(`Created ${sampleBreaking.length} breaking research alerts`)
+
+    // ─── 10. Update Reports with Observatory Scores ──────────────
+    const publishedReports = await db.observatoryReport.findMany({ where: { status: 'published' } })
+    for (const report of publishedReports) {
+      await db.observatoryReport.update({
+        where: { id: report.id },
+        data: {
+          evidenceScore: 88 + Math.floor(Math.random() * 12),
+          confidenceScore: 82 + Math.floor(Math.random() * 16),
+          freshnessScore: 90 + Math.floor(Math.random() * 11),
+          sampleSize: 2000 + Math.floor(Math.random() * 3000),
+          researchQualityScore: 85 + Math.floor(Math.random() * 13),
+        },
+      })
+    }
+    results.push(`Updated ${publishedReports.length} reports with Observatory Scores`)
+
     return NextResponse.json({
       success: true,
-      message: 'Observatory seed data created successfully.',
+      message: 'Observatory seed data created successfully (with Citation Warehouse).',
       results,
     })
   } catch (error) {
