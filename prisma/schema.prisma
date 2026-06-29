@@ -1050,3 +1050,191 @@ model PredictionLog {
   @@index([confidence])
   @@index([createdAt])
 }
+
+// ─── AI Visibility Observatory™ ─────────────────────────────────────────
+
+// Layer 1: Data Collection — Crawl sessions that query AI models
+model ObservatoryCrawl {
+  id              String   @id @default(cuid())
+  type            String   @default("daily")  // daily | weekly | monthly | manual
+  status          String   @default("running") // running | completed | failed | partial
+  modelsQueried   Int      @default(0)         // How many AI models were queried
+  promptsTotal    Int      @default(0)         // Total prompts sent
+  promptsCompleted Int     @default(0)         // Successfully completed
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  durationMs      Int?                         // Crawl duration in milliseconds
+  errorLog        String?                      // Any errors encountered
+  createdAt       DateTime @default(now())
+
+  responses       ObservatoryResponse[]
+  changes         ObservatoryChange[]
+
+  @@index([type])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// Layer 1: Individual AI model responses — this is the dataset
+model ObservatoryResponse {
+  id              String   @id @default(cuid())
+  crawlId         String
+  aiModel         String   // chatgpt | claude | gemini | perplexity | grok | deepseek
+  promptCategory  String   // brand_query | industry_query | competitive_query | factual_query | recommendation_query
+  promptText      String   // The exact prompt sent
+  responseText    String   // The AI model's response
+  citationsJson   String?  // JSON array of cited sources/domains
+  sentimentScore  Float?   // -1 to 1 sentiment towards the topic
+  confidenceScore Float?   // 0-1 how confident the model seems
+  responseTimeMs  Int?     // How long the model took to respond
+  tokensUsed      Int?     // Token count
+  metadataJson    String?  // Additional metadata as JSON
+  createdAt       DateTime @default(now())
+
+  crawl           ObservatoryCrawl @relation(fields: [crawlId], references: [id], onDelete: Cascade)
+
+  @@index([crawlId])
+  @@index([aiModel])
+  @@index([promptCategory])
+  @@index([createdAt])
+}
+
+// Layer 2: Detected changes between crawls
+model ObservatoryChange {
+  id                String   @id @default(cuid())
+  crawlId           String   // The crawl where this change was detected
+  previousCrawlId   String?  // The crawl being compared against
+  aiModel           String   // Which AI model changed
+  changeType        String   // citation_shift | sentiment_shift | source_shift | ranking_change | new_capability | behavior_change
+  category          String   // What domain/topic this relates to
+  beforeSummary     String   // What the model said/did before
+  afterSummary      String   // What the model says/does now
+  significanceScore Float    @default(0)  // 0-1 how significant this change is
+  detailsJson       String?  // Detailed change data as JSON
+  isSignal          Boolean  @default(false) // Whether this passes the signal threshold
+  signalReason      String?  // Why it is/isn't a signal
+  createdAt         DateTime @default(now())
+
+  crawl             ObservatoryCrawl @relation(fields: [crawlId], references: [id], onDelete: Cascade)
+
+  @@index([crawlId])
+  @@index([aiModel])
+  @@index([changeType])
+  @@index([isSignal])
+  @@index([significanceScore])
+  @@index([createdAt])
+}
+
+// Layer 3-4: Reports generated from signals
+model ObservatoryReport {
+  id              String   @id @default(cuid())
+  slug            String   @unique  // URL-friendly slug: /research/chatgpt-update-july-2026
+  title           String
+  type            String   @default("research") // research | blog | linkedin | newsletter | industry_update | vs_page | benchmark | monthly_report
+  status          String   @default("draft") // draft | proposed | approved | published | archived
+  editorialScore  Float    @default(0)  // 0-1 editorial AI score
+  editorialReason String?  // Why it was approved/rejected
+  aiModels        String?  // JSON array of relevant AI models
+  categories      String?  // JSON array of categories
+  contentJson     String?  // Full content as structured JSON (sections, data, charts)
+  contentMarkdown String?  // Full content as markdown
+  summary         String?  // Executive summary
+  keyFindings     String?  // JSON array of key findings
+  relatedChanges  String?  // JSON array of ObservatoryChange IDs
+  relatedReports  String?  // JSON array of related report IDs
+  coverImageUrl   String?
+  publishedAt     DateTime?
+  wordCount       Int      @default(0)
+  readingTimeMin  Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  publications    ObservatoryPublication[]
+  learning        ObservatoryLearning[]
+
+  @@index([slug])
+  @@index([type])
+  @@index([status])
+  @@index([editorialScore])
+  @@index([publishedAt])
+  @@index([createdAt])
+}
+
+// Layer 5: Publishing tracking
+model ObservatoryPublication {
+  id              String   @id @default(cuid())
+  reportId        String
+  channel         String   // website | linkedin | newsletter | twitter | pdf | api
+  status          String   @default("pending") // pending | published | failed
+  publishedUrl    String?  // URL where it was published
+  publishedAt     DateTime?
+  reachEstimate   Int?     // Estimated reach
+  errorLog        String?
+  metadataJson    String?
+  createdAt       DateTime @default(now())
+
+  report          ObservatoryReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([channel])
+  @@index([status])
+  @@index([publishedAt])
+}
+
+// Layer 6: Internal Learning / Growth Memory
+model ObservatoryLearning {
+  id              String   @id @default(cuid())
+  reportId        String
+  metric          String   // citations | ai_visibility | traffic | leads | conversions | backlinks
+  value           Float    @default(0)
+  previousValue   Float?   // For delta calculation
+  measuredAt      DateTime @default(now())
+  source          String   // analytics | manual | api | crawl
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  report          ObservatoryReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([metric])
+  @@index([measuredAt])
+}
+
+// Programmatic SEO: Industry pages
+model ObservatoryIndustry {
+  id              String   @id @default(cuid())
+  slug            String   @unique  // /industry/dentists
+  name            String   // Display name: "Dentists"
+  description     String?
+  aiVisibilityAvg Float    @default(0)  // Average AI Visibility score for this industry
+  topModelsJson   String?  // JSON: which AI models rank which businesses
+  rankingsJson    String?  // JSON: top businesses by AI visibility
+  benchmarksJson  String?  // JSON: industry benchmarks
+  lastUpdated     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([slug])
+  @@index([aiVisibilityAvg])
+  @@index([lastUpdated])
+}
+
+// AI Model Registry — tracks all known AI models and their metadata
+model AIModelRegistry {
+  id              String   @id @default(cuid())
+  modelId         String   @unique  // chatgpt | claude | gemini | perplexity | grok | deepseek
+  displayName     String   // ChatGPT | Claude | Gemini | Perplexity | Grok | DeepSeek
+  provider        String   // openai | anthropic | google | perplexity | xai | deepseek
+  version         String?  // Current known version
+  capabilities    String?  // JSON: {web_access: true, citation: true, reasoning: true}
+  lastCrawledAt   DateTime?
+  totalResponses  Int      @default(0)
+  knownChanges    Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([modelId])
+  @@index([provider])
+  @@index([isActive])
+}

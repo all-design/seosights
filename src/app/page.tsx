@@ -7,6 +7,7 @@ import SocialProofSection from '@/components/landing/SocialProofSection'
 import TrustSection from '@/components/landing/TrustSection'
 import LiveStatsSection from '@/components/landing/LiveStatsSection'
 import DashboardPreview from '@/components/landing/DashboardPreview'
+import ObservatorySection from '@/components/landing/ObservatorySection'
 import FeaturesSection from '@/components/landing/FeaturesSection'
 import AIVisibilityTimeline from '@/components/landing/AIVisibilityTimeline'
 import AIVisibilityReplay from '@/components/landing/AIVisibilityReplay'
@@ -203,6 +204,7 @@ export default function Home() {
       <TrustSection />
       <LiveStatsSection />
       <DashboardPreview onStartFree={() => openRegistration('starter')} />
+      <ObservatorySection />
       <FeaturesSection />
       <AIVisibilityTimeline />
       <AIVisibilityReplay onStartFree={() => openRegistration('starter')} />
