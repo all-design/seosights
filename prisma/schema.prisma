@@ -656,3 +656,368 @@ model DailyMetric {
   @@unique([date])
   @@index([date])
 }
+
+// ─── Client Zero Content Engine™ ──────────────────────────────────────
+
+model ContentBrief {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  topic               String
+  keywordTarget       String
+  pillar              String   @default("geo") // seo | aeo | geo | all
+  cluster             String?
+  suggestedTitle      String
+  targetWordCount     Int      @default(2500)
+  estimatedScoreGain  Int      @default(0)
+  opportunitySource   String?  // Which data source identified this opportunity
+  opportunityData     String?  // JSON: full opportunity context
+  briefContent        String?  // JSON: structured editorial brief (outline, entities, FAQ, links, schema)
+  status              String   @default("draft") // draft | approved | in_progress | completed | archived
+  priority            String   @default("medium") // low | medium | high | critical
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  articles            ContentArticle[]
+
+  @@index([domain])
+  @@index([status])
+  @@index([pillar])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model ContentArticle {
+  id                  String   @id @default(cuid())
+  briefId             String
+  domain              String   @default("seosights.com")
+  title               String
+  slug                String?
+  content             String?  // Full article body (markdown)
+  wordCount           Int      @default(0)
+  format              String   @default("blog") // blog | landing_page | case_study | linkedin | twitter_thread | newsletter | docs | vs_page
+  pillar              String   @default("geo")  // seo | aeo | geo | all
+  status              String   @default("draft") // draft | writing | review | approved | published | replay_scheduled | replayed | rewriting
+  seoScore            Int      @default(0)
+  aeoScore            Int      @default(0)
+  geoScore            Int      @default(0)
+  aiVisibilityGain    Int      @default(0)     // Measured after 24h replay
+  publishedUrl        String?
+  publishedAt         DateTime?
+  schemaMarkup        String?  // JSON: generated schema (Article, FAQ, etc.)
+  internalLinks       String?  // JSON: auto-generated internal links
+  ogImageUrl          String?
+  reviewResults       String?  // JSON: multi-agent review results
+  metadata            String?  // JSON: additional metadata
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  brief               ContentBrief     @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  reviews             ContentReview[]
+  experimentVariants  ContentExperimentVariant[]
+
+  @@index([briefId])
+  @@index([domain])
+  @@index([status])
+  @@index([format])
+  @@index([pillar])
+  @@index([publishedAt])
+  @@index([createdAt])
+}
+
+model ContentReview {
+  id                  String   @id @default(cuid())
+  articleId           String
+  reviewerType        String   // seo_review | aeo_review | geo_review | fact_checker | citation_optimizer | internal_linker | schema_builder | image_generator
+  status              String   @default("pending") // pending | passed | failed | needs_revision
+  score               Int      @default(0)    // 0-100
+  findings            String?  // JSON: structured findings (issues, suggestions, passes)
+  autoFixes           String?  // JSON: automatic fixes applied
+  confidence          Int      @default(0)    // 0-100 confidence score
+  model               String?  // Which AI model was used
+  tokensUsed          Int      @default(0)
+  costUsd             Float    @default(0)
+  reviewedAt          DateTime?
+  createdAt           DateTime @default(now())
+
+  article             ContentArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([reviewerType])
+  @@index([status])
+  @@index([reviewedAt])
+}
+
+model EditorialCalendarEntry {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  date                DateTime // The scheduled date
+  dayOfWeek           Int      @default(1) // 1=Monday, 7=Sunday
+  theme               String   // e.g. "Claude SEO Tuesdays", "AI Visibility Score Wednesdays"
+  briefId             String?  // Linked brief if generated
+  articleId           String?  // Linked article if written
+  status              String   @default("scheduled") // scheduled | brief_generated | writing | review | published | skipped
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([domain, date])
+  @@index([domain])
+  @@index([date])
+  @@index([status])
+}
+
+model ContentExperiment {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  title               String
+  hypothesis          String
+  metric              String   @default("ai_visibility") // ai_visibility | citations | organic_clicks | engagement
+  status              String   @default("running") // running | completed | inconclusive
+  startDate           DateTime @default(now())
+  endDate             DateTime?
+  winnerVariantId     String?  // ID of the winning variant
+  results             String?  // JSON: experiment results
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  variants            ContentExperimentVariant[]
+
+  @@index([domain])
+  @@index([status])
+  @@index([startDate])
+}
+
+model ContentExperimentVariant {
+  id                  String   @id @default(cuid())
+  experimentId        String
+  articleId           String
+  label               String   // "Version A" | "Version B"
+  aiVisibilityBefore  Int      @default(0)
+  aiVisibilityAfter   Int      @default(0)
+  citationsBefore     Int      @default(0)
+  citationsAfter      Int      @default(0)
+  organicClicks       Int      @default(0)
+  isWinner            Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  experiment          ContentExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  article             ContentArticle   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([experimentId])
+  @@index([articleId])
+  @@index([isWinner])
+}
+
+model ContentKPI {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  date                DateTime
+  articlesPublished   Int      @default(0)
+  avgAIScoreGain      Float    @default(0)
+  totalCitationGain   Int      @default(0)
+  totalAIMentions     Int      @default(0)
+  organicClicksDelta  Int      @default(0)
+  articlesReplayed    Int      @default(0)
+  articlesRewritten   Int      @default(0)
+  autoExecuteRate     Float    @default(0)  // % of articles auto-published
+  avgReviewScore      Float    @default(0)
+  contentFactoryOutputs Int    @default(0)  // Total multi-format outputs
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([domain, date])
+  @@index([domain])
+  @@index([date])
+}
+
+model ContentDecisionLog {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  decisionType        String   // auto_publish | auto_rewrite | experiment_winner | topic_selection | review_override | replay_trigger
+  context             String?  // JSON: decision context
+  decision            String   // The actual decision made
+  rationale           String?  // Why this decision was made
+  impact              String?  // Measured impact after the fact
+  automated           Boolean  @default(true) // true=AI decided, false=human decided
+  articleId           String?
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([decisionType])
+  @@index([automated])
+  @@index([createdAt])
+}
+
+// ─── AI Growth Engine™ — Learning System ──────────────────────────────
+
+model GrowthMemory {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  actionType          String   // created_faq | added_author | published_article | created_schema | added_internal_link | fixed_robots | updated_llms_txt | created_entity | added_citation_source
+  actionDetail        String   // What was done, e.g. "Created FAQ: What is AI Visibility?"
+  targetEntity        String?  // What entity/topic was affected, e.g. "AI Visibility for Dentists"
+  visibilityDelta     Int      @default(0)     // Change in AI Visibility Score after this action
+  citationDelta       Int      @default(0)     // Change in citations
+  organicDelta        Int      @default(0)     // Change in organic traffic
+  leadDelta           Int      @default(0)     // Change in leads attributed
+  revenueDelta        Float    @default(0)     // Change in revenue attributed
+  measuredAt          DateTime? // When the outcome was actually measured
+  confidence          Int      @default(0)     // How confident we are that this action caused this outcome (0-100)
+  articleId           String?  // Linked article if applicable
+  briefId             String?  // Linked brief if applicable
+  metadata            String?  // JSON: additional context
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([actionType])
+  @@index([targetEntity])
+  @@index([measuredAt])
+  @@index([createdAt])
+  @@index([domain, actionType])
+  @@index([domain, createdAt])
+}
+
+model EvidenceEntry {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  recommendationType  String   // create_faq | add_author | publish_article | create_schema | fix_robots | etc.
+  recommendation      String   // The recommendation text
+  basedOnCompanies    Int      @default(0)     // How many companies' data supports this
+  basedOnReplaySessions Int    @default(0)     // How many replay sessions
+  basedOnCompetitors  Int      @default(0)     // How many competitor analyses
+  basedOnArticles     Int      @default(0)     // How many published articles
+  basedOnGrowthMemories Int    @default(0)     // How many growth memory entries
+  avgVisibilityGain   Float    @default(0)     // Average visibility gain from this action type
+  confidence          Int      @default(0)     // 0-100 confidence score
+  sourceBreakdown     String?  // JSON: detailed source breakdown
+  validUntil          DateTime? // When this evidence should be re-validated
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([recommendationType])
+  @@index([confidence])
+  @@index([createdAt])
+}
+
+model KnowledgeNode {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  nodeType            String   // brand | founder | product | service | author | topic | entity | mention | source | industry | feature
+  label               String
+  description         String?
+  url                 String?  // Associated URL
+  properties          String?  // JSON: additional properties
+  aiVisibilityImpact  Int      @default(0)     // How much this node contributes to AI visibility
+  isComplete          Boolean  @default(false) // Whether this node has all required data
+  missingData         String?  // JSON: what data is missing (e.g. ["wikipedia", "crunchbase", "reddit"])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  outgoingEdges       KnowledgeEdge[] @relation("SourceNode")
+  incomingEdges       KnowledgeEdge[] @relation("TargetNode")
+
+  @@index([domain])
+  @@index([nodeType])
+  @@index([label])
+  @@index([isComplete])
+  @@index([aiVisibilityImpact])
+}
+
+model KnowledgeEdge {
+  id                  String   @id @default(cuid())
+  sourceNodeId        String
+  targetNodeId        String
+  relationship        String   // owns | founded | covers | mentions | cites | competes_with | related_to | author_of | about | part_of
+  strength            Int      @default(50)   // 0-100 how strong the relationship
+  metadata            String?  // JSON: additional edge properties
+  createdAt           DateTime @default(now())
+
+  sourceNode          KnowledgeNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode          KnowledgeNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+  @@index([relationship])
+}
+
+model Sprint {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  sprintNumber        Int      // Sequential sprint number
+  goal                String   // e.g. "+10 AI Visibility"
+  goalMetric          String   @default("ai_visibility") // ai_visibility | citations | organic_clicks | leads | revenue
+  goalTarget          Float    // Target value
+  currentValue        Float    @default(0)    // Current value at sprint start
+  status              String   @default("planning") // planning | active | completed | failed
+  aiPlan              String?  // JSON: AI-generated plan (3 articles, 2 FAQs, 1 schema, 5 links, etc.)
+  plannedActions      String?  // JSON: detailed action plan
+  executedActions     Int      @default(0)
+  totalActions        Int      @default(0)
+  resultSummary       String?  // JSON: results after sprint
+  startedAt           DateTime?
+  endsAt              DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([sprintNumber])
+  @@index([status])
+  @@index([endsAt])
+}
+
+model ArticleROI {
+  id                  String   @id @default(cuid())
+  articleId           String   @unique
+  domain              String   @default("seosights.com")
+  // Cost
+  writingCostUsd      Float    @default(0)     // AI writing cost
+  reviewCostUsd       Float    @default(0)     // Review pipeline cost
+  totalCostUsd        Float    @default(0)     // Total cost
+  writingTimeMinutes  Int      @default(0)     // Time from brief to published
+  // Results
+  visibilityBefore    Int      @default(0)     // AI Visibility Score before article
+  visibilityAfter     Int      @default(0)     // AI Visibility Score after article
+  visibilityDelta     Int      @default(0)
+  citationsGained     Int      @default(0)
+  organicClicks       Int      @default(0)
+  leadsGenerated      Int      @default(0)
+  revenueAttributed   Float    @default(0)
+  // Calculated
+  roi                 Float    @default(0)     // (revenue - cost) / cost
+  costPerCitation     Float    @default(0)
+  costPerLead         Float    @default(0)
+  measuredAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([articleId])
+  @@index([domain])
+  @@index([roi])
+  @@index([measuredAt])
+}
+
+model AIDailyRecommendation {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  date                DateTime // The date this recommendation is for
+  priority            Int      @default(1)     // 1=highest priority
+  category            String   // content | technical | entity | link | schema | experiment
+  recommendation      String   // The actual recommendation text
+  rationale           String   // Why this is recommended
+  evidenceId          String?  // Linked EvidenceEntry
+  evidenceSummary     String?  // Quick evidence summary
+  confidence          Int      @default(0)     // 0-100
+  estimatedImpact     String?  // e.g. "+4 AI Visibility"
+  effortMinutes       Int      @default(0)     // Estimated effort
+  status              String   @default("pending") // pending | accepted | rejected | executing | completed
+  executedAt          DateTime?
+  resultNote          String?  // What happened after execution
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([date])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+}

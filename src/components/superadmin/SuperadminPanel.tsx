@@ -63,6 +63,8 @@ import {
   Check,
   RotateCcw,
   Loader2,
+  Rocket,
+  Brain,
 } from 'lucide-react'
 import {
   BarChart,
@@ -73,6 +75,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+
+import ClientZeroPanel from './ClientZeroPanel'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -244,6 +248,10 @@ export default function SuperadminPanel({ isOpen, onClose }: SuperadminPanelProp
                   <Settings className="w-3.5 h-3.5" />
                   Settings
                 </TabsTrigger>
+                <TabsTrigger value="client-zero" className="gap-1.5 text-xs">
+                  <Brain className="w-3.5 h-3.5" />
+                  Client Zero
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -265,6 +273,9 @@ export default function SuperadminPanel({ isOpen, onClose }: SuperadminPanelProp
               </TabsContent>
               <TabsContent value="settings" className="h-full m-0">
                 <SettingsTab />
+              </TabsContent>
+              <TabsContent value="client-zero" className="h-full m-0">
+                <ClientZeroPanel />
               </TabsContent>
             </div>
           </Tabs>
