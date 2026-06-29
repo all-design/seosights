@@ -1021,3 +1021,32 @@ model AIDailyRecommendation {
   @@index([priority])
   @@index([category])
 }
+
+// ─── AI Confidence Learning™ ──────────────────────────────────────────
+
+model PredictionLog {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  // What the AI predicted
+  actionType          String   // created_faq | published_article | created_schema | etc.
+  predictedImpact     Int      // AI predicted this many points of visibility gain
+  actualImpact        Int?     // What actually happened (null until measured)
+  confidence          Int      @default(50)  // AI's confidence at prediction time (0-100)
+  confidenceAfter     Int?     // Confidence after measuring actual result
+  // Context
+  recommendation      String?  // The original recommendation text
+  evidenceId          String?  // Linked evidence
+  measuredAt          DateTime? // When actual result was measured
+  daysToMeasure       Int?     // How many days between prediction and measurement
+  // Learning
+  accuracyScore       Float?   // How close prediction was to actual (0-1, 1=perfect)
+  confidenceDelta     Int?     // How much confidence changed after measurement (+/-)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([actionType])
+  @@index([measuredAt])
+  @@index([confidence])
+  @@index([createdAt])
+}

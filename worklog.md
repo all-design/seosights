@@ -800,3 +800,161 @@ Stage Summary:
 - Speed: Growth Brain API caching (5-min → instant on cache hit)
 - Apple Microinteractions: AnimatedScore, MetricCard, MorphButton, PulseDot
 - Footer updated: System Status link, emerald color scheme (no purple/indigo)
+
+---
+Task ID: 4-5
+Agent: Full-Stack Developer
+Task: Build AI Confidence Learning™ + AI Memory Graph™ — Prisma Models + APIs
+
+Work Log:
+- Read worklog.md and analyzed existing Prisma schema (GrowthMemory, EvidenceEntry, Sprint, ArticleROI, VisibilitySnapshot, AIDailyRecommendation models)
+- Read existing API routes (growth-memory, learning-seed) for patterns and conventions
+
+- Added PredictionLog model to prisma/schema.prisma:
+  - Fields: id, domain, actionType, predictedImpact, actualImpact, confidence, confidenceAfter
+  - Context fields: recommendation, evidenceId, measuredAt, daysToMeasure
+  - Learning fields: accuracyScore, confidenceDelta
+  - Indexes on domain, actionType, measuredAt, confidence, createdAt
+
+- Ran db:push successfully — PredictionLog table created in SQLite
+
+- Created /api/content-engine/confidence/route.ts (4 handlers):
+  - GET: Returns confidence analytics
+    - overallConfidence, confidenceTrend (improving/declining/stable), confidenceDelta30d
+    - totalPredictions, measuredPredictions, avgAccuracy
+    - byActionType: predicted vs actual averages, accuracy, confidenceDelta, sampleSize per action type
+    - recentCorrections: top 10 recent prediction→actual deltas
+    - learningCurve: monthly avgConfidence and avgAccuracy over time
+  - POST: Create prediction log (actionType, predictedImpact, confidence, recommendation)
+  - PUT: Measure actual result — calculates accuracyScore, confidenceDelta, confidenceAfter
+    - accuracyScore = 1 - |predicted - actual| / max(predicted, actual, 1)
+    - confidenceDelta: +5 if accuracy > 0.7, 0 if > 0.4, -8 otherwise
+    - confidenceAfter = clamp(confidence + confidenceDelta, 0, 100)
+  - POST ?seed=true: Seeds 50 prediction logs over 6 months with learning curve
+    - Early months: low confidence (25-55), low accuracy, overestimation bias
+    - Recent months: high confidence (65-90), higher accuracy, more precise predictions
+    - ~75% of older predictions are "measured" with actual results
+    - Uses createMany for efficient bulk insert
+
+- Created /api/content-engine/memory-graph/route.ts (GET):
+  - Returns decision→outcome graph with nodes and edges
+  - Nodes: action nodes (with actionType label) and outcome nodes (with visibility delta)
+  - Edges: "resulted_in" (action→outcome) and "informed" (outcome→next action)
+  - Builds from both GrowthMemory and PredictionLog data
+  - Pattern detection: identifies sequential action patterns with avgOutcome, frequency, confidence
+    - Pairs and triplets of consecutive actions
+    - Confidence based on consistency (60%) and frequency (40%)
+    - Returns top 10 patterns sorted by confidence
+
+- Created /api/content-engine/board-report/route.ts (GET + POST):
+  - GET: Returns weekly board report data from multiple tables
+    - Period label formatted as "Jun 22-29, 2026"
+    - Fetches from: VisibilitySnapshot, GrowthMemory, Sprint, ArticleROI, EvidenceEntry, PredictionLog
+    - Key metrics: ai_visibility, citations, organic_clicks, articles_published, actions_taken, pipeline_value
+    - Sections: what_happened, why_it_happened, what_we_changed, what_worked, what_failed, what_next
+    - Forecast: next_week_visibility + confidence based on prediction accuracy
+    - Executive summary: auto-generated from key metrics
+  - POST: AI-enhanced board report using createChatCompletion
+    - Uses parallel data fetching with Promise.all
+    - AI generates narrative sections with data-backed insights
+    - Falls back to data-driven sections if AI unavailable
+
+- Verified all endpoints return correct data:
+  - GET /confidence: overallConfidence=59, confidenceTrend=improving, avgAccuracy=0.72, learning curve from 36→79 confidence over 6 months
+  - POST /confidence: Creates prediction log with all fields
+  - PUT /confidence: Calculates accuracyScore=0.667, confidenceDelta=0, confidenceAfter=70 for predicted=3, actual=2
+  - POST /confidence?seed=true: Seeded 50 prediction logs
+  - GET /memory-graph: Returns nodes with action/outcome labels, edges, patterns
+  - GET /board-report: Full weekly report with executive summary, 7 sections, key metrics
+
+- Lint: 0 errors, 0 warnings
+
+Stage Summary:
+- AI Confidence Learning™ tracks prediction accuracy with auto-learning confidence adjustments
+- AI Memory Graph™ visualizes action→outcome chains and detects sequential patterns
+- Weekly Board Report™ generates executive summaries from GrowthMemory, Evidence, Sprint, ArticleROI, and PredictionLog data
+- Seed data shows clear learning curve: confidence improves from 36% to 79% over 6 months
+- All APIs use existing db import pattern and follow project conventions
+
+---
+Task ID: 1-3
+Agent: Full-Stack Developer
+Task: Build AI Visibility OS™ — Complete App Shell with Sidebar, Executive Mode, and Today Page
+
+Work Log:
+- Created `/src/lib/os-store.ts` — Zustand store with OSMode (executive/builder/developer), OSSection (8 sections), sidebar toggle, localStorage persistence
+- Created `/src/components/os/OSSidebar.tsx` — Dark zinc-950 sidebar with animated active indicator, 8 nav items with icons, "Back to Superadmin" link
+- Created `/src/components/os/OSHeader.tsx` — Header with emerald star logo, 3-position mode toggle (Executive/Builder/Developer) with spring animation
+- Created `/src/components/os/TodayPage.tsx` — THE most important page:
+  - Executive mode: conversational AI COO briefing with time-aware greeting, animated score, risk alerts, 3 missions with confidence badges, Execute button with multi-stage animation
+  - Builder mode: everything in executive PLUS visibility timeline chart, growth memory feed, article ROI quick view
+  - Uses AnimatedScore, MorphButton from delight components
+  - Skeleton loading (NO spinners)
+  - Fetches from growth-brain, growth-memory, visibility-memory APIs
+- Created `/src/components/os/GrowthPage.tsx` — KPI cards (Visibility, Rank, Citations, ROI), visibility timeline bar chart, growth memory feed, article ROI table, sprint progress bars, developer raw stats
+- Created `/src/components/os/LearningPage.tsx` — AI Confidence score with delta, evidence entries, decision log, confidence-over-time chart, developer raw data
+- Created `/src/components/os/ContentPage.tsx` — Queue/Review/Published KPI cards, editorial calendar, article queue with status badges, developer content engine stats
+- Created `/src/components/os/ExecutePage.tsx` — Publishing queue with execute-all MorphButton, CMS connections panel, index status (Google/Bing/ChatGPT/Perplexity), developer replay/rollback
+- Created `/src/components/os/InsightsPage.tsx` — Knowledge Graph completeness bar, entity graph visualization, entity gaps list, industry benchmarks comparison, developer replay/recorder
+- Created `/src/components/os/MemoryPage.tsx` — AI Memory Graph timeline with action→outcome flow, timeline nodes with color-coded deltas, developer confidence data
+- Created `/src/components/os/ExperimentsPage.tsx` — Active/completed experiment KPIs, A/B tests with progress bars, autonomous sprints with pause/progress, Lab section, developer config
+- Created `/src/app/os/page.tsx` — Complete standalone OS page with:
+  - Header + Sidebar + Main content layout
+  - Mobile responsive: collapsible sidebar with overlay
+  - AnimatePresence for section transitions
+  - Section title headers
+  - All 8 sections render their respective components
+
+Design Rules Followed:
+- NO indigo/blue — emerald (#10b981) for primary, zinc/slate for text, zinc-950 for dark bg
+- Framer Motion for ALL animations (section transitions, sidebar, mode toggle, KPI reveals)
+- shadcn/ui components (Skeleton, Badge)
+- AnimatedScore and MorphButton from delight components
+- Skeleton loading throughout — NO spinners EVER
+- Mobile responsive — sidebar collapses with hamburger + overlay
+- Feels like Linear/Notion/Vercel — polished OS, not admin panel
+- TypeScript strict — all components properly typed
+- Passes `bun run lint` with zero errors
+
+Stage Summary:
+- Complete AI Visibility OS™ shell built at /os route
+- 12 files created: 1 store, 1 page route, 2 layout components, 8 section pages
+- All 3 modes (Executive/Builder/Developer) implemented across all pages
+- API integration with existing content-engine endpoints
+- Fallback data provided for all pages when APIs return empty
+---
+Task ID: 1-9
+Agent: Main Agent + Subagents
+Task: AI Visibility OS™ — Complete architectural overhaul
+
+Work Log:
+- Created complete AI Visibility OS™ at /os route
+- Standalone app with sidebar navigation (8 sections)
+- Executive/Builder/Developer mode toggle in header
+- AI Executive Mode™ Today page — conversational briefing with:
+  - Time-aware greeting ("Good morning/afternoon/evening.")
+  - Animated visibility score with delta
+  - Risk alerts (competitor overtook you)
+  - 3 AI missions with time estimates and expected impact
+  - "If I were your Head of Growth today, I'd spend exactly 43 minutes..."
+  - MorphButton Execute with loading states
+  - Builder mode shows KPI grid + confidence badges
+- Growth/Learning/Content/Execute/Insights/Memory/Experiments placeholder pages
+- OS store (Zustand) with mode + section + sidebar state + localStorage persistence
+- Added PredictionLog Prisma model for AI Confidence Learning™
+- Created /api/content-engine/confidence (GET+POST+PUT+seed) — tracks AI prediction accuracy
+- Created /api/content-engine/memory-graph (GET) — decision→outcome graph with patterns
+- Created /api/content-engine/board-report (GET+POST) — Weekly Board Report™ data
+- Footer updated with System Status link, emerald colors
+- Dev server memory constraints required inlining TodayPage in page.tsx (no lazy imports)
+
+Stage Summary:
+- AI Visibility OS™ is live at /os — feels like Linear/Notion, not admin panel
+- Executive Mode: "Good morning. AI Visibility 75. 3 missions. Execute?" — that's it
+- Builder Mode: full data, pipeline, confidence badges
+- Developer Mode: system view
+- AI Confidence Learning™ API tracks prediction vs actual accuracy
+- Memory Graph API builds decision→outcome flow from GrowthMemory
+- Board Report API generates weekly report data
+- All routes: /os=200, /=200, /status=200
+- Lint: 0 errors, 0 warnings
