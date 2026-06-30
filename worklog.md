@@ -76,3 +76,155 @@ Stage Summary:
 - Correct 8-section "Understand. Measure. Improve." landing page restored on /
 - Old 18-section version fully replaced
 - Production verified with Agent Browser - all 8 sections render correctly
+
+---
+Task ID: 4
+Agent: Scheduler Agent
+Task: Build Mission Scheduler page at /control/scheduler
+
+Work Log:
+- Read worklog.md and existing control page/layout for context and styling conventions
+- Created /control/scheduler/page.tsx as a 'use client' self-contained component with mock data
+- Section 1: Header with "Mission Scheduler" title, CalendarClock icon, "Healthy" badge (emerald pulse), "Auto-sync" badge (cyan)
+- Section 2: Today's Timeline — vertical timeline with 5 schedule items (06:00 QA → 07:00 Growth → 08:00 Client Zero → 09:00 Publish → 23:00 Learning)
+  - Completed items: green CheckCircle2 icon, emerald border, emerald connector lines
+  - Running item (Client Zero): cyan Play icon, pulse animation, progress bar (63%)
+  - Pending items: dimmed (opacity-50), grey Circle icon
+- Section 3: Upcoming Missions — 5 missions with live countdown timers (useCountdown hook, updates every second)
+  - Each shows system name, priority badge (high/medium/low), description, countdown in HH:MM:SS format
+- Section 4: System Run History — table-style list of last 10 runs
+  - Columns: System (with icon), Start, End, Duration, Result (success/failed with colored icons)
+  - Scrollable container with custom scrollbar
+- Section 5: Scheduler Configuration — cron-like schedules for 7 jobs
+  - Each card: system icon, system name, cron expression in code block, human-readable description, timezone
+  - Summary stats: 7 Active Jobs, 100% On-time Rate
+- Styling: Dark theme (bg-slate-950 from layout), cyan accents throughout, slate-900 cards, slate-800 borders
+- Fixed lint error: used requestAnimationFrame wrapper for setMounted to avoid react-hooks/set-state-in-effect rule
+- Removed unused import (AlertTriangle)
+
+Stage Summary:
+- Mission Scheduler page created at /control/scheduler with all 5 required sections
+- Consistent with existing AI Operations Center design language
+- Live countdown timers update every second for upcoming missions
+- Timeline visualization with clear completed/running/pending states and pulse animation
+- Lint clean for scheduler page (no new errors introduced)
+
+---
+Task ID: 3
+Agent: QA Engine Agent
+Task: Build QA Engine page at /control/qa
+
+Work Log:
+- Read worklog.md for context and existing control layout/page.tsx for styling conventions
+- Created /control/qa/page.tsx as a 'use client' self-contained component with mock data
+- Section 1: Header with "QA Engine" title, Shield icon, "Running" status badge (emerald pulse), "Re-run All" button
+- Section 2: Overall QA Score banner with SVG circular gauge (animated score counter from 0→89)
+  - 4 stat boxes: Passing (7), Warning (2), Failing (0), Dimensions (9)
+  - Open issues summary: critical count + warnings count
+- Section 3: 9 Quality Dimension cards in 3x3 responsive grid
+  - Dimensions: UI (94), API (97), UX (91), Copy (88), Performance (78/warning), SEO (93), Accessibility (72/warning), Security (96), Regression (99)
+  - Each card: icon + name + description, score (color-coded), mini progress bar, status badge (passing/warning/failing), last checked time
+  - Warning cards have amber border highlight
+- Section 4: Active Checks — 4 currently running QA checks with animated progress bars
+  - Lighthouse Performance Audit (67%), WCAG 2.1 AA Scan (34%), API Response Validation (89%), Visual Regression Diff (12%)
+  - Each shows dimension label and time since start
+- Section 5: Recent Issues — 7 issues with severity levels (critical/warning/info)
+  - Color-coded cards: red for critical, amber for warning, blue for info
+  - Each shows: title, description, severity label, dimension, detected time
+  - Scrollable with max-h-96 and custom scrollbar
+- Section 6: Quick Actions footer — next scan time, last scan, total checks today, pass rate
+- Styling: Dark theme (bg-slate-950 from layout), blue accents for QA, slate-900 cards, slate-800 borders
+- Fixed lint error: used useSyncExternalStore for hydration instead of useState+useEffect pattern to avoid react-hooks/set-state-in-effect rule
+- Used useRef for animation guard to prevent double animation in Strict Mode
+
+Stage Summary:
+- QA Engine page created at /control/qa with all required sections
+- Consistent with existing AI Operations Center design language
+- Circular gauge visual with animated score counter
+- 9 dimension cards in responsive 3x3 grid with color-coded status
+- Active checks with real-time progress bars
+- Recent issues with severity-based color coding
+- Lint clean for QA page (no new errors introduced)
+
+---
+Task ID: 2
+Agent: Growth Engine Agent
+Task: Build Growth Engine page at /control/growth
+
+Work Log:
+- Read worklog.md for context and existing control layout/page.tsx for styling conventions
+- Created /control/growth/page.tsx as a 'use client' self-contained component with mock data
+- Section 1: Header with "Growth Engine" title, TrendingUp icon, "Running" status badge (emerald pulse), pipeline item count badge
+- Section 2: Pipeline Visualization — 6 stages (Discovery → Queue → Generation → Review → Publishing → Learning)
+  - Desktop: horizontal flow with arrow connectors between stages
+  - Mobile: vertical flow with rotated arrows
+  - Each stage: icon, name, item count (large bold), status indicator (active=emerald pulse, idle=grey), description
+  - Active stages have emerald border glow; idle stages have dim slate styling
+- Section 3: Active Missions — 6 current growth missions
+  - Each mission: title, status badge (generating=emerald/reviewing=amber/publishing=cyan), target AI model badge (ChatGPT/Claude/Gemini/Perplexity with unique colors), impact badge (Critical/High/Medium), progress bar with percentage
+  - Scrollable with max-h-96 and custom scrollbar
+- Section 4: Content Queue — 6 items waiting for generation
+  - Each item: priority badge (P1/P2/P3 with red/amber/slate), title, type tag, target AI, estimated impact, time queued
+  - Scrollable with max-h-96 and custom scrollbar
+- Section 5: Recent Published — last 5 published items with results
+  - Each item: citation status icon (cited=emerald CheckCircle2, pending=amber Clock), title, target AI, visibility delta, citation count, URL, published time
+  - Summary stats row: Total Citations (14), Published (5), Avg Impact (+50%)
+- Styling: Dark theme (bg-slate-950 from layout), emerald accents, slate-900 cards, slate-800 borders
+- Fixed lint: used useSyncExternalStore for hydration instead of useState+useEffect pattern to avoid react-hooks/set-state-in-effect rule
+- All Lucide icons, no shadcn imports, pure Tailwind classes
+
+Stage Summary:
+- Growth Engine page created at /control/growth with all 5 required sections
+- Pipeline visualization with responsive horizontal/vertical layouts
+- Active missions with progress tracking and impact scoring
+- Content queue with priority system and AI targeting
+- Recent published items with citation tracking and visibility metrics
+- Consistent with existing AI Operations Center design language
+- Lint clean for growth page (no new errors introduced)
+
+---
+Task ID: 5
+Agent: Product Engine Agent
+Task: Build Autonomous Product Engine page at /control/product
+
+Work Log:
+- Read worklog.md and existing control page/layout for context and styling conventions
+- Created /control/product/page.tsx as a 'use client' self-contained component with mock data
+- Section 1: Header with "Product Engine" title, Package icon, "Idle — runs nightly" status badge (with Moon icon), last run and next review timestamps
+- Section 2: Executive Product Review — morning report card
+  - Overall Product Score: SVG circular gauge showing 72/100 (amber "Needs Attention")
+  - Key Findings: 4 bullet points with severity indicators (critical/high/positive) — color-coded dots and text
+  - Recommended Priorities: 5 ranked items with impact badges (high/medium/low)
+- Section 3: Onboarding Funnel — 5-step funnel visualization (Landing → Sign Up → First Scan → Dashboard → Upgrade)
+  - Each step shows: conversion rate, user count, drop-off percentage with arrow indicators
+  - Color-coded progress bars (green ≥60%, amber ≥30%, rose <30%)
+  - Summary row: 75% drop at Upgrade, 34% biggest step drop, 7.4% end-to-end conversion
+- Section 4: Feature Usage — 13 features tracked with live status
+  - Four status categories: Hot (Flame/rose), Alive (CheckCircle2/emerald), Lukewarm (AlertTriangle/amber), Dead (Skull/red)
+  - Each feature shows: name, last used time, user count, status badge
+  - Dead features highlighted with red background tint and border
+  - Hot features highlighted with rose background tint
+  - Legend bar at top, summary bar at bottom
+  - Scrollable with max-h-96 and custom scrollbar
+- Section 5: Complexity Score — trend visualization over 6 months
+  - Current score 71 with "+6 from last month" trend indicator and "Above healthy threshold" warning
+  - 6-bar chart (Oct→Mar) with height proportional to score, latest month highlighted with rose dot
+  - Color thresholds: Healthy (≤50), Caution (51-65), Over-complex (>65)
+- Section 6: AI Recommendations — 3-column grid
+  - What to Remove (red/XCircle): 3 dead features with rationale
+  - What to Simplify (amber/ChevronRight): 3 complexity reduction suggestions
+  - What to Prioritize Next (rose/numbered): 4 ranked ROI opportunities
+- Styling: Dark theme (bg-slate-950 from layout), rose/pink accents, slate-900 cards, slate-800 borders
+- All Lucide icons, no shadcn imports, pure Tailwind classes
+- Removed useState/useEffect hydration pattern to avoid react-hooks/set-state-in-effect lint error
+- Lint clean for product page (no new errors introduced)
+
+Stage Summary:
+- Product Engine page created at /control/product with all 6 required sections
+- Consistent with existing AI Operations Center design language
+- SVG circular gauge for product score visualization
+- Complete funnel analysis with drop-off tracking and summary stats
+- Feature usage tracking with 4-tier health status (hot/alive/lukewarm/dead)
+- 6-month complexity trend chart with threshold color coding
+- AI-powered recommendations in 3 categories (remove/simplify/prioritize)
+- Lint clean for product page (no new errors introduced)
