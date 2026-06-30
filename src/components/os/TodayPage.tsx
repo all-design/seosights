@@ -164,7 +164,26 @@ export function TodayPage() {
 
         if (brainRes.ok) {
           const brainJson = await brainRes.json()
-          setBrainData(brainJson)
+          // Map API response to component format
+          const missions: Mission[] = (brainJson.missions || []).slice(0, 3).map((m: { shortText?: string; text?: string; action?: string; effortMinutes?: number; effort?: string; estimatedImpact?: string; confidence?: number }) => ({
+            action: m.shortText || m.text || m.action || '',
+            timeEstimate: m.effortMinutes ? `${m.effortMinutes} min` : (m.effort || '15 min'),
+            impact: m.estimatedImpact || '+3 AI Visibility',
+            confidence: m.confidence || 80,
+          }))
+          const totalMinutes = missions.reduce((sum: number, m: Mission) => sum + (parseInt(m.timeEstimate) || 15), 0)
+          const mapped: GrowthBrainData = {
+            greeting: brainJson.greeting || getTimeGreeting(),
+            visibilityScore: brainJson.visibilityScore || brainJson.growthScore || 75,
+            visibilityDelta: brainJson.visibilityDelta || brainJson.todayGrowth || 4,
+            riskAlert: brainJson.riskAlert || null,
+            articleHighlight: brainJson.articleHighlight || null,
+            missions,
+            totalMinutes: brainJson.totalMinutes || totalMinutes,
+            expectedImpact: brainJson.expectedImpact || brainJson.expectedGain || '+6 AI Visibility',
+            pipelineEstimate: brainJson.pipelineEstimate || brainJson.pipelineValue || '+$1,200 pipeline',
+          }
+          setBrainData(mapped)
         }
 
         if (memoryRes.ok) {
@@ -174,7 +193,13 @@ export function TodayPage() {
 
         if (visRes.ok) {
           const visJson = await visRes.json()
-          setVisibilityTimeline(visJson.timeline || [])
+          const rawTimeline = visJson.timeline || []
+          // Map API format { month, aiVisibilityScore } → component format { date, score }
+          const mapped: VisibilityPoint[] = rawTimeline.map((pt: { month?: string; year?: number; monthNum?: number; aiVisibilityScore?: number; score?: number; date?: string }) => ({
+            date: pt.date || pt.month || `${pt.year}-${String((pt.monthNum ?? 0) + 1).padStart(2, '0')}`,
+            score: pt.score ?? pt.aiVisibilityScore ?? 0,
+          }))
+          setVisibilityTimeline(mapped)
         }
       } catch {
         // Use fallback data
