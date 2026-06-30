@@ -33,3 +33,27 @@ Stage Summary:
 - /os route protected with auth gate and blurred preview
 - /observatory split into public research and internal data sections
 - Browser verified all three routes: /, /os, /observatory - all pass
+
+---
+Task ID: 19
+Agent: Main Agent
+Task: Fix route structure - restore original landing page on /, move Observatory to /observatory, keep engagement on /engagement
+
+Work Log:
+- User reported that the Observatory content had overwritten the original landing page at /
+- Found original landing page code in git history (commit 647cb52)
+- Restored original SeoSights landing page at / (src/app/page.tsx) with dynamic imports to prevent dev OOM
+- Created new /observatory route (src/app/observatory/page.tsx) with Observatory content
+- Engagement system remains at /engagement
+- Resolved git merge conflicts in prisma/schema.prisma (kept both Engagement models AND Observatory/AI Search Graph models)
+- Pushed to GitHub, triggered Vercel deployment
+- Verified all 3 routes on production (seosights.com):
+  - / → 200, "Will AI Recommend Your Business?" (landing page)
+  - /observatory → 200, "AI Search Observatory™" (observatory)
+  - /engagement → 200, "Momentum™" sidebar with 16 sections (engagement system)
+- Agent Browser visual verification confirmed all 3 routes render correctly
+
+Stage Summary:
+- Route structure fixed: Landing page at /, Observatory at /observatory, Engagement at /engagement
+- All 3 production routes verified and working
+- Dynamic imports added to landing page to prevent dev server OOM
