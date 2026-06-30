@@ -1481,3 +1481,131 @@ model ObservatoryExternalCitation {
   @@index([citedAt])
   @@index([verified])
 }
+
+// ─── Public Company Profiles ──────────────────────────────────
+
+// /company/openai, /company/notion — SEO engine generating quality pages
+// ONLY populated with real data, never estimates or simulations
+model CompanyProfile {
+  id                String   @id @default(cuid())
+  slug              String   @unique  // openai | notion | hubspot
+  name              String   // Display name
+  domain            String   // openai.com | notion.so | hubspot.com
+  description       String?
+  logoUrl           String?
+  websiteUrl        String?
+  industry          String?  // Technology | Healthcare | Finance | etc.
+
+  // AI Visibility Score™ — the industry standard
+  aiVisibilityScore Float    @default(0)  // 0-100
+  previousScore     Float    @default(0)  // Previous period for delta
+  scoreTrend        String   @default("stable") // rising | falling | stable
+
+  // Score breakdown
+  trustScore        Float    @default(0)  // 0-100
+  freshnessScore    Float    @default(0)  // 0-100
+  authorityScore    Float    @default(0)  // 0-100
+  citationScore     Float    @default(0)  // 0-100
+
+  // Data points
+  totalCitations    Int      @default(0)  // Total citations across all AI models
+  citationTrend     String   @default("[]") // JSON: [{period, count}] last 6 periods
+  topModelsJson     String   @default("[]") // JSON: [{model, citations}]
+  topSourcesJson    String   @default("[]") // JSON: [{source, count}] — which sources cite this company
+  entitiesJson      String   @default("[]") // JSON: [{entity, count}] — named entities associated
+  graphJson         String   @default("[]") // JSON: [{source, target, relation}] — citation graph
+
+  // Verification
+  isVerified        Boolean  @default(false) // Has SeoSights verified this profile
+  verifiedAt        DateTime?
+  dataPoints        Int      @default(0)  // Number of real data points supporting scores
+  lastUpdated       DateTime?
+
+  // CRITICAL: Only real data
+  isSimulated       Boolean  @default(false) // NEVER publish simulated company profiles
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([slug])
+  @@index([domain])
+  @@index([industry])
+  @@index([aiVisibilityScore])
+  @@index([scoreTrend])
+  @@index([isVerified])
+  @@index([isSimulated])
+  @@index([lastUpdated])
+}
+
+// ─── AI Visibility Score™ Badge ───────────────────────────────
+
+// Embeddable badge: "AI Visibility Score 82 — Verified by SeoSights"
+model AIVisibilityBadge {
+  id                String   @id @default(cuid())
+  domain            String   // The domain this badge is for
+  score             Float    @default(0)  // 0-100
+  previousScore     Float    @default(0)
+  trend             String   @default("stable") // rising | falling | stable
+  isVerified        Boolean  @default(false)
+  verifiedAt        DateTime?
+  embedCount        Int      @default(0)  // How many times this badge was embedded
+  lastCalculated    DateTime @default(now())
+  isSimulated       Boolean  @default(false) // true = seed/dev data, NEVER serve in production
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([domain])
+  @@index([domain])
+  @@index([score])
+  @@index([isVerified])
+  @@index([isSimulated])
+}
+
+// ─── Observatory Health Metrics ───────────────────────────────
+
+// Daily health snapshot — "What I'd check every day"
+model ObservatoryHealthMetric {
+  id                String   @id @default(cuid())
+  date              DateTime @unique  // The date these metrics apply to
+  promptsCollected  Int      @default(0)  // Total prompts collected today
+  uniqueDomains     Int      @default(0)  // Unique domains cited
+  citationChanges   Int      @default(0)  // Citation changes detected
+  newEntities       Int      @default(0)  // New entities discovered
+  newReports        Int      @default(0)  // New reports published
+  activeModels      Int      @default(0)  // Models crawled today
+  totalArchiveSize  Int      @default(0)  // Total responses in archive
+  externalCitations Int      @default(0)  // External citations this month
+  isSimulated       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([date])
+  @@index([isSimulated])
+}
+
+// ─── Client Zero KPI Pipeline ─────────────────────────────────
+
+// Articles → Citations → Recommendations → Pipeline → Revenue
+// One line. One idea.
+model ClientZeroKPI {
+  id                String   @id @default(cuid())
+  date              DateTime // The date this KPI applies to
+  domain            String   // The domain being tracked
+
+  // Pipeline stages
+  articlesCreated   Int      @default(0)  // Content Engine articles created
+  citationsGained   Int      @default(0)  // New citations from AI models
+  recommendationsGained Int  @default(0)  // Times AI models recommend this domain
+  pipelineValue     Float    @default(0)  // Estimated pipeline value from AI visibility
+  revenueAttributed Float    @default(0)  // Revenue attributed to AI visibility
+
+  // AI Visibility Score for this domain
+  aiVisibilityScore Float    @default(0)
+
+  isSimulated       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@unique([date, domain])
+  @@index([date])
+  @@index([domain])
+  @@index([isSimulated])
+}
