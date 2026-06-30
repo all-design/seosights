@@ -1,37 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Brain,
-  Zap,
   Shield,
-  Timer,
-  Box,
   Search,
   BarChart3,
   ScrollText,
   Settings,
-  Users,
   ChevronRight,
   Menu,
   X,
   Activity,
-  Eye,
   Target,
-  Bug,
   CalendarClock,
   Package,
   TrendingUp,
+  Lock,
+  Loader2,
 } from 'lucide-react'
 
 const navGroups = [
   {
     label: '',
     items: [
-      { href: '/control', label: 'Overview', icon: LayoutDashboard, emoji: '🏠' },
+      { href: '/control', label: 'Overview', icon: LayoutDashboard },
     ],
   },
   {
@@ -66,11 +62,37 @@ const navGroups = [
   },
 ]
 
+interface AuthCheck {
+  authorized: boolean
+  user: { name: string; email: string } | null
+}
+
 export default function ControlLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState('')
+  const [auth, setAuth] = useState<AuthCheck | null>(null)
+  const [checking, setChecking] = useState(true)
 
+  // Auth check
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/superadmin/check')
+      const data: AuthCheck = await res.json()
+      setAuth(data)
+    } catch {
+      setAuth({ authorized: false, user: null })
+    } finally {
+      setChecking(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
+  // Clock
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date().toLocaleTimeString('en-US', { hour12: false }))
@@ -81,6 +103,42 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
   const isActive = (href: string) => {
     if (href === '/control') return pathname === '/control'
     return pathname.startsWith(href)
+  }
+
+  // Loading state
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+          <p className="text-slate-500 text-sm">Verifying access...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Access denied
+  if (!auth?.authorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+        <div className="text-center">
+          <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6 border border-red-500/20">
+            <Lock className="w-10 h-10 text-red-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
+          <p className="text-slate-400 mb-6 max-w-sm">
+            AI Operations Center™ is restricted to authorized administrators only.
+          </p>
+          <button
+            onClick={() => router.push('/superadmin-portal/login')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Shield className="w-4 h-4" />
+            Authenticate
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -159,6 +217,11 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
             <span>System Online</span>
             <span className="ml-auto font-mono">{currentTime}</span>
           </div>
+          {auth.user && (
+            <div className="px-3 py-1 text-[10px] text-slate-600 truncate">
+              {auth.user.email}
+            </div>
+          )}
         </div>
       </aside>
 
