@@ -36,6 +36,16 @@ import {
   Route,
   DollarSign,
   Landmark,
+  BookOpen,
+  FileText,
+  Webhook,
+  Table2,
+  TestTube,
+  Network,
+  MessageSquare,
+  FileClock,
+  Download,
+  Palette,
 } from 'lucide-react'
 
 const navGroups = [
@@ -71,6 +81,22 @@ const navGroups = [
       { href: '/control/replay', label: 'Replay Engine', icon: RotateCcw },
       { href: '/control/learning', label: 'Learning Engine', icon: GraduationCap },
       { href: '/control/engineering-memory', label: 'Engineering Memory', icon: Database },
+    ],
+  },
+  {
+    label: '📚 Documentation',
+    items: [
+      { href: '/control/documentation', label: 'Documentation Engine™', icon: BookOpen },
+      { href: '/control/documentation/product', label: 'Product Docs', icon: Package },
+      { href: '/control/documentation/technical', label: 'Technical Docs', icon: FileText },
+      { href: '/control/documentation/api', label: 'API Docs', icon: Webhook },
+      { href: '/control/documentation/database', label: 'Database Docs', icon: Table2 },
+      { href: '/control/documentation/qa', label: 'QA Docs', icon: TestTube },
+      { href: '/control/documentation/design-system', label: 'Design System', icon: Palette },
+      { href: '/control/documentation/knowledge-graph', label: 'Knowledge Graph™', icon: Network },
+      { href: '/control/documentation/copilot', label: 'AI Copilot™', icon: MessageSquare },
+      { href: '/control/documentation/changelog', label: 'Changelog', icon: FileClock },
+      { href: '/control/documentation/downloads', label: 'Downloads', icon: Download },
     ],
   },
   {
