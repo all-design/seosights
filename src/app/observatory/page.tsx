@@ -2,6 +2,8 @@
 
 import ObservatoryNavbar from '@/components/observatory/ObservatoryNavbar'
 import ObservatoryHero from '@/components/observatory/ObservatoryHero'
+import ObservatoryHealth from '@/components/observatory/ObservatoryHealth'
+import ClientZeroKPI from '@/components/observatory/ClientZeroKPI'
 import ObservatoryPulse from '@/components/observatory/ObservatoryPulse'
 import ObservatoryWeather from '@/components/observatory/ObservatoryWeather'
 import ObservatoryIndex from '@/components/observatory/ObservatoryIndex'
@@ -30,6 +32,20 @@ export default function ObservatoryRoutePage() {
 
       <main className="flex-1">
         <ObservatoryHero />
+
+        {/* ── Observatory Health: daily metrics ──────────────────── */}
+        <section id="observatory-health" className="scroll-mt-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+            <ObservatoryHealth />
+          </div>
+        </section>
+
+        {/* ── Client Zero KPI: Articles → Revenue pipeline ──────── */}
+        <section id="observatory-client-zero" className="scroll-mt-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+            <ClientZeroKPI />
+          </div>
+        </section>
 
         <section id="observatory-pulse" className="scroll-mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">

@@ -89,6 +89,27 @@ export function middleware(request: NextRequest) {
     return response
   }
 
+  // Skip observatory public data routes (they serve the public research page)
+  if (request.nextUrl.pathname.startsWith('/api/observatory/')) {
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', correlationId)
+    return response
+  }
+
+  // Skip cron routes (internal triggers)
+  if (request.nextUrl.pathname.startsWith('/api/cron/')) {
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', correlationId)
+    return response
+  }
+
+  // Skip public data routes
+  if (request.nextUrl.pathname.startsWith('/api/public/')) {
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', correlationId)
+    return response
+  }
+
   // Skip health checks
   if (request.nextUrl.pathname === '/api/route' || request.nextUrl.pathname === '/api/system/status') {
     const response = NextResponse.next()

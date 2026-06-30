@@ -17,6 +17,7 @@ import {
   Quote,
   Menu,
   X,
+  TrendingUp,
 } from 'lucide-react'
 
 interface ObservatoryNavbarProps {
@@ -42,7 +43,9 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
   }, [])
 
   const navItems = [
-    { id: 'pulse', label: 'Pulse', icon: Activity },
+    { id: 'health', label: 'Health', icon: Activity },
+    { id: 'client-zero', label: 'Client Zero', icon: TrendingUp },
+    { id: 'pulse', label: 'Pulse', icon: CloudSun },
     { id: 'weather', label: 'Weather', icon: CloudSun },
     { id: 'index', label: 'Index', icon: BarChart3 },
     { id: 'graph', label: 'Graph', icon: Network },

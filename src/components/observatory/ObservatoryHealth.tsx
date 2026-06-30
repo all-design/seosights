@@ -18,12 +18,12 @@ import {
 // ── Types ─────────────────────────────────────────────────────
 
 interface HealthData {
-  collectedToday: number
-  uniqueDomains: number
-  citationChanges: number
-  newEntities: number
-  newReports: number
-  researchCitations: number
+  collectedToday: number | string
+  uniqueDomains: number | string
+  citationChanges: number | string
+  newEntities: number | string
+  newReports: number | string
+  researchCitations: number | string
   date: string
 }
 
@@ -49,8 +49,9 @@ const METRICS = [
   { key: 'newReports' as const, label: 'New Reports', suffix: '', icon: FileText, color: 'text-slate-300', bg: 'bg-slate-500/10', border: 'border-slate-500/20', iconBg: 'bg-slate-500/20' },
 ]
 
-function formatNumber(n: number): string {
-  return n.toLocaleString()
+function formatNumber(n: number | string | undefined): string {
+  if (n === undefined || n === null) return '0'
+  return Number(n).toLocaleString()
 }
 
 // ── Loading Skeleton ─────────────────────────────────────────

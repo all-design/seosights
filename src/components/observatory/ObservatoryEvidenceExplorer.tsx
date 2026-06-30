@@ -42,7 +42,8 @@ const MODEL_COLORS: Record<string, string> = {
   deepseek: '#06b6d4',
 }
 
-function getModelColor(modelId: string): string {
+function getModelColor(modelId: string | null | undefined): string {
+  if (!modelId) return '#94a3b8'
   const key = modelId.toLowerCase()
   for (const [name, color] of Object.entries(MODEL_COLORS)) {
     if (key.includes(name)) return color
@@ -50,7 +51,8 @@ function getModelColor(modelId: string): string {
   return '#94a3b8'
 }
 
-function getModelDisplayName(modelId: string): string {
+function getModelDisplayName(modelId: string | null | undefined): string {
+  if (!modelId) return 'Unknown'
   const map: Record<string, string> = {
     chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini',
     perplexity: 'Perplexity', grok: 'Grok', deepseek: 'DeepSeek',
