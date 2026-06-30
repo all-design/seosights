@@ -154,6 +154,56 @@ export function MemoryPage() {
           ))}
         </div>
       </div>
+
+      {/* Developer Mode: Raw Memory Data & API Status */}
+      {mode === 'developer' && (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 p-4"
+          >
+            <h3 className="text-sm font-medium text-zinc-300 mb-3">Developer: Memory Graph API</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Total Entries</div>
+                <div className="text-zinc-200">{displayEntries.length}</div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Data Source</div>
+                <div className={cn('font-medium', entries.length > 0 ? 'text-emerald-400' : 'text-amber-400')}>
+                  {entries.length > 0 ? 'LIVE' : 'FALLBACK'}
+                </div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Avg Confidence</div>
+                <div className="text-zinc-200">
+                  {displayEntries.length > 0
+                    ? Math.round(displayEntries.reduce((s, e) => s + e.confidence, 0) / displayEntries.length)
+                    : 0}%
+                </div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Visibility Impact</div>
+                <div className="text-emerald-400">
+                  +{displayEntries.reduce((s, e) => s + Math.max(0, e.visibilityDelta), 0)}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 p-4"
+          >
+            <h3 className="text-sm font-medium text-zinc-300 mb-3">Developer: Raw Memory Payload</h3>
+            <pre className="text-[10px] text-zinc-500 font-mono max-h-48 overflow-y-auto whitespace-pre-wrap">
+              {JSON.stringify(entries.length > 0 ? entries : displayEntries, null, 2)}
+            </pre>
+          </motion.div>
+        </>
+      )}
     </div>
   )
 }

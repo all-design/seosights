@@ -83,7 +83,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   recommendation: 'Recommendation',
 }
 
-function getModelColor(modelId: string): string {
+function getModelColor(modelId: string | null | undefined): string {
+  if (!modelId) return '#94a3b8'
   const key = modelId.toLowerCase()
   for (const [name, color] of Object.entries(MODEL_COLORS)) {
     if (key.includes(name)) return color
@@ -91,7 +92,8 @@ function getModelColor(modelId: string): string {
   return '#94a3b8'
 }
 
-function getModelDisplayName(modelId: string): string {
+function getModelDisplayName(modelId: string | null | undefined): string {
+  if (!modelId) return 'Unknown'
   const map: Record<string, string> = {
     chatgpt: 'ChatGPT',
     claude: 'Claude',
@@ -107,11 +109,13 @@ function getModelDisplayName(modelId: string): string {
   return modelId.charAt(0).toUpperCase() + modelId.slice(1)
 }
 
-function getCategoryLabel(category: string): string {
+function getCategoryLabel(category: string | null | undefined): string {
+  if (!category) return 'Unknown'
   return CATEGORY_LABELS[category.toLowerCase()] || category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-function getCategoryColor(category: string): string {
+function getCategoryColor(category: string | null | undefined): string {
+  if (!category) return '#94a3b8'
   const colors: Record<string, string> = {
     brand_query: '#10b981',
     industry_query: '#3b82f6',

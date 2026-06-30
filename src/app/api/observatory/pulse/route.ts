@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { productionGate } from '@/lib/observatory-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,9 +63,9 @@ export async function GET() {
         select: { id: true },
       }),
 
-      // Total archived responses (exclude simulated)
+      // Total archived responses (production gate filters simulated in prod)
       db.observatoryResponse.count({
-        where: { isSimulated: false },
+        where: { ...productionGate() },
       }),
 
       // Recent breaking research

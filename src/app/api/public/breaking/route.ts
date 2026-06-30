@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { productionGate } from '@/lib/observatory-gate'
 
 export const revalidate = 300 // 5 minutes cache
 

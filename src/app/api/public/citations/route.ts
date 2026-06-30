@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { productionGate } from '@/lib/observatory-gate'
 
 export const revalidate = 300 // 5 minutes cache
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category') || undefined
 
     // Build where clause
-    const responseWhere: Record<string, unknown> = {}
+    const responseWhere: Record<string, unknown> = { ...productionGate() }
     if (model) responseWhere.aiModel = model
     if (category) responseWhere.promptCategory = category
 

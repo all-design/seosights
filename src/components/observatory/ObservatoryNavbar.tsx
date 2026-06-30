@@ -6,13 +6,18 @@ import { Button } from '@/components/ui/button'
 import {
   Satellite,
   Activity,
-  BarChart3,
-  Database,
   CloudSun,
+  BarChart3,
+  Network,
+  Clock,
+  Search,
+  Database,
   FileSearch,
   Shield,
+  Quote,
   Menu,
   X,
+  TrendingUp,
 } from 'lucide-react'
 
 interface ObservatoryNavbarProps {
@@ -30,7 +35,6 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Simulated live counter
   useEffect(() => {
     const interval = setInterval(() => {
       setLiveCount((prev) => prev + Math.floor(Math.random() * 3))
@@ -39,12 +43,18 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
   }, [])
 
   const navItems = [
-    { id: 'pulse', label: 'Pulse', icon: Activity },
+    { id: 'health', label: 'Health', icon: Activity },
+    { id: 'client-zero', label: 'Client Zero', icon: TrendingUp },
+    { id: 'pulse', label: 'Pulse', icon: CloudSun },
     { id: 'weather', label: 'Weather', icon: CloudSun },
     { id: 'index', label: 'Index', icon: BarChart3 },
+    { id: 'graph', label: 'Graph', icon: Network },
+    { id: 'timeline', label: 'Timeline', icon: Clock },
+    { id: 'evidence', label: 'Evidence', icon: Search },
     { id: 'archive', label: 'Archive', icon: Database },
     { id: 'charts', label: 'Charts', icon: FileSearch },
     { id: 'methodology', label: 'Methodology', icon: Shield },
+    { id: 'citations', label: 'Citations', icon: Quote },
   ]
 
   const scrollToSection = (id: string) => {
@@ -69,7 +79,10 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <div className="flex items-center gap-3">
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
             <div className="relative">
               <Satellite className="w-6 h-6 text-emerald-400" />
               <motion.div
@@ -86,15 +99,15 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
                 LIVE
               </span>
             </div>
-          </div>
+          </button>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-0.5">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => scrollToSection(item.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-md transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-md transition-colors"
               >
                 <item.icon className="w-3.5 h-3.5" />
                 {item.label}
@@ -103,11 +116,17 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
           </div>
 
           {/* Right side */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-xs font-mono text-slate-500">
               <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
               <span>{liveCount.toLocaleString()} responses archived</span>
             </div>
+            <a
+              href="/"
+              className="text-xs text-slate-500 hover:text-emerald-400 transition-colors"
+            >
+              seosights.com
+            </a>
             <Button
               size="sm"
               className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 text-xs h-7"
@@ -119,7 +138,7 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden text-slate-400 hover:text-white"
+            className="lg:hidden text-slate-400 hover:text-white"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -133,9 +152,9 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
-          className="md:hidden bg-slate-950/95 backdrop-blur-md border-b border-white/5"
+          className="lg:hidden bg-slate-950/95 backdrop-blur-md border-b border-white/5"
         >
-          <div className="px-4 py-3 space-y-1">
+          <div className="px-4 py-3 space-y-1 max-h-[70vh] overflow-y-auto">
             {navItems.map((item) => (
               <button
                 key={item.id}

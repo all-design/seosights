@@ -89,7 +89,13 @@ export function GrowthPage() {
         }
         if (visRes.ok) {
           const json = await visRes.json()
-          setVisibilityTimeline(json.timeline || [])
+          const raw = json.timeline || []
+          // Map API format { month, aiVisibilityScore } → component format { date, score }
+          const mapped: VisibilityPoint[] = raw.map((pt: { month?: string; year?: number; monthNum?: number; aiVisibilityScore?: number; score?: number; date?: string }) => ({
+            date: pt.date || pt.month || `${pt.year}-${String((pt.monthNum ?? 0) + 1).padStart(2, '0')}`,
+            score: pt.score ?? pt.aiVisibilityScore ?? 0,
+          }))
+          setVisibilityTimeline(mapped)
         }
         if (roiRes.ok) {
           const json = await roiRes.json()

@@ -89,58 +89,63 @@ export async function GET(req: NextRequest) {
     const snapshotWhere: Record<string, unknown> = { domain }
     if (userId) snapshotWhere.userId = userId
 
-    const latestSnapshot = await safeQuery(
+    const latestSnapshotResult = await safeQuery(
       (d) => d.visibilitySnapshot.findFirst({
         where: snapshotWhere,
         orderBy: { capturedAt: 'desc' },
       }),
       null
     )
+    const latestSnapshot = latestSnapshotResult.data
 
     // ── Fetch CitationEvent counts per engine ────────────────────
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const citationEvents = await safeQuery(
+    const citationEventsResult = await safeQuery(
       (d) => d.citationEvent.findMany({
         where: citationWhere,
         orderBy: { createdAt: 'desc' },
         take: 500,
       }),
-      []
+      [] as unknown[]
     )
+    const citationEvents = citationEventsResult.data
 
     // ── Fetch recent FeedItem activity ───────────────────────────
     const feedWhere: Record<string, unknown> = { domain }
     if (userId) feedWhere.userId = userId
 
-    const recentFeedItems = await safeQuery(
+    const recentFeedItemsResult = await safeQuery(
       (d) => d.feedItem.findMany({
         where: feedWhere,
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-      []
+      [] as unknown[]
     )
+    const recentFeedItems = recentFeedItemsResult.data
 
     // ── Fetch alert counts ───────────────────────────────────────
-    const unreadAlerts = await safeQuery(
+    const unreadAlertsResult = await safeQuery(
       (d) => d.visibilityAlert.count({
         where: { domain, isRead: false },
       }),
       0
     )
+    const unreadAlerts = unreadAlertsResult.data
 
     // ── Count opportunities (pending ActionItems) ────────────────
     const opportunityWhere: Record<string, unknown> = { domain, status: 'pending' }
     if (userId) opportunityWhere.userId = userId
 
-    const opportunityCount = await safeQuery(
+    const opportunityCountResult = await safeQuery(
       (d) => d.actionItem.count({
         where: opportunityWhere,
       }),
       0
     )
+    const opportunityCount = opportunityCountResult.data
 
     // ── If no snapshot and no citation data, fall back to mock ──
     if (!latestSnapshot && citationEvents.length === 0 && recentFeedItems.length === 0) {

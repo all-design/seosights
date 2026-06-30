@@ -164,7 +164,26 @@ export function TodayPage() {
 
         if (brainRes.ok) {
           const brainJson = await brainRes.json()
-          setBrainData(brainJson)
+          // Map API response to component format
+          const missions: Mission[] = (brainJson.missions || []).slice(0, 3).map((m: { shortText?: string; text?: string; action?: string; effortMinutes?: number; effort?: string; estimatedImpact?: string; confidence?: number }) => ({
+            action: m.shortText || m.text || m.action || '',
+            timeEstimate: m.effortMinutes ? `${m.effortMinutes} min` : (m.effort || '15 min'),
+            impact: m.estimatedImpact || '+3 AI Visibility',
+            confidence: m.confidence || 80,
+          }))
+          const totalMinutes = missions.reduce((sum: number, m: Mission) => sum + (parseInt(m.timeEstimate) || 15), 0)
+          const mapped: GrowthBrainData = {
+            greeting: brainJson.greeting || getTimeGreeting(),
+            visibilityScore: brainJson.visibilityScore || brainJson.growthScore || 75,
+            visibilityDelta: brainJson.visibilityDelta || brainJson.todayGrowth || 4,
+            riskAlert: brainJson.riskAlert || null,
+            articleHighlight: brainJson.articleHighlight || null,
+            missions,
+            totalMinutes: brainJson.totalMinutes || totalMinutes,
+            expectedImpact: brainJson.expectedImpact || brainJson.expectedGain || '+6 AI Visibility',
+            pipelineEstimate: brainJson.pipelineEstimate || brainJson.pipelineValue || '+$1,200 pipeline',
+          }
+          setBrainData(mapped)
         }
 
         if (memoryRes.ok) {
@@ -174,7 +193,13 @@ export function TodayPage() {
 
         if (visRes.ok) {
           const visJson = await visRes.json()
-          setVisibilityTimeline(visJson.timeline || [])
+          const rawTimeline = visJson.timeline || []
+          // Map API format { month, aiVisibilityScore } → component format { date, score }
+          const mapped: VisibilityPoint[] = rawTimeline.map((pt: { month?: string; year?: number; monthNum?: number; aiVisibilityScore?: number; score?: number; date?: string }) => ({
+            date: pt.date || pt.month || `${pt.year}-${String((pt.monthNum ?? 0) + 1).padStart(2, '0')}`,
+            score: pt.score ?? pt.aiVisibilityScore ?? 0,
+          }))
+          setVisibilityTimeline(mapped)
         }
       } catch {
         // Use fallback data
@@ -506,6 +531,75 @@ export function TodayPage() {
           Top articles and their citation impact will appear here as your content engine runs.
         </div>
       </motion.div>
+
+      {/* Developer Mode: Raw Data & System Status */}
+      {mode === 'developer' && (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 p-4"
+          >
+            <h3 className="text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-zinc-400" />
+              Developer: Raw Growth Brain Payload
+            </h3>
+            <pre className="text-[10px] text-zinc-500 font-mono max-h-48 overflow-y-auto whitespace-pre-wrap">
+              {JSON.stringify(brainData, null, 2)}
+            </pre>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 p-4"
+          >
+            <h3 className="text-sm font-medium text-zinc-300 mb-3">Developer: System Status</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">API Source</div>
+                <div className="text-zinc-200">{brainData ? 'growth-brain' : 'fallback'}</div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Memory Entries</div>
+                <div className="text-zinc-200">{memoryEntries.length}</div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Timeline Points</div>
+                <div className="text-zinc-200">{visibilityTimeline.length}</div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Data Status</div>
+                <div className={cn('font-medium', brainData ? 'text-emerald-400' : 'text-amber-400')}>
+                  {brainData ? 'LIVE' : 'FALLBACK'}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 p-4"
+          >
+            <h3 className="text-sm font-medium text-zinc-300 mb-3">Developer: AI Router</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 text-xs font-mono">
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Task Type</div>
+                <div className="text-zinc-200">strategy</div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Provider</div>
+                <div className="text-zinc-200">zai (sandbox)</div>
+              </div>
+              <div className="p-2 rounded bg-zinc-800/50">
+                <div className="text-zinc-500">Fallback Chain</div>
+                <div className="text-zinc-200">groq → gemini → zai</div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
     </div>
   )
 }

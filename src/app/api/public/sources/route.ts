@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { productionGate } from '@/lib/observatory-gate'
 
 export const revalidate = 300 // 5 minutes cache
 
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
     // Build where clause for responses
     const responseWhere: Record<string, unknown> = {
       createdAt: { gte: startDate },
+      ...productionGate(),
     }
     if (model) {
       responseWhere.aiModel = model

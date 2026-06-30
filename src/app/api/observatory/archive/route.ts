@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { filterSimulated, productionGate } from '@/lib/observatory-gate'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,9 +26,10 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
 
     // ─── Build where clause ────────────────────────────────────────
-    // CRITICAL: Never return isSimulated=true data in public API
+    // Production gate: in prod, filter out simulated data at DB level;
+    // in dev, show everything for debugging.
     const where: Record<string, unknown> = {
-      isSimulated: false,
+      ...productionGate(),
     }
 
     if (model) where.aiModel = model
@@ -45,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ─── Fetch responses with citations ────────────────────────────
-    const [responses, total] = await Promise.all([
+    const [rawResponses, total] = await Promise.all([
       db.observatoryResponse.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -68,22 +70,25 @@ export async function GET(request: NextRequest) {
       db.observatoryResponse.count({ where }),
     ])
 
+    // ─── Apply production gate filter (defense-in-depth) ─────────────
+    const responses = filterSimulated(rawResponses)
+
     // ─── Available filters ─────────────────────────────────────────
     const [availableModels, availableCategories, dateRangeResult] = await Promise.all([
       db.observatoryResponse.findMany({
-        where: { isSimulated: false },
+        where: { ...productionGate() },
         select: { aiModel: true },
         distinct: ['aiModel'],
         orderBy: { aiModel: 'asc' },
       }),
       db.observatoryResponse.findMany({
-        where: { isSimulated: false },
+        where: { ...productionGate() },
         select: { promptCategory: true },
         distinct: ['promptCategory'],
         orderBy: { promptCategory: 'asc' },
       }),
       db.observatoryResponse.aggregate({
-        where: { isSimulated: false },
+        where: { ...productionGate() },
         _min: { createdAt: true },
         _max: { createdAt: true },
       }),

@@ -1159,12 +1159,23 @@ model ObservatoryReport {
   isBreaking      Boolean  @default(false) // Whether this is Breaking Research 🚨
   breakingAlertId String?  // Link to BreakingResearch
   methodologyJson String?  // CRITICAL: Methodology transparency — queries, models, period, significance criteria
+  methodologyVersion String?  // e.g., "v1.4" — versioned methodology for reproducibility tracking
+  promptSet       String?  // e.g., "2026-07" — which prompt set was used
+  modelsStudied   String?  // JSON array: ["Claude 4", "Gemini", "GPT-5"] — exact models tested
+  studyPeriod     String?  // e.g., "30 days" — the time period covered
+  significanceCriteria String? // Criteria used to determine significance of findings
+  doi             String?  // Observatory DOI: OBS-2026-0042 — citable research identifier
+  confidenceDistribution String? // JSON: {"90plus": 42, "80plus": 18, "70plus": 5, "60plus": 2, "below60": 1}
+  permanentUrl    String?  // Permanent URL: /research/2026/07/chatgpt-github-citations — never changes
+  citedByCount    Int      @default(0) // Number of external citations of this research
+  citedBySources  String?  // JSON: ["HubSpot", "Search Engine Land", "Ahrefs"] — who cited this
   isSimulated     Boolean  @default(false) // CRITICAL: true = seed/dev data, NEVER publish publicly
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   publications    ObservatoryPublication[]
   learning        ObservatoryLearning[]
+  externalCitations ObservatoryExternalCitation[]
 
   @@index([slug])
   @@index([type])
@@ -1173,6 +1184,8 @@ model ObservatoryReport {
   @@index([publishedAt])
   @@index([isBreaking])
   @@index([isSimulated])
+  @@index([doi])
+  @@index([methodologyVersion])
   @@index([createdAt])
 }
 
@@ -1720,4 +1733,208 @@ model EngagementActivitySummary {
   @@unique([domain, summaryDate])
   @@index([domain])
   @@index([summaryDate])
+}
+
+// ─── AI Search Graph™ ─────────────────────────────────────────
+
+// Global citation graph — maps how AI models chain through sources
+// Example: ChatGPT → Wikipedia → Health → CDC → Mayo Clinic
+model AISearchGraphEdge {
+  id              String   @id @default(cuid())
+  sourceNode      String   // e.g., "ChatGPT", "Wikipedia", "CDC"
+  sourceType      String   // ai_model | source | industry | entity
+  targetNode      String   // e.g., "Wikipedia", "Health", "Mayo Clinic"
+  targetType      String   // ai_model | source | industry | entity
+  relation        String   // cites | references | recommends | belongs_to | influences
+  aiModel         String?  // Which AI model produces this edge (if applicable)
+  weight          Float    @default(1)  // Edge weight (citation frequency, strength)
+  period          String   // "2026-07" — when this edge was observed
+  citationCount   Int      @default(0)  // How many times this citation path was observed
+  isSimulated     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@unique([sourceNode, targetNode, relation, period])
+  @@index([sourceNode])
+  @@index([targetNode])
+  @@index([relation])
+  @@index([aiModel])
+  @@index([period])
+  @@index([weight])
+  @@index([isSimulated])
+}
+
+// ─── AI Search Timeline™ ──────────────────────────────────────
+
+// Internet-wide AI search history — not for a company, for the internet
+// Example: "January — Claude stopped using Reddit"
+model ObservatoryTimeline {
+  id              String   @id @default(cuid())
+  date            DateTime // When this event occurred
+  event           String   // Short description: "Claude stopped using Reddit"
+  aiModel         String?  // Which AI model (if applicable)
+  category        String   // citation_shift | source_shift | behavior_change | new_capability | industry_impact | policy_change
+  significance    Float    @default(0)  // 0-1 how significant
+  description     String?  // Longer description
+  evidenceUrl     String?  // Link to supporting evidence/report
+  relatedReportId String?  // Link to ObservatoryReport
+  isSimulated     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([date])
+  @@index([aiModel])
+  @@index([category])
+  @@index([significance])
+  @@index([isSimulated])
+}
+
+// ─── Observatory Citations™ ───────────────────────────────────
+
+// External citations of Observatory research — the ultimate KPI
+// "Cited by HubSpot, Search Engine Land, Ahrefs"
+model ObservatoryExternalCitation {
+  id              String   @id @default(cuid())
+  reportId        String   // Which report was cited
+  sourceName      String   // "HubSpot", "Search Engine Land", "Ahrefs"
+  sourceUrl       String?  // URL of the citing article
+  sourceType      String   // blog | news | research | social_media | book | report
+  citedAt         DateTime // When it was cited
+  context         String?  // The surrounding text/context of the citation
+  verified        Boolean  @default(false) // Whether we verified this citation
+  createdAt       DateTime @default(now())
+
+  report          ObservatoryReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([sourceName])
+  @@index([sourceType])
+  @@index([citedAt])
+  @@index([verified])
+}
+
+// ─── Public Company Profiles ──────────────────────────────────
+
+// /company/openai, /company/notion — SEO engine generating quality pages
+// ONLY populated with real data, never estimates or simulations
+model CompanyProfile {
+  id                String   @id @default(cuid())
+  slug              String   @unique  // openai | notion | hubspot
+  name              String   // Display name
+  domain            String   // openai.com | notion.so | hubspot.com
+  description       String?
+  logoUrl           String?
+  websiteUrl        String?
+  industry          String?  // Technology | Healthcare | Finance | etc.
+
+  // AI Visibility Score™ — the industry standard
+  aiVisibilityScore Float    @default(0)  // 0-100
+  previousScore     Float    @default(0)  // Previous period for delta
+  scoreTrend        String   @default("stable") // rising | falling | stable
+
+  // Score breakdown
+  trustScore        Float    @default(0)  // 0-100
+  freshnessScore    Float    @default(0)  // 0-100
+  authorityScore    Float    @default(0)  // 0-100
+  citationScore     Float    @default(0)  // 0-100
+
+  // Data points
+  totalCitations    Int      @default(0)  // Total citations across all AI models
+  citationTrend     String   @default("[]") // JSON: [{period, count}] last 6 periods
+  topModelsJson     String   @default("[]") // JSON: [{model, citations}]
+  topSourcesJson    String   @default("[]") // JSON: [{source, count}] — which sources cite this company
+  entitiesJson      String   @default("[]") // JSON: [{entity, count}] — named entities associated
+  graphJson         String   @default("[]") // JSON: [{source, target, relation}] — citation graph
+
+  // Verification
+  isVerified        Boolean  @default(false) // Has SeoSights verified this profile
+  verifiedAt        DateTime?
+  dataPoints        Int      @default(0)  // Number of real data points supporting scores
+  lastUpdated       DateTime?
+
+  // CRITICAL: Only real data
+  isSimulated       Boolean  @default(false) // NEVER publish simulated company profiles
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([slug])
+  @@index([domain])
+  @@index([industry])
+  @@index([aiVisibilityScore])
+  @@index([scoreTrend])
+  @@index([isVerified])
+  @@index([isSimulated])
+  @@index([lastUpdated])
+}
+
+// ─── AI Visibility Score™ Badge ───────────────────────────────
+
+// Embeddable badge: "AI Visibility Score 82 — Verified by SeoSights"
+model AIVisibilityBadge {
+  id                String   @id @default(cuid())
+  domain            String   // The domain this badge is for
+  score             Float    @default(0)  // 0-100
+  previousScore     Float    @default(0)
+  trend             String   @default("stable") // rising | falling | stable
+  isVerified        Boolean  @default(false)
+  verifiedAt        DateTime?
+  embedCount        Int      @default(0)  // How many times this badge was embedded
+  lastCalculated    DateTime @default(now())
+  isSimulated       Boolean  @default(false) // true = seed/dev data, NEVER serve in production
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([domain])
+  @@index([domain])
+  @@index([score])
+  @@index([isVerified])
+  @@index([isSimulated])
+}
+
+// ─── Observatory Health Metrics ───────────────────────────────
+
+// Daily health snapshot — "What I'd check every day"
+model ObservatoryHealthMetric {
+  id                String   @id @default(cuid())
+  date              DateTime @unique  // The date these metrics apply to
+  promptsCollected  Int      @default(0)  // Total prompts collected today
+  uniqueDomains     Int      @default(0)  // Unique domains cited
+  citationChanges   Int      @default(0)  // Citation changes detected
+  newEntities       Int      @default(0)  // New entities discovered
+  newReports        Int      @default(0)  // New reports published
+  activeModels      Int      @default(0)  // Models crawled today
+  totalArchiveSize  Int      @default(0)  // Total responses in archive
+  externalCitations Int      @default(0)  // External citations this month
+  isSimulated       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([date])
+  @@index([isSimulated])
+}
+
+// ─── Client Zero KPI Pipeline ─────────────────────────────────
+
+// Articles → Citations → Recommendations → Pipeline → Revenue
+// One line. One idea.
+model ClientZeroKPI {
+  id                String   @id @default(cuid())
+  date              DateTime // The date this KPI applies to
+  domain            String   // The domain being tracked
+
+  // Pipeline stages
+  articlesCreated   Int      @default(0)  // Content Engine articles created
+  citationsGained   Int      @default(0)  // New citations from AI models
+  recommendationsGained Int  @default(0)  // Times AI models recommend this domain
+  pipelineValue     Float    @default(0)  // Estimated pipeline value from AI visibility
+  revenueAttributed Float    @default(0)  // Revenue attributed to AI visibility
+
+  // AI Visibility Score for this domain
+  aiVisibilityScore Float    @default(0)
+
+  isSimulated       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@unique([date, domain])
+  @@index([date])
+  @@index([domain])
+  @@index([isSimulated])
 }

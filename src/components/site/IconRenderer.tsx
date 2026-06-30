@@ -11,6 +11,8 @@ import {
   Link2,
   Quote,
   TrendingUp,
+  TrendingDown,
+  Minus,
   Gauge,
   Target,
   BarChart3,
@@ -21,6 +23,31 @@ import {
   Calculator,
   BookOpen,
   Brain,
+  Stethoscope,
+  Scale,
+  Monitor,
+  Building2,
+  ShoppingBag,
+  Heart,
+  GraduationCap,
+  Home,
+  Shield,
+  Plane,
+  UtensilsCrossed,
+  HardHat,
+  Megaphone,
+  Dumbbell,
+  Car,
+  PawPrint,
+  Compass,
+  Wrench,
+  SprayCan,
+  ArrowRight,
+  ArrowUpRight,
+  Filter,
+  ChevronRight,
+  Activity,
+  Zap,
   type LucideProps,
 } from 'lucide-react'
 
@@ -78,6 +105,60 @@ export default function IconRenderer({ name, ...props }: { name: string } & Luci
       return <BookOpen {...props} />
     case 'Brain':
       return <Brain {...props} />
+    case 'Stethoscope':
+      return <Stethoscope {...props} />
+    case 'Scale':
+      return <Scale {...props} />
+    case 'Monitor':
+      return <Monitor {...props} />
+    case 'Building2':
+      return <Building2 {...props} />
+    case 'ShoppingBag':
+      return <ShoppingBag {...props} />
+    case 'Heart':
+      return <Heart {...props} />
+    case 'GraduationCap':
+      return <GraduationCap {...props} />
+    case 'Home':
+      return <Home {...props} />
+    case 'Shield':
+      return <Shield {...props} />
+    case 'Plane':
+      return <Plane {...props} />
+    case 'UtensilsCrossed':
+      return <UtensilsCrossed {...props} />
+    case 'HardHat':
+      return <HardHat {...props} />
+    case 'Megaphone':
+      return <Megaphone {...props} />
+    case 'Dumbbell':
+      return <Dumbbell {...props} />
+    case 'Car':
+      return <Car {...props} />
+    case 'PawPrint':
+      return <PawPrint {...props} />
+    case 'Compass':
+      return <Compass {...props} />
+    case 'Wrench':
+      return <Wrench {...props} />
+    case 'SprayCan':
+      return <SprayCan {...props} />
+    case 'TrendingDown':
+      return <TrendingDown {...props} />
+    case 'Minus':
+      return <Minus {...props} />
+    case 'ArrowRight':
+      return <ArrowRight {...props} />
+    case 'ArrowUpRight':
+      return <ArrowUpRight {...props} />
+    case 'Filter':
+      return <Filter {...props} />
+    case 'ChevronRight':
+      return <ChevronRight {...props} />
+    case 'Activity':
+      return <Activity {...props} />
+    case 'Zap':
+      return <Zap {...props} />
     default:
       return <Sparkles {...props} />
   }

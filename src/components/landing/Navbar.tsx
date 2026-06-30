@@ -6,13 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Menu, X } from 'lucide-react'
 
+// ── Navigation Links (simplified to 4) ────────────────────────
 const navLinks = [
-  { label: 'Features', href: '/#features', external: true },
-  { label: 'Free Tools', href: '/free-ai-seo-tools', external: true },
-  { label: 'Pricing', href: '/pricing', external: true },
-  { label: 'Blog', href: '/blog', external: true },
-  { label: 'Affiliates', href: '/affiliates', external: true },
-  { label: 'How It Works', href: '/#how-it-works', external: true },
+  { label: 'How It Works', href: '#understand', isScroll: true },
+  { label: 'Pricing', href: '#pricing', isScroll: true },
+  { label: 'Observatory', href: '/observatory', isScroll: false },
+  { label: 'AI Visibility OS', href: '/os', isScroll: false },
 ]
 
 export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
@@ -34,6 +33,13 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
       el.scrollIntoView({ behavior: 'smooth' })
       setIsMobileMenuOpen(false)
     }
+  }
+
+  const handleNavClick = (link: typeof navLinks[number]) => {
+    if (link.isScroll) {
+      scrollToSection(link.href)
+    }
+    setIsMobileMenuOpen(false)
   }
 
   const handleLogoClick = () => {
@@ -59,39 +65,23 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Text-only Logo */}
+            {/* Logo */}
             <div
               className="flex flex-col items-start cursor-pointer select-none"
               onClick={handleLogoClick}
             >
-              <span className="font-bold text-xl tracking-tight leading-none bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400 bg-clip-text text-transparent">
+              <span className="font-bold text-xl tracking-tight leading-none bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
                 seosights
               </span>
-              <span className="text-[8px] tracking-[0.2em] text-purple-400/60 uppercase leading-none mt-0.5">
+              <span className="text-[8px] tracking-[0.2em] text-emerald-400/60 uppercase leading-none mt-0.5">
                 AI Visibility Intelligence
-              </span>
-            </div>
-
-            {/* Powered by AI Router™ badge */}
-            <div className="hidden md:flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-semibold text-emerald-400 tracking-wide uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Powered by AI Router™
               </span>
             </div>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map((link) =>
-                link.external ? (
-                  <Link
-                    key={link.label}
-                    href={link.href}
-                    className="px-4 py-2.5 min-h-[44px] inline-flex items-center text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
-                  >
-                    {link.label}
-                  </Link>
-                ) : (
+                link.isScroll ? (
                   <button
                     key={link.label}
                     onClick={() => scrollToSection(link.href)}
@@ -99,6 +89,14 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                   >
                     {link.label}
                   </button>
+                ) : (
+                  <Link
+                    key={link.label}
+                    href={link.href}
+                    className="px-4 py-2.5 min-h-[44px] inline-flex items-center text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                  >
+                    {link.label}
+                  </Link>
                 )
               )}
             </div>
@@ -107,7 +105,7 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
             <div className="hidden md:flex items-center gap-3">
               <Button
                 size="sm"
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold shadow-[0_0_20px_rgba(139,92,246,0.2)] hover:shadow-[0_0_30px_rgba(139,92,246,0.4)] transition-all duration-300"
+                className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300"
                 onClick={onStartFree}
               >
                 Analyze Site
@@ -153,7 +151,15 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
             >
               <div className="px-4 py-4 space-y-1">
                 {navLinks.map((link) =>
-                  link.external ? (
+                  link.isScroll ? (
+                    <button
+                      key={link.label}
+                      onClick={() => scrollToSection(link.href)}
+                      className="block w-full text-left px-4 py-3.5 min-h-[48px] text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
+                    >
+                      {link.label}
+                    </button>
+                  ) : (
                     <Link
                       key={link.label}
                       href={link.href}
@@ -162,20 +168,15 @@ export default function Navbar({ onStartFree }: { onStartFree?: () => void }) {
                     >
                       {link.label}
                     </Link>
-                  ) : (
-                    <button
-                      key={link.label}
-                      onClick={() => scrollToSection(link.href)}
-                      className="block w-full text-left px-4 py-3.5 min-h-[48px] text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-all duration-200"
-                    >
-                      {link.label}
-                    </button>
                   )
                 )}
                 <div className="pt-2">
                   <Button
-                    onClick={onStartFree}
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      onStartFree?.()
+                    }}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold"
                   >
                     Analyze Site
                   </Button>
