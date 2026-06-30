@@ -2,46 +2,65 @@
 
 import {
   Brain, TrendingUp, Shield, CalendarClock, Package, Target, Search,
-  Activity, CheckCircle2, AlertTriangle, Clock, ArrowUpRight, Zap,
-  BarChart3, Eye,
+  Activity, CheckCircle2, Clock, ArrowRight, Zap,
+  BarChart3, Eye, Factory, Landmark, Code2, GitMerge, Rocket,
+  RotateCcw, GraduationCap, Bug, Lock, Gauge,
 } from 'lucide-react'
 
 interface SystemStatus {
   name: string
-  status: 'running' | 'healthy' | 'collecting' | 'idle' | 'warning'
+  status: 'running' | 'healthy' | 'collecting' | 'idle' | 'warning' | 'monitoring' | 'learning'
   health: number
   icon: React.ElementType
   description: string
   lastAction: string
   color: string
+  href: string
 }
 
 const systems: SystemStatus[] = [
-  { name: 'Growth Engine', status: 'running', health: 98, icon: TrendingUp, description: 'Content generation & publishing', lastAction: 'Published 3 articles — 2m ago', color: 'emerald' },
-  { name: 'QA Engine', status: 'running', health: 95, icon: Shield, description: 'Quality & stability checks', lastAction: 'All checks passed — 8m ago', color: 'blue' },
-  { name: 'Client Zero', status: 'running', health: 92, icon: Target, description: 'First-user validation', lastAction: 'New visibility score: 73 → 78 — 1h ago', color: 'purple' },
-  { name: 'Observatory', status: 'collecting', health: 88, icon: Search, description: 'AI model research & monitoring', lastAction: 'Crawled 4 models — 15m ago', color: 'amber' },
-  { name: 'Scheduler', status: 'healthy', health: 100, icon: CalendarClock, description: 'Mission orchestration', lastAction: 'Next: Growth Engine at 07:00', color: 'cyan' },
-  { name: 'Product Engine', status: 'idle', health: 85, icon: Package, description: 'Product analysis & recommendations', lastAction: 'Review generated — 6h ago', color: 'rose' },
+  { name: 'Observatory', status: 'collecting', health: 88, icon: Search, description: 'AI model research & monitoring', lastAction: 'Crawled 4 models — 15m ago', color: 'amber', href: '/control/observatory' },
+  { name: 'Product Engine', status: 'running', health: 91, icon: Package, description: 'Product analysis & recommendations', lastAction: 'Review generated — 2h ago', color: 'rose', href: '/control/product' },
+  { name: 'Architecture Engine', status: 'running', health: 87, icon: Landmark, description: 'Staff Engineer — where code goes', lastAction: 'Blocked feature creep — 1h ago', color: 'cyan', href: '/control/architecture' },
+  { name: 'Engineering Engine', status: 'running', health: 94, icon: Code2, description: 'Writes code on branches only', lastAction: 'PR #47 created — 30m ago', color: 'violet', href: '/control/engineering' },
+  { name: 'QA Engine', status: 'running', health: 95, icon: Shield, description: 'Quality & stability checks', lastAction: 'All checks passed — 8m ago', color: 'blue', href: '/control/qa' },
+  { name: 'Review Engine', status: 'healthy', health: 91, icon: Eye, description: 'Design system & philosophy checks', lastAction: 'Brand review passed — 20m ago', color: 'amber', href: '/control/review' },
+  { name: 'Security Engine', status: 'monitoring', health: 96, icon: Lock, description: 'Vulnerability & dependency scanning', lastAction: '0 vulnerabilities — 12m ago', color: 'red', href: '/control/security' },
+  { name: 'Performance Engine', status: 'monitoring', health: 94, icon: Gauge, description: 'Core Web Vitals & budgets', lastAction: 'LCP 1.2s — all good — 5m ago', color: 'orange', href: '/control/performance' },
+  { name: 'Merge Engine', status: 'healthy', health: 100, icon: GitMerge, description: 'PR creation & gate enforcement', lastAction: 'PR #46 approved — 2h ago', color: 'emerald', href: '/control/merge' },
+  { name: 'Deploy Engine', status: 'idle', health: 98, icon: Rocket, description: 'Production deployment', lastAction: 'v2.4.12 deployed — 6h ago', color: 'cyan', href: '/control/deploy' },
+  { name: 'Replay Engine', status: 'monitoring', health: 92, icon: RotateCcw, description: 'Post-deploy metric tracking', lastAction: 'Conversion 82→84% ↑ — 1h ago', color: 'amber', href: '/control/replay' },
+  { name: 'Learning Engine', status: 'learning', health: 81, icon: GraduationCap, description: 'Pattern learning & confidence', lastAction: 'New pattern: FAQ → +15% citations — 3h ago', color: 'emerald', href: '/control/learning' },
 ]
 
-const scheduleItems = [
-  { time: '06:00', system: 'QA', icon: Shield, status: 'completed', description: 'Full platform scan' },
-  { time: '07:00', system: 'Growth', icon: TrendingUp, status: 'running', description: 'Content generation batch' },
-  { time: '08:00', system: 'Client Zero', icon: Target, status: 'pending', description: 'Visibility measurement' },
-  { time: '09:00', system: 'Publish', icon: Zap, status: 'pending', description: 'Approved content publishing' },
-  { time: '23:00', system: 'Learning', icon: Brain, status: 'pending', description: 'Model retraining & updates' },
+const pipelineStages = [
+  { name: 'Observatory', icon: Search, color: 'amber', desc: 'Gather intelligence' },
+  { name: 'Product Engine', icon: Package, color: 'rose', desc: 'Decide what to build' },
+  { name: 'Architecture', icon: Landmark, color: 'cyan', desc: 'Plan where it goes' },
+  { name: 'Engineering', icon: Code2, color: 'violet', desc: 'Write code on branch' },
+  { name: 'QA', icon: Shield, color: 'blue', desc: 'Run all tests' },
+  { name: 'Review', icon: Eye, color: 'amber', desc: 'Design & philosophy' },
+  { name: 'Security', icon: Lock, color: 'red', desc: 'Vulnerability scan' },
+  { name: 'Performance', icon: Gauge, color: 'orange', desc: 'Budget check' },
+  { name: 'Human', icon: Target, color: 'emerald', desc: '🧑 Approval gate' },
+  { name: 'Deploy', icon: Rocket, color: 'cyan', desc: 'Ship to production' },
+  { name: 'Replay', icon: RotateCcw, color: 'amber', desc: 'Measure impact' },
+  { name: 'Learning', icon: GraduationCap, color: 'emerald', desc: 'Get smarter' },
 ]
 
 const recentEvents = [
-  { time: '2m ago', text: 'Growth Engine published 3 articles for seosights.com', type: 'success' },
-  { time: '8m ago', text: 'QA Engine: All 47 checks passed', type: 'success' },
-  { time: '15m ago', text: 'Observatory crawled ChatGPT, Claude, Gemini, Perplexity', type: 'info' },
-  { time: '1h ago', text: 'Client Zero AI Visibility: 73 → 78 (+5)', type: 'success' },
-  { time: '2h ago', text: 'Product Engine: Onboarding funnel analysis complete', type: 'info' },
-  { time: '3h ago', text: 'Growth Engine: FAQ schema auto-generated for 4 pages', type: 'success' },
-  { time: '4h ago', text: 'QA Engine: 2 accessibility warnings detected on /pricing', type: 'warning' },
-  { time: '6h ago', text: 'Product Engine: Executive Product Review generated', type: 'info' },
+  { time: '2m ago', text: 'Engineering Engine: Created branch feature/ai-advisor-widget', type: 'success' },
+  { time: '8m ago', text: 'QA Engine: All 47 checks passed for PR #47', type: 'success' },
+  { time: '15m ago', text: 'Architecture Engine: Blocked new dashboard — expand Mission Control instead', type: 'info' },
+  { time: '20m ago', text: 'Review Engine: Brand philosophy check passed for FloatingAdvisor', type: 'success' },
+  { time: '1h ago', text: 'Security Engine: 0 vulnerabilities found in dependency scan', type: 'success' },
+  { time: '1h ago', text: 'Replay Engine: Conversion 82% → 84% after PR #46 deploy', type: 'success' },
+  { time: '2h ago', text: 'Product Engine: Suggested AI Advisor on Hero section', type: 'info' },
+  { time: '2h ago', text: 'Merge Engine: PR #46 approved by admin@seosights.io', type: 'success' },
+  { time: '3h ago', text: 'Performance Engine: Bundle 847KB / 1MB budget (84%)', type: 'info' },
+  { time: '4h ago', text: 'Learning Engine: FAQ schema → +15% AI citation rate (94% confidence)', type: 'success' },
+  { time: '6h ago', text: 'Deploy Engine: v2.4.12 deployed to production', type: 'success' },
+  { time: '8h ago', text: 'Tech Debt Engine: Found 3 duplicated components — added to backlog', type: 'warning' },
 ]
 
 export default function ControlOverview() {
@@ -52,6 +71,8 @@ export default function ControlOverview() {
       case 'running': return 'text-emerald-400'
       case 'healthy': return 'text-emerald-400'
       case 'collecting': return 'text-amber-400'
+      case 'monitoring': return 'text-cyan-400'
+      case 'learning': return 'text-emerald-400'
       case 'idle': return 'text-slate-400'
       case 'warning': return 'text-red-400'
       default: return 'text-slate-400'
@@ -74,8 +95,8 @@ export default function ControlOverview() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-white">AI Operations Center™</h1>
-        <p className="text-slate-400 text-sm mt-1">All autonomous systems. One view.</p>
+        <h1 className="text-2xl font-bold text-white">AI Software Factory™</h1>
+        <p className="text-slate-400 text-sm mt-1">Autonomous development pipeline. Human-approved deploys.</p>
       </div>
 
       {/* Overall Health Banner */}
@@ -85,13 +106,17 @@ export default function ControlOverview() {
             <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Platform Health</div>
             <div className="flex items-baseline gap-3">
               <span className="text-5xl font-bold text-emerald-400">{overallHealth}%</span>
-              <span className="text-sm text-emerald-400/60">All systems operational</span>
+              <span className="text-sm text-emerald-400/60">All 12 systems operational</span>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">{systems.filter(s => s.status === 'running').length}</div>
+              <div className="text-2xl font-bold text-emerald-400">{systems.filter(s => s.status === 'running').length}</div>
               <div className="text-[10px] text-slate-500 uppercase">Running</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-cyan-400">{systems.filter(s => s.status === 'monitoring').length}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Monitoring</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-amber-400">{systems.filter(s => s.status === 'collecting').length}</div>
@@ -105,14 +130,46 @@ export default function ControlOverview() {
         </div>
       </div>
 
+      {/* The Complete Pipeline */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <Factory className="w-4 h-4 text-emerald-400" />
+          AI Software Factory™ — The Complete Pipeline
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+          {pipelineStages.map((stage, i) => {
+            const Icon = stage.icon
+            return (
+              <div key={stage.name} className="relative">
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center hover:border-slate-600 transition-colors">
+                  <div className={`w-7 h-7 rounded-lg bg-${stage.color}-500/10 flex items-center justify-center mx-auto mb-1.5`}>
+                    <Icon className={`w-3.5 h-3.5 text-${stage.color}-400`} />
+                  </div>
+                  <div className="text-[11px] font-semibold text-white">{stage.name}</div>
+                  <div className="text-[9px] text-slate-500 mt-0.5">{stage.desc}</div>
+                </div>
+                {i < pipelineStages.length - 1 && (
+                  <ArrowRight className="w-3 h-3 text-slate-600 absolute -right-1.5 top-1/2 -translate-y-1/2 hidden lg:block" />
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-slate-500">
+          <Target className="w-3 h-3 text-emerald-400" />
+          <span>Human Approval is the only gate that can push to production</span>
+        </div>
+      </div>
+
       {/* System Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {systems.map((system) => {
           const Icon = system.icon
           return (
-            <div
+            <a
               key={system.name}
-              className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors"
+              href={system.href}
+              className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors block"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -130,7 +187,6 @@ export default function ControlOverview() {
                   {system.health}%
                 </div>
               </div>
-              {/* Health bar */}
               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-3">
                 <div
                   className={`h-full rounded-full ${healthBarColor(system.health)} transition-all duration-1000`}
@@ -142,44 +198,37 @@ export default function ControlOverview() {
                 <Clock className="w-3 h-3" />
                 {system.lastAction}
               </div>
-            </div>
+            </a>
           )
         })}
       </div>
 
       {/* Bottom row: Schedule + Events */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Today's Schedule */}
+        {/* Factory Principles */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <CalendarClock className="w-4 h-4 text-cyan-400" />
-            Today&apos;s Schedule
+            <Shield className="w-4 h-4 text-emerald-400" />
+            Factory Principles
           </h2>
           <div className="space-y-3">
-            {scheduleItems.map((item, i) => {
+            {[
+              { principle: 'No AI writes to main', detail: 'All code goes through branches → PRs → human approval', icon: GitMerge },
+              { principle: 'Multiple quality gates', detail: 'QA + Review + Security + Performance must ALL pass', icon: CheckCircle2 },
+              { principle: 'Architecture prevents feature creep', detail: 'Reuse existing components before creating new ones', icon: Landmark },
+              { principle: 'Review checks philosophy, not syntax', detail: 'Does this look like SeoSights? Is our voice right?', icon: Eye },
+              { principle: 'Measure after every deploy', detail: 'If metrics get worse → automatic rollback', icon: RotateCcw },
+              { principle: 'Learn from every suggestion', detail: 'Suggestion → Code → Result → Confidence builds over time', icon: GraduationCap },
+            ].map((item, i) => {
               const Icon = item.icon
               return (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="text-xs font-mono text-slate-500 w-12 flex-shrink-0">{item.time}</div>
-                  <div className={`
-                    w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
-                    ${item.status === 'completed' ? 'bg-emerald-500/10' : ''}
-                    ${item.status === 'running' ? 'bg-cyan-500/10 animate-pulse' : ''}
-                    ${item.status === 'pending' ? 'bg-slate-800' : ''}
-                  `}>
-                    <Icon className={`w-4 h-4 ${
-                      item.status === 'completed' ? 'text-emerald-400' :
-                      item.status === 'running' ? 'text-cyan-400' :
-                      'text-slate-500'
-                    }`} />
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-4 h-4 text-emerald-400" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-white">{item.system}</span>
-                      {item.status === 'completed' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
-                      {item.status === 'running' && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />}
-                    </div>
-                    <div className="text-[11px] text-slate-500">{item.description}</div>
+                  <div>
+                    <div className="text-xs font-medium text-white">{item.principle}</div>
+                    <div className="text-[11px] text-slate-500">{item.detail}</div>
                   </div>
                 </div>
               )
@@ -199,7 +248,7 @@ export default function ControlOverview() {
                 <div className={`
                   w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0
                   ${event.type === 'success' ? 'bg-emerald-400' : ''}
-                  ${event.type === 'info' ? 'bg-blue-400' : ''}
+                  ${event.type === 'info' ? 'bg-cyan-400' : ''}
                   ${event.type === 'warning' ? 'bg-amber-400' : ''}
                 `} />
                 <div className="flex-1 min-w-0">
@@ -209,39 +258,6 @@ export default function ControlOverview() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Five Autonomous Systems Summary */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <Brain className="w-4 h-4 text-purple-400" />
-          Five Autonomous Systems — The Complete Loop
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-          {[
-            { name: 'Observatory', desc: 'Gather & understand external changes', icon: Search, color: 'amber' },
-            { name: 'Growth Engine', desc: 'Improve platform & content', icon: TrendingUp, color: 'emerald' },
-            { name: 'QA Engine', desc: 'Verify quality & stability', icon: Shield, color: 'blue' },
-            { name: 'Client Zero', desc: 'Validate on real example', icon: Target, color: 'purple' },
-            { name: 'Product Engine', desc: 'Evaluate product direction', icon: Package, color: 'rose' },
-          ].map((sys, i) => {
-            const Icon = sys.icon
-            return (
-              <div key={sys.name} className="relative">
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-                  <div className={`w-8 h-8 rounded-lg bg-${sys.color}-500/10 flex items-center justify-center mx-auto mb-2`}>
-                    <Icon className={`w-4 h-4 text-${sys.color}-400`} />
-                  </div>
-                  <div className="text-xs font-semibold text-white">{sys.name}</div>
-                  <div className="text-[10px] text-slate-500 mt-1">{sys.desc}</div>
-                </div>
-                {i < 4 && (
-                  <ArrowUpRight className="w-4 h-4 text-slate-600 absolute -right-2.5 top-1/2 -translate-y-1/2 hidden sm:block rotate-45" />
-                )}
-              </div>
-            )
-          })}
         </div>
       </div>
     </div>

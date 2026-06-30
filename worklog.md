@@ -281,3 +281,34 @@ Stage Summary:
 - Unauthenticated access to /control/* redirects to /control/login?from=/control/...
 - Sidebar shows user info + logout button
 - All API endpoints verified working (200 responses)
+
+---
+Task ID: 23
+Agent: Main Agent + 5 Subagents
+Task: Add AI Software Factory™ — 8 new autonomous engines + pipeline architecture
+
+Work Log:
+- Updated /control layout sidebar with new nav groups: Intelligence, AI Software Factory™, Pipeline, Operations, Admin
+- Changed header branding to "AI Software Factory™" with Factory icon
+- Added 8 new engine pages via parallel subagents:
+  1. Architecture Engine™ (/control/architecture) — Staff Engineer, decides where code goes, prevents feature creep
+  2. Engineering Engine™ (/control/engineering) — Writes code on branches, NEVER on main, pipeline visualization
+  3. Review Engine™ (/control/review) — Design system compliance + philosophy checks (not syntax)
+  4. Security Engine™ (/control/security) — Vulnerability scanning, dependency audit, API security
+  5. Performance Engine™ (/control/performance) — Core Web Vitals, bundle analysis, performance budgets
+  6. Merge Engine™ (/control/merge) — 3-gate system (QA+Review+Architecture), opens PRs only, never auto-merges
+  7. Deploy Engine™ (/control/deploy) — Deploys only after human approval, rollback capability
+  8. Replay Engine™ (/control/replay) — Post-deploy metric monitoring, auto-rollback if metrics worse
+  9. Learning Engine™ (/control/learning) — Suggestion→Code→Result→Confidence chains, pattern learning
+  10. Tech Debt Engine™ (/control/tech-debt) — Nightly analysis: duplicates, dead APIs, unused models, circular imports
+- Updated /control overview page with new 12-stage pipeline visualization and Factory Principles section
+- All 21 control pages verified returning 200
+- Lint passes clean (only pre-existing warning)
+
+Stage Summary:
+- Complete AI Software Factory™ pipeline: Observatory → Product → Architecture → Engineering → QA → Review → Security → Performance → Human Approval → Deploy → Replay → Learning
+- 8 new engines added (Architecture, Engineering, Review, Security, Performance, Merge, Deploy, Replay, Learning, Tech Debt)
+- Total: 21 control pages + login page
+- Key principle: No AI writes to main — all code goes through branches → PRs → human approval
+- Architecture Reviewer™ prevents feature creep (suggests reusing existing components)
+- Dev server OOM is sandbox-only issue; production (Vercel) works fine

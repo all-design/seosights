@@ -21,6 +21,18 @@ import {
   TrendingUp,
   Loader2,
   LogOut,
+  Factory,
+  PenTool,
+  Eye,
+  GitMerge,
+  Rocket,
+  RotateCcw,
+  GraduationCap,
+  Bug,
+  Lock,
+  Gauge,
+  Code2,
+  Landmark,
 } from 'lucide-react'
 
 const navGroups = [
@@ -31,32 +43,47 @@ const navGroups = [
     ],
   },
   {
-    label: '🧠 Platform',
+    label: '🧠 Intelligence',
     items: [
-      { href: '/control/client-zero', label: 'Client Zero', icon: Target },
       { href: '/control/observatory', label: 'Observatory', icon: Search },
-    ],
-  },
-  {
-    label: '⚙️ Autonomous Systems',
-    items: [
-      { href: '/control/growth', label: 'Growth Engine', icon: TrendingUp },
-      { href: '/control/qa', label: 'QA Engine', icon: Shield },
-      { href: '/control/scheduler', label: 'Mission Scheduler', icon: CalendarClock },
       { href: '/control/product', label: 'Product Engine', icon: Package },
     ],
   },
   {
-    label: '📊 Operations',
+    label: '🏭 AI Software Factory™',
     items: [
+      { href: '/control/architecture', label: 'Architecture Engine', icon: Landmark },
+      { href: '/control/engineering', label: 'Engineering Engine', icon: Code2 },
+      { href: '/control/qa', label: 'QA Engine', icon: Shield },
+      { href: '/control/review', label: 'Review Engine', icon: Eye },
+      { href: '/control/security', label: 'Security Engine', icon: Lock },
+      { href: '/control/performance', label: 'Performance Engine', icon: Gauge },
+    ],
+  },
+  {
+    label: '🔀 Pipeline',
+    items: [
+      { href: '/control/merge', label: 'Merge Engine', icon: GitMerge },
+      { href: '/control/deploy', label: 'Deploy Engine', icon: Rocket },
+      { href: '/control/replay', label: 'Replay Engine', icon: RotateCcw },
+      { href: '/control/learning', label: 'Learning Engine', icon: GraduationCap },
+    ],
+  },
+  {
+    label: '⚙️ Operations',
+    items: [
+      { href: '/control/growth', label: 'Growth Engine', icon: TrendingUp },
+      { href: '/control/scheduler', label: 'Mission Scheduler', icon: CalendarClock },
+      { href: '/control/client-zero', label: 'Client Zero', icon: Target },
       { href: '/control/engagement', label: 'Engagement', icon: Activity },
-      { href: '/control/analytics', label: 'Analytics', icon: BarChart3 },
-      { href: '/control/logs', label: 'Logs', icon: ScrollText },
     ],
   },
   {
     label: '🔧 Admin',
     items: [
+      { href: '/control/tech-debt', label: 'Tech Debt Engine', icon: Bug },
+      { href: '/control/analytics', label: 'Analytics', icon: BarChart3 },
+      { href: '/control/logs', label: 'Logs', icon: ScrollText },
       { href: '/control/settings', label: 'Settings', icon: Settings },
     ],
   },
@@ -106,7 +133,6 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
   const handleLogout = useCallback(async () => {
     setLoggingOut(true)
     try {
-      // Call server to clear httpOnly superadmin_key cookie
       await fetch('/api/control/logout', { method: 'POST' })
     } finally {
       router.replace('/control/login')
@@ -170,11 +196,11 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
         <div className="p-4 border-b border-slate-800">
           <Link href="/control" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
             <div className="w-9 h-9 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <Brain className="w-5 h-5 text-emerald-400" />
+              <Factory className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <div className="text-sm font-bold text-white tracking-tight">AI Operations Center™</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-widest">Control Panel</div>
+              <div className="text-sm font-bold text-white tracking-tight">AI Software Factory™</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-widest">Operations Center</div>
             </div>
           </Link>
         </div>
@@ -218,14 +244,11 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
 
         {/* Footer with auth info + logout */}
         <div className="p-3 border-t border-slate-800">
-          {/* System status */}
           <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-500">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>System Online</span>
             <span className="ml-auto font-mono">{currentTime}</span>
           </div>
-
-          {/* User info + logout */}
           <div className="flex items-center gap-2 px-3 py-1.5">
             <div className="flex-1 min-w-0">
               <div className="text-[11px] text-slate-300 font-medium truncate">
@@ -253,7 +276,6 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
-        {/* Mobile header */}
         <div className="lg:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-slate-950/90 backdrop-blur border-b border-slate-800">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -261,7 +283,7 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
-          <span className="text-sm font-semibold text-white">AI Operations Center™</span>
+          <span className="text-sm font-semibold text-white">AI Software Factory™</span>
           <div className="ml-auto">
             <button
               onClick={handleLogout}
@@ -274,7 +296,6 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
 
-        {/* Page content */}
         <main className="p-4 lg:p-6 max-w-7xl mx-auto">
           {children}
         </main>
