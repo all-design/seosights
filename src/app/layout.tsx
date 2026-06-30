@@ -21,9 +21,12 @@ const SITE_URL = "https://seosights.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "AI Search Observatory™ — Independent Research Center for AI Model Analysis",
+  title: {
+    default: "seosights — Will AI Recommend Your Business?",
+    template: "%s — seosights",
+  },
   description:
-    "AI Search Observatory™ is an independent research center that daily analyzes the behavior of leading AI models. Real data, no fluff. AI Search Weather™, Observatory Index™, AI Search Archive™, and Public Charts.",
+    "SeoSights helps companies understand, measure and improve how AI models recommend their business. AI Visibility Intelligence Platform with Observatory and AI Visibility OS.",
   keywords: [
     "AI visibility",
     "AI Visibility Score",
