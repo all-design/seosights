@@ -1159,12 +1159,23 @@ model ObservatoryReport {
   isBreaking      Boolean  @default(false) // Whether this is Breaking Research 🚨
   breakingAlertId String?  // Link to BreakingResearch
   methodologyJson String?  // CRITICAL: Methodology transparency — queries, models, period, significance criteria
+  methodologyVersion String?  // e.g., "v1.4" — versioned methodology for reproducibility tracking
+  promptSet       String?  // e.g., "2026-07" — which prompt set was used
+  modelsStudied   String?  // JSON array: ["Claude 4", "Gemini", "GPT-5"] — exact models tested
+  studyPeriod     String?  // e.g., "30 days" — the time period covered
+  significanceCriteria String? // Criteria used to determine significance of findings
+  doi             String?  // Observatory DOI: OBS-2026-0042 — citable research identifier
+  confidenceDistribution String? // JSON: {"90plus": 42, "80plus": 18, "70plus": 5, "60plus": 2, "below60": 1}
+  permanentUrl    String?  // Permanent URL: /research/2026/07/chatgpt-github-citations — never changes
+  citedByCount    Int      @default(0) // Number of external citations of this research
+  citedBySources  String?  // JSON: ["HubSpot", "Search Engine Land", "Ahrefs"] — who cited this
   isSimulated     Boolean  @default(false) // CRITICAL: true = seed/dev data, NEVER publish publicly
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   publications    ObservatoryPublication[]
   learning        ObservatoryLearning[]
+  externalCitations ObservatoryExternalCitation[]
 
   @@index([slug])
   @@index([type])
@@ -1173,6 +1184,8 @@ model ObservatoryReport {
   @@index([publishedAt])
   @@index([isBreaking])
   @@index([isSimulated])
+  @@index([doi])
+  @@index([methodologyVersion])
   @@index([createdAt])
 }
 
@@ -1391,4 +1404,80 @@ model ObservatoryChartData {
   @@index([chartKey])
   @@index([isPublic])
   @@index([lastUpdated])
+}
+
+// ─── AI Search Graph™ ─────────────────────────────────────────
+
+// Global citation graph — maps how AI models chain through sources
+// Example: ChatGPT → Wikipedia → Health → CDC → Mayo Clinic
+model AISearchGraphEdge {
+  id              String   @id @default(cuid())
+  sourceNode      String   // e.g., "ChatGPT", "Wikipedia", "CDC"
+  sourceType      String   // ai_model | source | industry | entity
+  targetNode      String   // e.g., "Wikipedia", "Health", "Mayo Clinic"
+  targetType      String   // ai_model | source | industry | entity
+  relation        String   // cites | references | recommends | belongs_to | influences
+  aiModel         String?  // Which AI model produces this edge (if applicable)
+  weight          Float    @default(1)  // Edge weight (citation frequency, strength)
+  period          String   // "2026-07" — when this edge was observed
+  citationCount   Int      @default(0)  // How many times this citation path was observed
+  isSimulated     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@unique([sourceNode, targetNode, relation, period])
+  @@index([sourceNode])
+  @@index([targetNode])
+  @@index([relation])
+  @@index([aiModel])
+  @@index([period])
+  @@index([weight])
+  @@index([isSimulated])
+}
+
+// ─── AI Search Timeline™ ──────────────────────────────────────
+
+// Internet-wide AI search history — not for a company, for the internet
+// Example: "January — Claude stopped using Reddit"
+model ObservatoryTimeline {
+  id              String   @id @default(cuid())
+  date            DateTime // When this event occurred
+  event           String   // Short description: "Claude stopped using Reddit"
+  aiModel         String?  // Which AI model (if applicable)
+  category        String   // citation_shift | source_shift | behavior_change | new_capability | industry_impact | policy_change
+  significance    Float    @default(0)  // 0-1 how significant
+  description     String?  // Longer description
+  evidenceUrl     String?  // Link to supporting evidence/report
+  relatedReportId String?  // Link to ObservatoryReport
+  isSimulated     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([date])
+  @@index([aiModel])
+  @@index([category])
+  @@index([significance])
+  @@index([isSimulated])
+}
+
+// ─── Observatory Citations™ ───────────────────────────────────
+
+// External citations of Observatory research — the ultimate KPI
+// "Cited by HubSpot, Search Engine Land, Ahrefs"
+model ObservatoryExternalCitation {
+  id              String   @id @default(cuid())
+  reportId        String   // Which report was cited
+  sourceName      String   // "HubSpot", "Search Engine Land", "Ahrefs"
+  sourceUrl       String?  // URL of the citing article
+  sourceType      String   // blog | news | research | social_media | book | report
+  citedAt         DateTime // When it was cited
+  context         String?  // The surrounding text/context of the citation
+  verified        Boolean  @default(false) // Whether we verified this citation
+  createdAt       DateTime @default(now())
+
+  report          ObservatoryReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([sourceName])
+  @@index([sourceType])
+  @@index([citedAt])
+  @@index([verified])
 }

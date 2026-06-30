@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { filterSimulated, productionGate } from '@/lib/observatory-gate'
 
 export const revalidate = 300 // 5 minutes cache
 
@@ -28,12 +29,12 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20)
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    const where: Record<string, unknown> = { status: 'published' }
+    const where: Record<string, unknown> = { status: 'published', ...productionGate() }
     if (type) {
       where.type = type
     }
 
-    const [reports, total] = await Promise.all([
+    const [rawReports, total] = await Promise.all([
       db.observatoryReport.findMany({
         where,
         orderBy: { publishedAt: 'desc' },
@@ -53,10 +54,14 @@ export async function GET(request: NextRequest) {
           confidenceScore: true,
           freshnessScore: true,
           sampleSize: true,
+          isSimulated: true,
         },
       }),
       db.observatoryReport.count({ where }),
     ])
+
+    // ─── Apply production gate filter (defense-in-depth) ─────────────
+    const reports = filterSimulated(rawReports)
 
     const data = reports.map((r) => ({
       ...r,
