@@ -1075,7 +1075,7 @@ model ObservatoryCrawl {
   @@index([startedAt])
 }
 
-// Layer 1: Individual AI model responses — this is the dataset
+// Layer 1: Individual AI model responses — the AI Search Archive™ dataset
 model ObservatoryResponse {
   id              String   @id @default(cuid())
   crawlId         String
@@ -1090,6 +1090,7 @@ model ObservatoryResponse {
   tokensUsed      Int?     // Token count
   metadataJson    String?  // Additional metadata as JSON
   answerHash      String?  // SHA-256 hash of responseText for quick change detection
+  isSimulated     Boolean  @default(false) // CRITICAL: true = seed/dev data, NEVER publish publicly
   createdAt       DateTime @default(now())
 
   crawl           ObservatoryCrawl @relation(fields: [crawlId], references: [id], onDelete: Cascade)
@@ -1100,6 +1101,7 @@ model ObservatoryResponse {
   @@index([promptCategory])
   @@index([createdAt])
   @@index([answerHash])
+  @@index([isSimulated])
 }
 
 // Layer 2: Detected changes between crawls
@@ -1128,12 +1130,12 @@ model ObservatoryChange {
   @@index([createdAt])
 }
 
-// Layer 3-4: Reports generated from signals
+// Layer 3-4: Reports generated from signals — only data-backed findings
 model ObservatoryReport {
   id              String   @id @default(cuid())
   slug            String   @unique  // URL-friendly slug: /research/chatgpt-update-july-2026
   title           String
-  type            String   @default("research") // research | blog | linkedin | newsletter | industry_update | vs_page | benchmark | monthly_report
+  type            String   @default("research") // research | benchmark | industry_update | monthly_report | breaking
   status          String   @default("draft") // draft | proposed | approved | published | archived
   editorialScore  Float    @default(0)  // 0-1 editorial AI score
   editorialReason String?  // Why it was approved/rejected
@@ -1153,9 +1155,11 @@ model ObservatoryReport {
   confidenceScore Float    @default(0)  // 0-100 confidence in findings
   freshnessScore  Float    @default(0)  // 0-100 how recent the data is
   sampleSize      Int      @default(0) // Number of prompts/data points
-  researchQualityScore Float @default(0) // 0-100 overall score
-  isBreaking      Boolean  @default(false) // Whether this is Breaking Research
+  researchQualityScore Float @default(0) // 0-100 overall Observatory Score™
+  isBreaking      Boolean  @default(false) // Whether this is Breaking Research 🚨
   breakingAlertId String?  // Link to BreakingResearch
+  methodologyJson String?  // CRITICAL: Methodology transparency — queries, models, period, significance criteria
+  isSimulated     Boolean  @default(false) // CRITICAL: true = seed/dev data, NEVER publish publicly
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -1167,6 +1171,8 @@ model ObservatoryReport {
   @@index([status])
   @@index([editorialScore])
   @@index([publishedAt])
+  @@index([isBreaking])
+  @@index([isSimulated])
   @@index([createdAt])
 }
 
@@ -1210,21 +1216,28 @@ model ObservatoryLearning {
   @@index([measuredAt])
 }
 
-// Programmatic SEO: Industry pages
+// Observatory Index™: Industry pages with trend data
 model ObservatoryIndustry {
   id              String   @id @default(cuid())
   slug            String   @unique  // /industry/dentists
   name            String   // Display name: "Dentists"
   description     String?
+  indexScore      Float    @default(0)  // 0-100 Observatory Index™ score
+  previousScore   Float    @default(0)  // Previous period score for delta
+  trend           String   @default("stable") // rising | falling | stable
   aiVisibilityAvg Float    @default(0)  // Average AI Visibility score for this industry
   topModelsJson   String?  // JSON: which AI models rank which businesses
   rankingsJson    String?  // JSON: top businesses by AI visibility
   benchmarksJson  String?  // JSON: industry benchmarks
+  dataPoints      Int      @default(0)  // Number of data points supporting this score
+  signalsCount    Int      @default(0)  // Number of recent signals
   lastUpdated     DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([slug])
+  @@index([indexScore])
+  @@index([trend])
   @@index([aiVisibilityAvg])
   @@index([lastUpdated])
 }
@@ -1325,4 +1338,57 @@ model BreakingResearch {
   @@index([isPublished])
   @@index([significance])
   @@index([createdAt])
+}
+
+// ─── AI Search Weather™ ──────────────────────────────────────────
+
+// Daily weather snapshot per AI model — the daily indicator
+model ObservatoryWeatherDaily {
+  id              String   @id @default(cuid())
+  date            DateTime // The date this weather applies to
+  aiModel         String   // chatgpt | claude | gemini | perplexity | grok | deepseek | overall
+  stabilityIndex  Float    @default(0)  // 0-100: 100 = perfectly stable, 0 = chaos
+  volatility      Float    @default(0)  // 0-100: inverse of stability, how much changed
+  trend           String   @default("stable") // stable | high_volatility | low_volatility | recovering
+  changesCount    Int      @default(0)  // Number of detected changes today
+  citationShifts  Int      @default(0)  // Citation-level changes
+  sourceShifts    Int      @default(0)  // Source-level shifts
+  newCapabilities Int      @default(0)  // New capabilities detected
+  avgSignificance Float    @default(0)  // Average significance of changes
+  previousStability Float  @default(0)  // Yesterday's stability for delta
+  createdAt       DateTime @default(now())
+
+  @@unique([date, aiModel])
+  @@index([date])
+  @@index([aiModel])
+  @@index([stabilityIndex])
+  @@index([trend])
+}
+
+// ─── Public Charts Cache ─────────────────────────────────────────
+
+// Pre-computed chart data for embeddable public charts
+model ObservatoryChartData {
+  id              String   @id @default(cuid())
+  chartType       String   // source_trend | model_citations | industry_health | citation_distribution | weather_history
+  chartKey        String   // Unique key: "github-365d" | "wikipedia-trend" | "reddit-decline"
+  title           String   // Chart title for embedding
+  description     String?  // Chart description
+  dataJson        String   // JSON: chart data points [{date, value, ...}]
+  labelsJson      String?  // JSON: axis labels, units, etc.
+  sourceDomains   String?  // JSON: which domains are included
+  aiModels        String?  // JSON: which AI models are included
+  dateRange       String?  // "365d" | "90d" | "30d" | "7d"
+  dataPoints      Int      @default(0)  // Number of data points
+  isPublic        Boolean  @default(true)  // Whether this chart is publicly embeddable
+  embedCount      Int      @default(0)  // How many times embedded
+  lastUpdated     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([chartType, chartKey])
+  @@index([chartType])
+  @@index([chartKey])
+  @@index([isPublic])
+  @@index([lastUpdated])
 }
