@@ -32,6 +32,9 @@ import {
   Lock,
   Gauge,
   Code2,
+  Database,
+  Route,
+  DollarSign,
   Landmark,
 } from 'lucide-react'
 
@@ -67,6 +70,14 @@ const navGroups = [
       { href: '/control/deploy', label: 'Deploy Engine', icon: Rocket },
       { href: '/control/replay', label: 'Replay Engine', icon: RotateCcw },
       { href: '/control/learning', label: 'Learning Engine', icon: GraduationCap },
+      { href: '/control/engineering-memory', label: 'Engineering Memory', icon: Database },
+    ],
+  },
+  {
+    label: '🤖 AI Mesh',
+    items: [
+      { href: '/control/ai-router', label: 'AI Router™', icon: Route },
+      { href: '/control/ai-cost', label: 'AI Cost Dashboard', icon: DollarSign },
     ],
   },
   {

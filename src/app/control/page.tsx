@@ -5,6 +5,7 @@ import {
   Activity, CheckCircle2, Clock, ArrowRight, Zap,
   BarChart3, Eye, Factory, Landmark, Code2, GitMerge, Rocket,
   RotateCcw, GraduationCap, Bug, Lock, Gauge,
+  Database, Route, DollarSign,
 } from 'lucide-react'
 
 interface SystemStatus {
@@ -31,6 +32,9 @@ const systems: SystemStatus[] = [
   { name: 'Deploy Engine', status: 'idle', health: 98, icon: Rocket, description: 'Production deployment', lastAction: 'v2.4.12 deployed — 6h ago', color: 'cyan', href: '/control/deploy' },
   { name: 'Replay Engine', status: 'monitoring', health: 92, icon: RotateCcw, description: 'Post-deploy metric tracking', lastAction: 'Conversion 82→84% ↑ — 1h ago', color: 'amber', href: '/control/replay' },
   { name: 'Learning Engine', status: 'learning', health: 81, icon: GraduationCap, description: 'Pattern learning & confidence', lastAction: 'New pattern: FAQ → +15% citations — 3h ago', color: 'emerald', href: '/control/learning' },
+  { name: 'Engineering Memory', status: 'recording', health: 87, icon: Database, description: 'Change tracking & pattern memory', lastAction: 'Hero.tsx pattern detected — 91% confidence', color: 'indigo', href: '/control/engineering-memory' },
+  { name: 'AI Router', status: 'routing', health: 99, icon: Route, description: 'Free AI Mesh™ — model routing', lastAction: '431 calls routed — 86% cached — $0.00', color: 'emerald', href: '/control/ai-router' },
+  { name: 'AI Cost Dashboard', status: 'monitoring', health: 100, icon: DollarSign, description: 'LLM cost tracking — 100% free', lastAction: 'Today: 431 calls, $0.00 cost', color: 'emerald', href: '/control/ai-cost' },
 ]
 
 const pipelineStages = [
@@ -61,6 +65,8 @@ const recentEvents = [
   { time: '4h ago', text: 'Learning Engine: FAQ schema → +15% AI citation rate (94% confidence)', type: 'success' },
   { time: '6h ago', text: 'Deploy Engine: v2.4.12 deployed to production', type: 'success' },
   { time: '8h ago', text: 'Tech Debt Engine: Found 3 duplicated components — added to backlog', type: 'warning' },
+  { time: '10h ago', text: 'Engineering Memory: Hero.tsx change pattern detected — CTA drops 91% confidence', type: 'info' },
+  { time: '12h ago', text: 'AI Router: 86% cache hit rate today — 372 of 431 calls cached', type: 'success' },
 ]
 
 export default function ControlOverview() {
@@ -73,6 +79,8 @@ export default function ControlOverview() {
       case 'collecting': return 'text-amber-400'
       case 'monitoring': return 'text-cyan-400'
       case 'learning': return 'text-emerald-400'
+      case 'recording': return 'text-indigo-400'
+      case 'routing': return 'text-emerald-400'
       case 'idle': return 'text-slate-400'
       case 'warning': return 'text-red-400'
       default: return 'text-slate-400'
@@ -106,7 +114,7 @@ export default function ControlOverview() {
             <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Platform Health</div>
             <div className="flex items-baseline gap-3">
               <span className="text-5xl font-bold text-emerald-400">{overallHealth}%</span>
-              <span className="text-sm text-emerald-400/60">All 12 systems operational</span>
+              <span className="text-sm text-emerald-400/60">All 15 systems operational</span>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-6">
