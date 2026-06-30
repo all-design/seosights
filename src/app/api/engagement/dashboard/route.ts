@@ -7,20 +7,8 @@ export async function GET() {
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-    // Fetch all dashboard data in parallel
-    const [
-      momentum,
-      todayBrief,
-      activeMission,
-      streak,
-      activitySummary,
-      unreadCount,
-      activeCountdowns,
-      mysteryBox,
-      coach,
-      season,
-      weeklyMission,
-    ] = await Promise.all([
+    // Fetch dashboard data — some queries use boolean fields that need int comparison for SQLite
+    const [momentum, todayBrief, activeMission, streak, activitySummary, activeCountdowns, coach, season, weeklyMission] = await Promise.all([
       db.engagementMomentum.findFirst({ where: { domain }, orderBy: { createdAt: 'desc' } }),
       db.engagementBrief.findFirst({
         where: { domain, briefDate: { gte: todayStart } },
@@ -35,15 +23,10 @@ export async function GET() {
         where: { domain, summaryDate: { gte: todayStart } },
         orderBy: { summaryDate: 'desc' },
       }),
-      db.engagementInboxItem.count({ where: { domain, isUnread: true } }),
       db.engagementCountdown.findMany({
-        where: { domain, isCompleted: false, targetTime: { gt: now } },
+        where: { domain, targetTime: { gt: now } },
         orderBy: { targetTime: 'asc' },
         take: 5,
-      }),
-      db.engagementMysteryBox.findFirst({
-        where: { domain, revealDate: { gte: todayStart } },
-        orderBy: { revealDate: 'asc' },
       }),
       db.engagementCoach.findFirst({
         where: { domain, coachDate: { gte: todayStart } },
@@ -59,20 +42,29 @@ export async function GET() {
       }),
     ])
 
+    // Separate queries for boolean-filtered data
+    const [unreadCount, mysteryBox] = await Promise.all([
+      db.engagementInboxItem.count({ where: { domain, isUnread: true } }),
+      db.engagementMysteryBox.findFirst({
+        where: { domain, revealDate: { gte: todayStart } },
+        orderBy: { revealDate: 'asc' },
+      }),
+    ])
+
     // Fallback to most recent brief if today's doesn't exist
-    const brief =
-      todayBrief ??
-      (await db.engagementBrief.findFirst({
-        where: { domain },
-        orderBy: { briefDate: 'desc' },
-      }))
+    const brief = todayBrief ?? (await db.engagementBrief.findFirst({
+      where: { domain },
+      orderBy: { briefDate: 'desc' },
+    }))
 
     // Calculate remaining time for countdowns
-    const countdownsWithRemaining = activeCountdowns.map((c) => ({
-      ...c,
-      remainingMs: c.targetTime.getTime() - now.getTime(),
-      remainingHuman: formatRemaining(c.targetTime.getTime() - now.getTime()),
-    }))
+    const countdownsWithRemaining = activeCountdowns
+      .filter(c => !c.isCompleted)
+      .map((c) => ({
+        ...c,
+        remainingMs: new Date(c.targetTime).getTime() - now.getTime(),
+        remainingHuman: formatRemaining(new Date(c.targetTime).getTime() - now.getTime()),
+      }))
 
     return NextResponse.json({
       momentum,
@@ -89,7 +81,7 @@ export async function GET() {
     })
   } catch (error) {
     console.error('[engagement/dashboard] Error:', error)
-    return NextResponse.json({ error: 'Failed to load dashboard' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load dashboard', details: String(error) }, { status: 500 })
   }
 }
 

@@ -1,24 +1,26 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import EngagementSidebar, { MobileMenuButton } from './EngagementSidebar'
 import MomentumWidget from './MomentumWidget'
 import AIWorkingBanner from './AIWorkingBanner'
-import DailyBrief from './DailyBrief'
-import DailyMissions from './DailyMissions'
-import AIStreak from './AIStreak'
-import WaitingMechanic from './WaitingMechanic'
-import MysteryBox from './MysteryBox'
-import AIInbox from './AIInbox'
-import PredictionGame from './PredictionGame'
-import ObservatoryDrops from './ObservatoryDrops'
-import WeeklyBoss from './WeeklyBoss'
-import AICoach from './AICoach'
-import AISeason from './AISeason'
-import Leaderboards from './Leaderboards'
-import AIVault from './AIVault'
 import { Skeleton } from '@/components/ui/skeleton'
+
+// Lazy load all section components to reduce initial bundle
+const DailyBrief = lazy(() => import('./DailyBrief'))
+const DailyMissions = lazy(() => import('./DailyMissions'))
+const AIStreak = lazy(() => import('./AIStreak'))
+const WaitingMechanic = lazy(() => import('./WaitingMechanic'))
+const MysteryBox = lazy(() => import('./MysteryBox'))
+const AIInbox = lazy(() => import('./AIInbox'))
+const PredictionGame = lazy(() => import('./PredictionGame'))
+const ObservatoryDrops = lazy(() => import('./ObservatoryDrops'))
+const WeeklyBoss = lazy(() => import('./WeeklyBoss'))
+const AICoach = lazy(() => import('./AICoach'))
+const AISeason = lazy(() => import('./AISeason'))
+const Leaderboards = lazy(() => import('./Leaderboards'))
+const AIVault = lazy(() => import('./AIVault'))
 
 interface DashboardData {
   momentum: {
@@ -44,6 +46,15 @@ interface DashboardData {
   coach: Record<string, unknown> | null
   season: Record<string, unknown> | null
   weeklyMission: Record<string, unknown> | null
+}
+
+function SectionLoader() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <Skeleton className="h-48 w-full bg-slate-900 rounded-xl" />
+      <Skeleton className="h-36 w-full bg-slate-900 rounded-xl" />
+    </div>
+  )
 }
 
 export default function EngagementShell() {
@@ -79,7 +90,6 @@ export default function EngagementShell() {
   useEffect(() => {
     const init = async () => {
       const data = await fetchData()
-      // If no momentum data, seed demo data
       if (data && !data.momentum) {
         await seedData()
       } else {
@@ -87,7 +97,7 @@ export default function EngagementShell() {
       }
     }
     init()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (dashboardData) {
@@ -174,7 +184,6 @@ export default function EngagementShell() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex">
-        {/* Sidebar skeleton */}
         <div className="hidden lg:flex lg:w-64 lg:fixed lg:inset-y-0 bg-slate-900 border-r border-slate-800 p-6">
           <div className="w-full space-y-3">
             <Skeleton className="h-8 w-32 bg-slate-800" />
@@ -183,7 +192,6 @@ export default function EngagementShell() {
             ))}
           </div>
         </div>
-        {/* Main skeleton */}
         <div className="flex-1 lg:ml-64 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             <Skeleton className="h-48 w-full bg-slate-900 rounded-xl" />
@@ -196,7 +204,6 @@ export default function EngagementShell() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex">
-      {/* Sidebar */}
       <EngagementSidebar
         activeSection={activeSection}
         onSectionChange={setActiveSection}
@@ -205,9 +212,7 @@ export default function EngagementShell() {
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      {/* Main content */}
       <main className="flex-1 lg:ml-64 min-h-screen">
-        {/* Top bar for mobile */}
         <div className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center gap-3 lg:hidden">
           <MobileMenuButton onClick={() => setMobileOpen(true)} />
           <h1 className="text-sm font-bold text-slate-200">
@@ -215,7 +220,6 @@ export default function EngagementShell() {
           </h1>
         </div>
 
-        {/* Content */}
         <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
           <AnimatePresence mode="wait">
             <motion.div
@@ -225,7 +229,9 @@ export default function EngagementShell() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {renderSection()}
+              <Suspense fallback={<SectionLoader />}>
+                {renderSection()}
+              </Suspense>
             </motion.div>
           </AnimatePresence>
         </div>
