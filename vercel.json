@@ -1,4 +1,8 @@
 {
+  "framework": "nextjs",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install",
+  "outputDirectory": ".next",
   "functions": {
     "src/app/api/analyze/route.ts": {
       "maxDuration": 300
@@ -11,6 +15,23 @@
     },
     "src/app/api/analysis/[id]/route.ts": {
       "maxDuration": 10
+    },
+    "src/app/api/content-engine/**/*.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/observatory/**/*.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/ai/**/*.ts": {
+      "maxDuration": 30
     }
-  }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=10, stale-while-revalidate=59" }
+      ]
+    }
+  ]
 }
