@@ -46,6 +46,10 @@ import {
   FileClock,
   Download,
   Palette,
+  Crown,
+  Scale,
+  Scroll,
+  ClipboardList,
 } from 'lucide-react'
 
 const navGroups = [
@@ -53,6 +57,15 @@ const navGroups = [
     label: '',
     items: [
       { href: '/control', label: 'Overview', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: '⚖️ Governance',
+    items: [
+      { href: '/control/governor', label: 'AI Governor™', icon: Crown },
+      { href: '/control/governor/constitution', label: 'Constitution', icon: Scale },
+      { href: '/control/governor/master-spec', label: 'Master Spec', icon: Scroll },
+      { href: '/control/governor/daily-mission', label: 'Daily Mission', icon: ClipboardList },
     ],
   },
   {
