@@ -1392,3 +1392,332 @@ model ObservatoryChartData {
   @@index([isPublic])
   @@index([lastUpdated])
 }
+
+// ─── Momentum™ Engagement System ──────────────────────────────────────
+
+// Momentum™ — the top-level progress indicator
+model EngagementMomentum {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  momentumScore       Float    @default(0)    // 0-100 current momentum
+  previousScore       Float    @default(0)    // Yesterday's score
+  daysActive          Int      @default(0)    // Consecutive days with improvement
+  bestStreak          Int      @default(0)    // All-time best streak
+  totalMissionsDone   Int      @default(0)
+  totalPredictions    Int      @default(0)
+  correctPredictions  Int      @default(0)
+  aiVisibilityGain    Float    @default(0)    // Total AI Visibility gained during streak
+  lastActivityAt      DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([momentumScore])
+}
+
+// Daily AI Brief™ — the morning hook that makes people open the app
+model EngagementBrief {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  briefDate           DateTime // Which morning this brief is for
+  greeting            String   // "Good morning, Mark."
+  headline1           String   // "Claude stopped recommending one of your competitors."
+  headline2           String?  // "ChatGPT started citing your FAQ page."
+  headline3           String?  // "You have one opportunity worth +4 AI Visibility."
+  estimatedMinutes    Int      @default(17) // "Estimated time: 17 minutes"
+  aiVisibilityDelta   Int      @default(0)  // Overnight change
+  newOpportunities    Int      @default(0)
+  unreadInbox         Int      @default(0)
+  missionAvailable    Boolean  @default(true)
+  isRead              Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@unique([domain, briefDate])
+  @@index([domain])
+  @@index([briefDate])
+  @@index([isRead])
+}
+
+// Daily Missions™ — today's tasks with rewards
+model EngagementMission {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  missionDate         DateTime // Which day this mission is for
+  title               String   // "Today's Mission"
+  difficulty          String   @default("Medium") // Easy | Medium | Hard | Expert
+  difficultyStars     Int      @default(3)  // 1-5 stars
+  rewardVisibility    Int      @default(0)  // "+6 AI Visibility"
+  totalSteps          Int      @default(3)
+  completedSteps      Int      @default(0)
+  status              String   @default("active") // active | completed | failed | expired
+  completedAt         DateTime?
+  createdAt           DateTime @default(now())
+
+  steps               EngagementMissionStep[]
+
+  @@index([domain])
+  @@index([missionDate])
+  @@index([status])
+}
+
+// Mission steps — individual tasks within a mission
+model EngagementMissionStep {
+  id                  String   @id @default(cuid())
+  missionId           String
+  stepOrder           Int      // 1, 2, 3...
+  title               String   // "Publish FAQ"
+  rewardText          String   // "+3"
+  rewardValue         Int      @default(0)
+  isCompleted         Boolean  @default(false)
+  completedAt         DateTime?
+
+  mission             EngagementMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+  @@index([stepOrder])
+}
+
+// AI Streak™ — improvement streak (NOT login streak)
+model EngagementStreak {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  currentStreak       Int      @default(0)  // Current consecutive improvement days
+  bestStreak          Int      @default(0)  // All-time best
+  lastImprovedAt      DateTime?  // Last day with measurable improvement
+  streakType          String   @default("ai_visibility") // ai_visibility | citations | missions
+  endsToday           Boolean  @default(false) // True if no improvement today
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([streakType])
+  @@index([currentStreak])
+}
+
+// AI Inbox™ — notifications about AI changes (not email)
+model EngagementInboxItem {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  itemType            String   // citation_change | competitor_drop | opportunity | prediction_result | breaking_signal | vault_unlock | mission_complete | streak_warning
+  headline            String   // "ChatGPT cited your pricing page."
+  body                String?  // More detail
+  aiModel             String?  // Which AI model is involved
+  isUnread            Boolean  @default(true)
+  isActionable        Boolean  @default(false) // Can the user do something about it?
+  actionLabel         String?  // "Execute" | "View" | "Start Mission"
+  actionRoute         String?  // Where clicking goes
+  priority            Int      @default(0) // Higher = more important
+  relatedEntityType   String?  // "opportunity" | "prediction" | "signal"
+  relatedEntityId     String?  // ID of the related entity
+  readAt              DateTime?
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([itemType])
+  @@index([isUnread])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+// Waiting Mechanic™ — countdowns that create anticipation
+model EngagementCountdown {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  countdownType       String   // replay_available | observatory_analysis | next_crawl | learning_update | vault_unlock | season_start
+  label               String   // "Replay available in"
+  targetTime          DateTime // When the countdown expires
+  isCompleted         Boolean  @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([countdownType])
+  @@index([targetTime])
+  @@index([isCompleted])
+}
+
+// Mystery Box™ — teaser for tomorrow's high-value opportunity
+model EngagementMysteryBox {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  revealDate          DateTime // When this mystery is revealed
+  teaserText          String   // "Tomorrow the system expects one high-value opportunity."
+  revealedText        String?  // "Claude changed." (shown after reveal)
+  isRevealed          Boolean  @default(false)
+  category            String?  // opportunity | citation | competitor | signal
+  significance        Float    @default(0) // 0-1 how important this is
+  revealedAt          DateTime?
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([revealDate])
+  @@index([isRevealed])
+}
+
+// Prediction Game™ — AI predicts, user executes, next day shows result
+model EngagementPrediction {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  actionType          String   // add_faq | publish_article | create_schema | add_internal_link | fix_robots
+  prediction          String   // "I think adding FAQ will increase AI Visibility by +4"
+  predictedImpact     Int      // AI predicted this many points
+  actualImpact        Int?     // What actually happened
+  confidence          Int      @default(50)  // AI confidence 0-100
+  confidenceAfter     Int?     // Updated confidence after measurement
+  status              String   @default("pending") // pending | executed | measuring | correct | incorrect
+  userExecuted        Boolean  @default(false)
+  executedAt          DateTime?
+  measuredAt          DateTime?
+  daysToMeasure       Int?     // How long until we know
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Observatory Drops™ — breaking alerts (not every day, only when something big)
+model EngagementDrop {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  headline            String   // "Breaking: Claude changed."
+  body                String?  // Detail
+  aiModel             String?  // Which model changed
+  changeType          String?  // citation_shift | source_shift | behavior_change
+  significance        Float    @default(0) // 0-1
+  isRead              Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([isRead])
+  @@index([significance])
+  @@index([createdAt])
+}
+
+// Weekly Boss™ — weekly mission with board report reward
+model EngagementWeeklyMission {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  weekStart           DateTime // Monday of this week
+  weekEnd             DateTime // Sunday of this week
+  title               String   // "Weekly Mission: Reach 80 AI Visibility"
+  targetValue         Float    // 80
+  currentValue        Float    @default(0)
+  unit                String   @default("ai_visibility") // ai_visibility | citations | missions_completed
+  status              String   @default("active") // active | completed | failed
+  rewardType          String   @default("board_report") // board_report | certificate | insight
+  completedAt         DateTime?
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([weekStart])
+  @@index([status])
+}
+
+// AI Season™ — monthly/seasonal challenges
+model EngagementSeason {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  seasonName          String   // "July Challenge"
+  seasonSlug          String   @unique  // "july-2026"
+  challenge           String   // "Become Top 10% AI Visible SaaS"
+  startDate           DateTime
+  endDate             DateTime
+  targetPercentile    Int      @default(10)  // Top 10%
+  currentPercentile   Int?     // Current ranking percentile
+  currentVisibility   Float    @default(0)
+  targetVisibility    Float    @default(0)
+  status              String   @default("upcoming") // upcoming | active | completed | failed
+  participants        Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([domain])
+  @@index([seasonSlug])
+  @@index([status])
+  @@index([startDate])
+}
+
+// Leaderboards — category-specific (NOT generic "top users")
+model EngagementLeaderboard {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  category            String   // visibility_gains | most_improved | top_healthcare | top_saas | top_finance
+  period              String   // monthly | weekly | seasonal
+  periodKey           String   // "2026-07" | "2026-W28"
+  rank                Int
+  companyName         String
+  industryVertical    String?  // SaaS | Healthcare | Finance | Legal | Ecommerce
+  aiVisibilityScore   Float    @default(0)
+  visibilityGain      Float    @default(0)  // Change this period
+  isUser              Boolean  @default(false) // Is this the current user?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([category, periodKey, rank])
+  @@index([category])
+  @@index([periodKey])
+  @@index([rank])
+  @@index([isUser])
+}
+
+// AI Vault™ — reports that unlock with countdown
+model EngagementVaultItem {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  itemType            String   // report | analysis | prediction_result | benchmark
+  title               String   // "Weekly Competitor Analysis"
+  description         String?  // Brief description
+  unlockAt            DateTime // When this item unlocks
+  isUnlocked          Boolean  @default(false)
+  unlockedAt          DateTime?
+  contentRef          String?  // Reference to actual content (report ID, etc.)
+  createdAt           DateTime @default(now())
+
+  @@index([domain])
+  @@index([unlockAt])
+  @@index([isUnlocked])
+}
+
+// AI Coach™ — daily personalized recommendation
+model EngagementCoach {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  coachDate           DateTime
+  greeting            String   // "Good evening."
+  message             String   // "If I had only 20 minutes today I'd do this."
+  recommendedAction   String   // "Publish your FAQ page about AI Visibility"
+  actionType          String   // publish_faq | replay_article | approve_schema | fix_technical | add_content
+  estimatedMinutes    Int      @default(20)
+  estimatedImpact     String?  // "+4 AI Visibility"
+  isCompleted         Boolean  @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime @default(now())
+
+  @@unique([domain, coachDate])
+  @@index([domain])
+  @@index([coachDate])
+  @@index([isCompleted])
+}
+
+// AI Is Working While You're Away — overnight activity summary
+model EngagementActivitySummary {
+  id                  String   @id @default(cuid())
+  domain              String   @default("seosights.com")
+  summaryDate         DateTime // Which 24-hour period
+  opportunitiesFound  Int      @default(0)
+  pagesImproved       Int      @default(0)
+  competitorsDropped  Int      @default(0)
+  signalsDetected     Int      @default(0)
+  learningConfidenceDelta Float @default(0)
+  decisionsWaiting    Int      @default(0)
+  articlesPublished   Int      @default(0)
+  qaIssuesFound       Int      @default(0)
+  qaIssuesFixed       Int      @default(0)
+  createdAt           DateTime @default(now())
+
+  @@unique([domain, summaryDate])
+  @@index([domain])
+  @@index([summaryDate])
+}
