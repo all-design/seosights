@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -19,8 +19,8 @@ import {
   CalendarClock,
   Package,
   TrendingUp,
-  Lock,
   Loader2,
+  LogOut,
 } from 'lucide-react'
 
 const navGroups = [
@@ -71,9 +71,11 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [currentTime, setCurrentTime] = useState('')
+  const currentTime = useCurrentTime()
   const [auth, setAuth] = useState<AuthCheck | null>(null)
   const [checking, setChecking] = useState(true)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const hasRedirected = useRef(false)
 
   // Auth check
   const checkAuth = useCallback(async () => {
@@ -92,17 +94,28 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
     checkAuth()
   }, [checkAuth])
 
-  // Clock
+  // Redirect to login if not authorized (but not if already on login page)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString('en-US', { hour12: false }))
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
+    if (!checking && !auth?.authorized && pathname !== '/control/login' && !hasRedirected.current) {
+      hasRedirected.current = true
+      router.replace(`/control/login?from=${encodeURIComponent(pathname)}`)
+    }
+  }, [checking, auth, pathname, router])
 
-  const isActive = (href: string) => {
-    if (href === '/control') return pathname === '/control'
-    return pathname.startsWith(href)
+  // Logout handler
+  const handleLogout = useCallback(async () => {
+    setLoggingOut(true)
+    try {
+      // Call server to clear httpOnly superadmin_key cookie
+      await fetch('/api/control/logout', { method: 'POST' })
+    } finally {
+      router.replace('/control/login')
+    }
+  }, [router])
+
+  // Don't wrap login page in the control layout shell
+  if (pathname === '/control/login') {
+    return <>{children}</>
   }
 
   // Loading state
@@ -117,28 +130,21 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
     )
   }
 
-  // Access denied
+  // If not authorized, show nothing (redirect is handled in useEffect)
   if (!auth?.authorized) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-        <div className="text-center">
-          <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6 border border-red-500/20">
-            <Lock className="w-10 h-10 text-red-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-slate-400 mb-6 max-w-sm">
-            AI Operations Center™ is restricted to authorized administrators only.
-          </p>
-          <button
-            onClick={() => router.push('/superadmin-portal/login')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Shield className="w-4 h-4" />
-            Authenticate
-          </button>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+          <p className="text-slate-500 text-sm">Redirecting to login...</p>
         </div>
       </div>
     )
+  }
+
+  const isActive = (href: string) => {
+    if (href === '/control') return pathname === '/control'
+    return pathname.startsWith(href)
   }
 
   return (
@@ -210,18 +216,38 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
           ))}
         </nav>
 
-        {/* Footer */}
+        {/* Footer with auth info + logout */}
         <div className="p-3 border-t border-slate-800">
+          {/* System status */}
           <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-500">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>System Online</span>
             <span className="ml-auto font-mono">{currentTime}</span>
           </div>
-          {auth.user && (
-            <div className="px-3 py-1 text-[10px] text-slate-600 truncate">
-              {auth.user.email}
+
+          {/* User info + logout */}
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] text-slate-300 font-medium truncate">
+                {auth.user?.name || 'Admin'}
+              </div>
+              <div className="text-[10px] text-slate-600 truncate">
+                {auth.user?.email}
+              </div>
             </div>
-          )}
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              title="Logout"
+            >
+              {loggingOut ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <LogOut className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -236,6 +262,16 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <span className="text-sm font-semibold text-white">AI Operations Center™</span>
+          <div className="ml-auto">
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Page content */}
@@ -245,4 +281,21 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
       </div>
     </div>
   )
+}
+
+// Custom hook for clock
+function useCurrentTime() {
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-US', { hour12: false }))
+  const timerRef = useRef<ReturnType<typeof setInterval>>()
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setTime(new Date().toLocaleTimeString('en-US', { hour12: false }))
+    }, 1000)
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
+
+  return time
 }
