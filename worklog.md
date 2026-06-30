@@ -57,3 +57,22 @@ Stage Summary:
 - Route structure fixed: Landing page at /, Observatory at /observatory, Engagement at /engagement
 - All 3 production routes verified and working
 - Dynamic imports added to landing page to prevent dev server OOM
+
+---
+Task ID: 20
+Agent: Main Agent
+Task: Fix landing page - restore the 8-section AI Visibility Intelligence redesign (not the old 18-section version)
+
+Work Log:
+- User clarified that the restored landing page was the wrong version (old 18-section with SocialProof, LiveStats, etc.)
+- Found the correct 8-section redesign in git commit 78cb658 (SeoSightsPage component)
+- Restored page.tsx to use SeoSightsPage (server component with metadata)
+- SeoSightsPage.tsx uses 8 focused sections: Hero, Emotional, Understand, Measure, Improve, Observatory, Pricing, CTA
+- Plus floating widgets: AIVisibilityAdvisor + AIStickyScore
+- Deployed to production, verified all content renders correctly
+- All 3 routes confirmed: / (8-section landing), /observatory, /engagement
+
+Stage Summary:
+- Correct 8-section "Understand. Measure. Improve." landing page restored on /
+- Old 18-section version fully replaced
+- Production verified with Agent Browser - all 8 sections render correctly
