@@ -3,31 +3,22 @@
 import { useState, useCallback } from 'react'
 import Navbar from '@/components/landing/Navbar'
 import HeroSection from '@/components/landing/HeroSection'
-import SocialProofSection from '@/components/landing/SocialProofSection'
-import LiveStatsSection from '@/components/landing/LiveStatsSection'
-import StatsSection from '@/components/landing/StatsSection'
-import TrustSection from '@/components/landing/TrustSection'
-import FeaturesSection from '@/components/landing/FeaturesSection'
-import HowItWorksSection from '@/components/landing/HowItWorksSection'
-import DashboardPreview from '@/components/landing/DashboardPreview'
-import AIVisibilityScoreSection from '@/components/landing/AIVisibilityScoreSection'
-import ComparisonSection from '@/components/landing/ComparisonSection'
-import CompleteSolutionSection from '@/components/landing/CompleteSolutionSection'
+import EmotionalSection from '@/components/landing/EmotionalSection'
+import UnderstandSection from '@/components/landing/UnderstandSection'
+import MeasureSection from '@/components/landing/MeasureSection'
+import ImproveSection from '@/components/landing/ImproveSection'
 import ObservatorySection from '@/components/landing/ObservatorySection'
-import FreeToolsSection from '@/components/landing/FreeToolsSection'
-import IntegrationsSection from '@/components/landing/IntegrationsSection'
-import BuildInPublicSection from '@/components/landing/BuildInPublicSection'
 import PricingSection from '@/components/landing/PricingSection'
 import CTASection from '@/components/landing/CTASection'
 import SiteFooter from '@/components/site/SiteFooter'
-import URLInputModal from '@/components/landing/URLInputModal'
+import AIVisibilityAdvisor from '@/components/landing/AIVisibilityAdvisor'
 import AIStickyScore from '@/components/landing/AIStickyScore'
+import URLInputModal from '@/components/landing/URLInputModal'
 import LoginModal from '@/components/landing/LoginModal'
 
 /**
- * seosights.com — Full SaaS landing page.
- * Complete set of landing components with dark theme,
- * purple gradient branding, floating elements, and all navigation links.
+ * seosights.com — Streamlined SaaS landing page.
+ * Understand → Measure → Improve narrative.
  */
 export default function SeoSightsPage() {
   const [showURLModal, setShowURLModal] = useState(false)
@@ -43,27 +34,19 @@ export default function SeoSightsPage() {
 
       <main className="flex-1">
         <HeroSection onStartFree={handleStartFree} />
-        <SocialProofSection />
-        <LiveStatsSection />
-        <StatsSection />
-        <TrustSection />
-        <FeaturesSection />
-        <HowItWorksSection />
-        <DashboardPreview />
-        <AIVisibilityScoreSection />
-        <ComparisonSection />
-        <CompleteSolutionSection />
+        <EmotionalSection />
+        <UnderstandSection onStartFree={handleStartFree} />
+        <MeasureSection onStartFree={handleStartFree} />
+        <ImproveSection onStartFree={handleStartFree} />
         <ObservatorySection />
-        <FreeToolsSection />
-        <IntegrationsSection />
-        <BuildInPublicSection />
         <PricingSection onStartFree={handleStartFree} />
         <CTASection onStartFree={handleStartFree} />
       </main>
 
       <SiteFooter />
 
-      {/* Floating AI Visibility Score — sticky bottom-right */}
+      {/* Floating elements */}
+      <AIVisibilityAdvisor onStartFree={handleStartFree} />
       <AIStickyScore onStartFree={handleStartFree} />
 
       {/* Modals */}

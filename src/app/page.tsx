@@ -2,14 +2,14 @@ import type { Metadata } from 'next'
 import SeoSightsPage from './SeoSightsPage'
 
 /**
- * seosights.com — SaaS product landing page.
- * Observatory is at /observatory and ai.seosights.com
+ * seosights.com — AI Visibility Intelligence Platform.
+ * Understand, Measure, Improve how AI recommends your business.
  */
 
 export const metadata: Metadata = {
-  title: 'seosights — Will AI Recommend Your Business?',
+  title: 'seosights — AI Visibility Intelligence Platform',
   description:
-    'SeoSights helps companies understand, measure and improve how AI models recommend their business. Track your AI Visibility Score across ChatGPT, Claude, Gemini & Perplexity.',
+    'Understand, measure and improve how AI recommends your business. Track your AI Visibility Score across ChatGPT, Claude, Gemini & Perplexity. Daily updates. 40+ signals.',
 }
 
 export default function Home() {

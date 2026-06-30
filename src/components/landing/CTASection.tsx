@@ -4,27 +4,23 @@ import { motion, useInView } from 'framer-motion'
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { ShieldCheck, CreditCard, Clock, Zap } from 'lucide-react'
+import { Shield, Clock, Crown, ArrowRight, Search } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import Link from 'next/link'
 
 export default function CTASection({ onStartFree }: { onStartFree?: () => void }) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    website: '',
-  })
+  const [url, setUrl] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleScan = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name || !formData.email) {
+    if (!url.trim()) {
       toast({
-        title: 'Missing fields',
-        description: 'Please fill in your name and email.',
+        title: 'Enter your website URL',
+        description: 'We need a URL to scan your AI visibility.',
         variant: 'destructive',
       })
       return
@@ -35,7 +31,7 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
       const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ name: 'URL Scan', email: '', website: url }),
       })
 
       if (!res.ok) {
@@ -43,10 +39,14 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
       }
 
       toast({
-        title: 'You\'re in!',
-        description: 'We\'ll send your free Citation Gap Audit shortly.',
+        title: 'Scanning your site!',
+        description: 'We\'ll analyze your AI visibility across major models.',
       })
-      setFormData({ name: '', email: '', website: '' })
+      setUrl('')
+      // Also trigger the main URL input modal
+      if (onStartFree) {
+        onStartFree()
+      }
     } catch {
       toast({
         title: 'Something went wrong',
@@ -70,21 +70,21 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
 
       <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
-          className="text-center mb-12"
+          className="text-center mb-10"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
-          <h2 className="text-4xl sm:text-5xl font-bold mb-6">
-            Ready to See All{' '}
-            <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-amber-400 bg-clip-text text-transparent">Three Sights</span>?
+          <h2 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
+            Will AI recommend{' '}
+            <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-emerald-300 bg-clip-text text-transparent">your business</span>?
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Set it up once. Your AI engine works 24/7 — auditing, writing, and ranking across every Sight. Without the agency fees.
+            Find out in 20 seconds. No signup required.
           </p>
         </motion.div>
 
-        {/* Quick Start Button */}
+        {/* Large CTA Button */}
         <motion.div
           className="text-center mb-8"
           initial={{ opacity: 0, y: 30 }}
@@ -93,103 +93,78 @@ export default function CTASection({ onStartFree }: { onStartFree?: () => void }
         >
           <Button
             size="lg"
-            className="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-lg px-10 py-7 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
+            className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-lg px-10 py-7 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] transition-all duration-300"
             onClick={onStartFree}
           >
-            <Zap className="mr-2 w-5 h-5" />
-            Analyze My Site — Free
+            <Search className="mr-2 w-5 h-5" />
+            Check Your AI Visibility
           </Button>
         </motion.div>
 
-        {/* Contact Form */}
+        {/* Inline URL Scan Form */}
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="mb-6"
         >
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 shadow-[0_0_40px_rgba(16,185,129,0.08)]">
-            <p className="text-center text-sm text-muted-foreground mb-6">
-              Or contact us for the <span className="text-amber-400 font-semibold">Managed Done-For-You</span> service:
-            </p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-foreground/80 text-sm">
-                    Name
-                  </Label>
-                  <Input
-                    id="name"
-                    placeholder="Your name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="bg-white/5 border-white/10 focus:border-emerald-500/50 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-foreground/80 text-sm">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@company.com"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    className="bg-white/5 border-white/10 focus:border-emerald-500/50 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="website" className="text-foreground/80 text-sm">
-                  Website URL
-                </Label>
-                <Input
-                  id="website"
-                  type="url"
-                  placeholder="https://yourwebsite.com"
-                  value={formData.website}
-                  onChange={(e) =>
-                    setFormData({ ...formData, website: e.target.value })
-                  }
-                  className="bg-white/5 border-white/10 focus:border-emerald-500/50 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50"
-                />
-              </div>
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 font-semibold text-base py-5 transition-all duration-300"
-                variant="outline"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Sending...' : 'Contact Us — Managed Service'}
-              </Button>
-            </form>
-          </div>
+          <form onSubmit={handleScan} className="flex gap-2 max-w-lg mx-auto">
+            <Input
+              type="url"
+              placeholder="https://yourwebsite.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="bg-white/5 border-white/10 focus:border-emerald-500/50 focus:ring-emerald-500/30 placeholder:text-muted-foreground/50 h-12 text-base"
+            />
+            <Button
+              type="submit"
+              size="lg"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shrink-0 px-6"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Scanning...' : 'Scan Now'}
+            </Button>
+          </form>
         </motion.div>
 
         {/* Trust Signals */}
         <motion.div
-          className="flex flex-col sm:flex-row gap-6 justify-center mt-10"
+          className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center mb-10"
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.35 }}
+        >
+          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+            <Shield className="w-4 h-4 text-emerald-400" />
+            No credit card required
+          </div>
+          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+            <Clock className="w-4 h-4 text-emerald-400" />
+            14-day free trial
+          </div>
+          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+            <Crown className="w-4 h-4 text-emerald-400" />
+            Cancel anytime
+          </div>
+        </motion.div>
+
+        {/* Secondary CTA */}
+        <motion.div
+          className="text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.5 }}
         >
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Clock className="w-4 h-4 text-emerald-400" />
-            14-Day Free Trial
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            No Credit Card Required
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <CreditCard className="w-4 h-4 text-emerald-400" />
-            Cancel Anytime
-          </div>
+          <Link href="/book-demo">
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-white/10 text-muted-foreground hover:text-foreground hover:border-emerald-500/30 hover:bg-emerald-500/5 font-semibold px-8 transition-all duration-300"
+            >
+              Book a Live AI Visibility Review
+              <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
+          </Link>
         </motion.div>
       </div>
     </section>

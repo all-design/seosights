@@ -120,9 +120,9 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
     <section className="relative bg-background text-white pt-32 pb-20 px-6 overflow-hidden">
       {/* Background AI effect — Blurred orbs */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full pointer-events-none opacity-20">
-        <div className="absolute top-12 left-10 w-72 h-72 bg-purple-600 rounded-full blur-[120px]" />
-        <div className="absolute bottom-12 right-10 w-96 h-96 bg-indigo-600 rounded-full blur-[150px]" />
-        <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-blue-600 rounded-full blur-[100px]" />
+        <div className="absolute top-12 left-10 w-72 h-72 bg-emerald-600 rounded-full blur-[120px]" />
+        <div className="absolute bottom-12 right-10 w-96 h-96 bg-purple-600 rounded-full blur-[150px]" />
+        <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-amber-500 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative max-w-5xl mx-auto text-center space-y-7">
@@ -134,42 +134,58 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs font-medium text-purple-400">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>The AI Visibility Intelligence Platform</span>
+            <span>AI Visibility Intelligence Platform</span>
           </div>
         </motion.div>
 
-        {/* Main Heading — problem-first, aggressive */}
+        {/* Main Heading — category-creating triad */}
         <motion.h1
           className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05]"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          Will AI{' '}
-          <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-            recommend
+          <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-400 bg-clip-text text-transparent">
+            Understand
           </span>
-          <br className="hidden sm:block" />
-          your business?
+          .{' '}
+          <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
+            Measure
+          </span>
+          .{' '}
+          <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400 bg-clip-text text-transparent">
+            Improve
+          </span>
+          .
         </motion.h1>
 
-        {/* Subheadline — benefit, not features */}
+        {/* Subtitle — the powerful one-liner */}
         <motion.p
-          className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto font-normal"
+          className="text-xl md:text-2xl text-slate-400 font-medium"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.18 }}
+        >
+          How AI recommends your business.
+        </motion.p>
+
+        {/* Supporting text — expanded explanation */}
+        <motion.p
+          className="text-base md:text-lg text-slate-500 max-w-2xl mx-auto font-normal"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.25 }}
         >
           ChatGPT, Claude, Gemini &amp; Perplexity answer millions of buyer questions every day. Your{' '}
           <span className="text-foreground font-semibold">AI Visibility Score</span> tells you whether
           you&apos;re the answer — and shows you exactly how to become it.
         </motion.p>
 
-        {/* URL Scan Form — the "Try Demo" the user asked for */}
+        {/* URL Scan Form */}
         <motion.div
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.3 }}
+          transition={{ duration: 0.7, delay: 0.35 }}
         >
           <form
             action="/api/quick-audit"
@@ -236,7 +252,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
           className="flex flex-wrap justify-center items-center gap-x-5 gap-y-2 pt-4 text-sm text-slate-400 font-medium"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={{ duration: 0.6, delay: 0.45 }}
         >
           <span className="text-xs uppercase tracking-wider text-muted-foreground/70">Tracked across</span>
           <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" />ChatGPT</div>

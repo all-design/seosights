@@ -1,50 +1,35 @@
-# SeoSights Worklog
-
 ---
-Task ID: 1
-Agent: Main
-Task: Verify entire project against Master Product Specification document
+Task ID: 1-18
+Agent: Main Agent + Subagents
+Task: Complete homepage redesign based on user's strategic feedback - transform from "SEO tool" to "AI Visibility Intelligence Platform"
 
 Work Log:
-- Read the uploaded DOCX specification document (18 sections)
-- Verified all three main routes: /, /os, /observatory (HTTP 200)
-- Verified AI Visibility OS (/os) - 8 sidebar sections, Executive/Builder/Developer toggle, AI Executive Mode, Execute button
-- Verified Observatory (/observatory) - all 13 sections (Hero, Health, ClientZeroKPI, Pulse, Weather, Index, Graph, Timeline, Evidence, Archive, Charts, Methodology, Citations, Footer)
-- Verified Homepage (/) - all 15+ sections (Navbar, Hero, Social Proof, Features, How It Works, Dashboard Preview, AI Visibility Score, Comparison, Observatory, Free Tools, Pricing, CTA, Footer, Sticky Score)
-- Verified backend: safeQuery (SafeResult<T>), safeAction, AI Router (6 providers), Fallback Logger, Production Data Gate, Observatory Gate
-- Verified all Prisma models exist
-- Verified all API routes (50+ routes across content-engine, observatory, ai, ops)
-- Browser verification with Agent Browser for all three pages
-- Fixed TodayPage Developer mode (was missing dedicated Developer sections)
-- Fixed MemoryPage Developer mode (was missing dedicated Developer sections)
-- Fixed page title/meta for homepage (was showing Observatory title)
-- Added layout.tsx files for /os and /observatory with proper metadata
-- Updated root layout.tsx to use title template pattern
+- Read and analyzed all 18 existing homepage sections (SeoSightsPage.tsx)
+- Identified all old iteration remnants: Three Sights, 8 AI Agents, SEO/GEO/AEO feature-selling
+- Rewrote HeroSection: "Understand. Measure. Improve." with tri-color gradient (emerald/purple/amber)
+- Created EmotionalSection: Yesterday/Today/Tomorrow narrative after hero
+- Created UnderstandSection: AI Visibility Score gauge + 4 factor cards
+- Created MeasureSection: 5 AI engine cards (ChatGPT/Claude/Gemini/Perplexity/Copilot)
+- Created ImproveSection: AI Growth Brain, Auto Execute, Mission Control
+- Rewrote ObservatorySection: "AI Search Observatory Powered by SeoSights" branding
+- Updated PricingSection: "Monitor your AI Visibility" for Starter, removed "Classic SEO"
+- Rewrote CTASection: Removed "Three Sights" language, added "Book a Live AI Visibility Review"
+- Updated Navbar: Simplified to 4 links (How It Works, Pricing, Observatory, AI Visibility OS)
+- Created AIVisibilityAdvisor: Guided conversation widget (bottom-left)
+- Rewrote AIStickyScore: From 564-line page section to clean floating widget (bottom-right)
+- Protected /os route: Gate page with blurred OS preview for unauthenticated users
+- Split /observatory: Public sections visible, Internal sections locked behind auth
+- Updated page.tsx metadata: "AI Visibility Intelligence Platform"
+- Added data-scroll-behavior="smooth" to fix Next.js warning
+- Reduced homepage from 18 sections to 8 focused sections
+- All lint checks pass, zero console errors on homepage
 
 Stage Summary:
-- All 18 specification sections verified against implementation
-- Key fixes applied: Developer mode for TodayPage + MemoryPage, page titles
-- All three products functional: SeoSights SaaS, AI Visibility OS, AI Search Observatory
-
----
-Task ID: 2
-Agent: Main
-Task: Deploy to seosights.com
-
-Work Log:
-- Pushed latest code to GitHub (main branch)
-- Created .env.example for production environment variables
-- Updated vercel.json with framework, build command, and function durations
-- Linked Vercel project using API token (project ID: prj_CpBYcxoqA6mJ6NCtegtPKPpY42Kc)
-- Deployed to production via `vercel --prod`
-- Build succeeded: Next.js 16.1.3, 121 static pages, all API routes compiled
-- Verified all 3 routes return HTTP 200 on production:
-  - https://seosights.com → 200
-  - https://seosights.com/os → 200
-  - https://seosights.com/observatory → 200
-
-Stage Summary:
-- Production deployment LIVE on seosights.com
-- Build time: ~2 minutes
-- Server: Vercel (iad1 - Washington DC)
-- All pages and API routes deployed successfully
+- Homepage transformed from SEO tool positioning to AI Visibility Intelligence Platform
+- New narrative: Understand → Measure → Improve → Research → Pricing → CTA
+- All "Three Sights", "8 AI Agents", SEO/GEO/AEO feature-selling language removed
+- Observatory promoted prominently with "Powered by SeoSights" branding
+- AI Visibility Advisor chat widget provides guided demo experience
+- /os route protected with auth gate and blurred preview
+- /observatory split into public research and internal data sections
+- Browser verified all three routes: /, /os, /observatory - all pass

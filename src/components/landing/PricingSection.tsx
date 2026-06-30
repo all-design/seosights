@@ -26,6 +26,7 @@ import {
   MessageSquare,
   Crown,
   Rocket,
+  Eye,
 } from 'lucide-react'
 
 interface PricingSectionProps {
@@ -38,7 +39,7 @@ interface PricingSectionProps {
 const plans = [
   {
     name: 'Starter',
-    subtitle: 'For website owners & bloggers',
+    subtitle: 'Monitor your AI Visibility',
     price: '$9.90',
     period: '/month',
     freeTrial: '6 months at 50% off, then $19/mo',
@@ -48,32 +49,27 @@ const plans = [
       'For website owners, bloggers, and small businesses who want insight into their AI and SEO visibility.',
     features: [
       {
-        icon: Search,
-        title: 'AEO/GEO Position Tracking',
+        icon: Eye,
+        title: 'AI Visibility Score',
         description:
-          'Track up to 50 key queries/prompts on ChatGPT, Claude, and Perplexity search engines.',
+          'Track your AI Visibility Score across ChatGPT, Claude, Gemini & Perplexity.',
+      },
+      {
+        icon: Search,
+        title: 'AI Citation Tracking',
+        description:
+          'See how often AI models mention your brand in their answers.',
       },
       {
         icon: Shield,
-        title: 'Basic E-E-A-T Audit',
-        description:
-          'Quick check of fundamental trust signals on your website.',
-      },
-      {
-        icon: Bot,
         title: 'AI Crawler Status',
         description:
-          'Insight into whether AI bots (like GPTBot) successfully crawl your content.',
-      },
-      {
-        icon: BarChart3,
-        title: 'Classic SEO Check',
-        description: 'Analysis of meta tags, titles, and basic on-page structure.',
+          'Know which AI bots can access your site and which are blocked.',
       },
       {
         icon: Globe,
-        title: '1 Domain (Project)',
-        description: 'Full analysis capacity for one domain.',
+        title: '1 Domain',
+        description: 'Full AI Visibility analysis for one domain.',
       },
     ],
     cta: 'Start Free Trial',
@@ -92,7 +88,7 @@ const plans = [
     period: '/month',
     freeTrial: '14-day free trial',
     description:
-      'For SEO freelancers and growing marketing teams who need the full AI Visibility engine. Most popular.',
+      'For growing teams who need the full AI Visibility engine with AI-powered recommendations. Most popular.',
     features: [
       {
         icon: Check,
@@ -143,7 +139,7 @@ const plans = [
     period: '/month',
     freeTrial: '14-day free trial',
     description:
-      'For SEO agencies generating reports for clients. Full white-label.',
+      'For agencies delivering AI Visibility reports to clients. Full white-label.',
     features: [
       {
         icon: Check,
@@ -261,17 +257,16 @@ export default function PricingSection({ onStartFree, onAgencyRegister, onTierSe
             className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-emerald-500/50 text-emerald-400 bg-emerald-500/10 backdrop-blur-sm mb-6"
           >
             <Star className="w-3.5 h-3.5" />
-            One Metric. Five AI Engines. Zero Agency Fees.
+            AI Visibility for every stage
           </Badge>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Pricing that scales{' '}
+            Start tracking{' '}
             <span className="bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400 bg-clip-text text-transparent">
-              with your ambition
+              your AI Visibility
             </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            14-day free trial. No credit card required. No contracts — cancel
-            anytime. Every plan tracks your AI Visibility Score across ChatGPT, Claude, Gemini & Perplexity.
+            14-day free trial. No credit card required. Every plan includes AI Visibility Score tracking across ChatGPT, Claude, Gemini & Perplexity.
           </p>
         </motion.div>
 

@@ -1,24 +1,16 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback } from 'react'
-import { motion, useInView, AnimatePresence } from 'framer-motion'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import {
-  ArrowRight,
-  BarChart3,
-  ChevronRight,
-  Eye,
-  Gauge,
-  Loader2,
-  Minus,
-  Monitor,
-  Pin,
-  Plus,
   TrendingUp,
-  Users,
-  Zap,
+  TrendingDown,
+  Pin,
+  Loader2,
+  ChevronUp,
+  ChevronDown,
+  X,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -61,19 +53,7 @@ interface MissionControlResponse {
 const FALLBACK_SCORE = { current: 71, delta: 3 }
 const FALLBACK_SPARKLINE = [62, 64, 63, 66, 65, 68, 67, 69, 71]
 
-const ENGINE_ICON_MAP: Record<string, typeof Gauge> = {
-  default: Gauge,
-}
-
-// Mock dashboard sections to simulate scrolling
-const DASHBOARD_SECTIONS = [
-  { id: 'overview', title: 'Overview', icon: Gauge, color: 'text-emerald-400' },
-  { id: 'citations', title: 'Citation Tracker', icon: Eye, color: 'text-purple-400' },
-  { id: 'competitors', title: 'Competitor Analysis', icon: Users, color: 'text-amber-400' },
-  { id: 'performance', title: 'Performance', icon: BarChart3, color: 'text-cyan-400' },
-]
-
-// ── Sparkline Component ───────────────────────────────────────
+// ── Mini Sparkline ────────────────────────────────────────────
 function MiniSparkline({ data, width = 80, height = 28 }: { data: number[]; width?: number; height?: number }) {
   if (data.length === 0) return null
 
@@ -93,12 +73,12 @@ function MiniSparkline({ data, width = 80, height = 28 }: { data: number[]; widt
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
       <defs>
-        <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id="stickySparkGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
           <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <polygon points={fillPoints} fill="url(#sparkGrad)" />
+      <polygon points={fillPoints} fill="url(#stickySparkGrad)" />
       <polyline
         points={points}
         fill="none"
@@ -107,7 +87,6 @@ function MiniSparkline({ data, width = 80, height = 28 }: { data: number[]; widt
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* Current value dot */}
       <circle
         cx={padding + ((data.length - 1) / (data.length - 1)) * (width - padding * 2)}
         cy={height - padding - ((data[data.length - 1] - min) / range) * (height - padding * 2)}
@@ -118,87 +97,24 @@ function MiniSparkline({ data, width = 80, height = 28 }: { data: number[]; widt
   )
 }
 
-// ── Sticky Widget Component ───────────────────────────────────
-function StickyWidget({
-  visible,
-  score,
-  delta,
-  sparklineData,
-  isLoading,
-}: {
-  visible: boolean
-  score: number
-  delta: number
-  sparklineData: number[]
-  isLoading: boolean
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8, y: 10 }}
-      animate={{ opacity: visible ? 1 : 0, scale: visible ? 1 : 0.8, y: visible ? 0 : 10 }}
-      transition={{ duration: 0.3 }}
-      className="absolute bottom-4 right-4 z-30 w-52"
-    >
-      <div className="rounded-xl border border-emerald-500/30 bg-[#0d1117]/95 backdrop-blur-xl shadow-xl shadow-black/40 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">AI Visibility</span>
-          <Pin className="h-3 w-3 text-emerald-400" />
-        </div>
-        {isLoading ? (
-          <div className="flex items-center justify-center h-10">
-            <Loader2 className="h-4 w-4 text-emerald-400 animate-spin" />
-          </div>
-        ) : (
-          <>
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-bold font-mono text-emerald-400">{score}</span>
-              <span className="text-xs font-mono text-white/30 mb-1">/100</span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              {delta >= 0 ? (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-emerald-400">
-                  <TrendingUp className="h-2.5 w-2.5" />
-                  +{delta}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-red-400">
-                  <Minus className="h-2.5 w-2.5" />
-                  {delta}
-                </span>
-              )}
-              <span className="text-[9px] text-white/30">vs yesterday</span>
-            </div>
-            <div className="mt-2">
-              <MiniSparkline data={sparklineData} width={160} height={24} />
-            </div>
-          </>
-        )}
-      </div>
-    </motion.div>
-  )
-}
-
-// ── Component ─────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────
 export default function AIStickyScore({ onStartFree }: AIStickyScoreProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const isInView = useInView(ref, { once: true, margin: '-80px' })
-  const [activeSection, setActiveSection] = useState(0)
-  const [widgetVisible, setWidgetVisible] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
 
-  // ── API State ─────────────────────────────────────────────
+  // API state
   const [data, setData] = useState<MissionControlResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  // ── Derived display values with fallback ──────────────────
+  // Derived display values with fallback
   const displayScore = data?.score.overall ?? FALLBACK_SCORE.current
   const displayDelta = data
     ? data.recentActivity.reduce((sum, a) => sum + a.delta, 0)
     : FALLBACK_SCORE.delta
   const displaySparkline = data
     ? (() => {
-        // Build sparkline from recentActivity deltas: accumulate from base score
-        const activities = [...data.recentActivity].reverse() // oldest first
+        const activities = [...data.recentActivity].reverse()
         if (activities.length === 0) return FALLBACK_SPARKLINE
         let running = data.score.overall - activities.reduce((s, a) => s + a.delta, 0)
         return activities.map(a => {
@@ -208,356 +124,181 @@ export default function AIStickyScore({ onStartFree }: AIStickyScoreProps) {
       })()
     : FALLBACK_SPARKLINE
 
-  // ── Fetch function ────────────────────────────────────────
+  // Fetch function
   const fetchData = useCallback(async () => {
     try {
-      setIsLoading(prev => data === null ? true : prev) // only show loading on first fetch
       const res = await fetch('/api/ai/mission-control?domain=seosights.com')
       if (!res.ok) throw new Error(`API returned ${res.status}`)
       const json: MissionControlResponse = await res.json()
       setData(json)
-      setError(null)
-    } catch (err) {
-      console.error('Failed to fetch mission control data:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch data')
-      // Keep existing data as fallback (or fallback defaults if never loaded)
+    } catch {
+      // Keep existing data as fallback
     } finally {
       setIsLoading(false)
     }
-  }, [data])
+  }, [])
 
-  // ── Initial fetch + auto-refresh every 60s ────────────────
+  // Initial fetch + auto-refresh every 60s
   useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 60_000)
     return () => clearInterval(interval)
   }, [fetchData])
 
-  // ── Simulate scrolling through dashboard sections ─────────
+  // Show widget after a delay (don't bombard user immediately)
   useEffect(() => {
-    if (!isInView) return
+    const timer = setTimeout(() => setIsVisible(true), 3000)
+    return () => clearTimeout(timer)
+  }, [])
 
-    const timer = setInterval(() => {
-      setActiveSection(prev => {
-        const next = prev + 1
-        if (next >= DASHBOARD_SECTIONS.length) {
-          clearInterval(timer)
-          return prev
-        }
-        return next
-      })
-    }, 1800)
-
-    // Show widget after a short delay
-    const widgetTimer = setTimeout(() => setWidgetVisible(true), 800)
-
-    return () => {
-      clearInterval(timer)
-      clearTimeout(widgetTimer)
-    }
-  }, [isInView])
+  if (isDismissed || !isVisible) return null
 
   return (
-    <section ref={ref} className="relative w-full py-16 md:py-24 overflow-hidden bg-[#0a0a0f]">
-      {/* Grid background */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
-
-      {/* Gradient glows */}
-      <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 h-[400px] w-[600px] rounded-full bg-emerald-500/5 blur-[120px]" />
-      <div className="pointer-events-none absolute right-0 top-1/3 h-[300px] w-[400px] rounded-full bg-purple-500/5 blur-[100px]" />
-
-      <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6">
-        {/* Section Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
-          className="mb-12 text-center"
-        >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white/60">
-            <Pin className="h-3.5 w-3.5" />
-            ALWAYS VISIBLE
-          </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white">
-            Sticky AI Visibility{' '}
-            <span className="bg-gradient-to-r from-emerald-400 to-purple-400 bg-clip-text text-transparent">
-              Score
-            </span>
-          </h2>
-          <p className="mt-3 text-sm sm:text-base text-white/50 max-w-xl mx-auto">
-            Your score follows you everywhere. No matter where you are in the dashboard, your AI Visibility Score stays pinned and updated in real-time.
-          </p>
-        </motion.div>
-
-        {/* Feature Preview: Mock Dashboard with Sticky Widget */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="mb-8"
-        >
-          <Card className="border border-white/10 bg-white/[0.03] backdrop-blur-xl overflow-hidden">
-            <CardContent className="p-0">
-              {/* Mock browser chrome */}
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-white/[0.02]">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
-                </div>
-                <div className="flex-1 flex justify-center">
-                  <div className="flex items-center gap-1.5 rounded-md bg-white/5 px-3 py-1 text-[10px] text-white/30 font-mono">
-                    <Monitor className="h-3 w-3" />
-                    app.seosights.io/dashboard
-                  </div>
-                </div>
-              </div>
-
-              {/* Mock dashboard content with sticky widget */}
-              <div className="relative min-h-[340px] sm:min-h-[400px] bg-[#0d1117]">
-                {/* Sidebar mock */}
-                <div className="hidden sm:block absolute left-0 top-0 bottom-0 w-12 border-r border-white/5 bg-white/[0.01]">
-                  <div className="flex flex-col items-center gap-3 py-4">
-                    {DASHBOARD_SECTIONS.map((section, i) => (
-                      <button
-                        key={section.id}
-                        onClick={() => setActiveSection(i)}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                          activeSection === i
-                            ? 'bg-white/10 text-white/80'
-                            : 'text-white/20 hover:text-white/40'
-                        }`}
-                      >
-                        <section.icon className="h-4 w-4" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Main content area */}
-                <div className="sm:ml-12 p-4 sm:p-6">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={activeSection}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="flex items-center gap-2 mb-4">
-                        {(() => {
-                          const Icon = DASHBOARD_SECTIONS[activeSection].icon
-                          return <Icon className={`h-4 w-4 ${DASHBOARD_SECTIONS[activeSection].color}`} />
-                        })()}
-                        <span className="text-sm font-semibold text-white/80">
-                          {DASHBOARD_SECTIONS[activeSection].title}
-                        </span>
-                      </div>
-
-                      {/* Content blocks — show real engine data when available */}
-                      <div className="space-y-3">
-                        <div className="h-20 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                          {data && data.engines.length > 0 ? (
-                            <div className="flex items-center gap-4">
-                              {data.engines.slice(0, 4).map(engine => (
-                                <div key={engine.name} className="flex items-center gap-1.5">
-                                  <div className={`w-2 h-2 rounded-full ${engine.indexed ? 'bg-emerald-400' : 'bg-white/20'}`} />
-                                  <span className="text-[10px] font-mono text-white/40">{engine.name}</span>
-                                  <span className="text-[10px] font-mono text-white/20">({engine.citations})</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-white/20 font-mono">Chart Area</span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {data ? (
-                            <>
-                              <div className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                                <span className="text-[10px] text-white/30 font-mono">Trust {data.score.trust}</span>
-                              </div>
-                              <div className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                                <span className="text-[10px] text-white/30 font-mono">Fresh {data.score.freshness}</span>
-                              </div>
-                              <div className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                                <span className="text-[10px] text-white/30 font-mono">Auth {data.score.authority}</span>
-                              </div>
-                            </>
-                          ) : (
-                            [1, 2, 3].map(n => (
-                              <div key={n} className="h-14 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                                <span className="text-[10px] text-white/15 font-mono">Metric {n}</span>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        <div className="h-24 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center">
-                          {data && data.recentActivity.length > 0 ? (
-                            <div className="flex items-center gap-3 overflow-hidden px-2">
-                              {data.recentActivity.slice(0, 3).map(activity => (
-                                <div key={activity.id} className="flex items-center gap-1 shrink-0">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${
-                                    activity.severity === 'positive' ? 'bg-emerald-400' :
-                                    activity.severity === 'negative' ? 'bg-red-400' :
-                                    'bg-amber-400'
-                                  }`} />
-                                  <span className="text-[9px] text-white/30 font-mono max-w-[100px] truncate">{activity.title}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-white/20 font-mono">Data Table</span>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-
-                {/* Sticky Widget — the star of the show */}
-                <StickyWidget
-                  visible={widgetVisible}
-                  score={displayScore}
-                  delta={displayDelta}
-                  sparklineData={displaySparkline}
-                  isLoading={isLoading}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Feature highlights */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
-        >
-          {[
-            {
-              icon: Pin,
-              title: 'Always Pinned',
-              description: 'Score stays in the corner no matter where you navigate in the dashboard.',
-              color: 'text-emerald-400',
-              bg: 'bg-emerald-500/10 border-emerald-500/20',
-            },
-            {
-              icon: TrendingUp,
-              title: 'Real-time Updates',
-              description: 'Score updates live as new citations are found or rankings change.',
-              color: 'text-purple-400',
-              bg: 'bg-purple-500/10 border-purple-500/20',
-            },
-            {
-              icon: BarChart3,
-              title: 'Mini Sparkline',
-              description: 'See 7-day trend at a glance without leaving your current view.',
-              color: 'text-amber-400',
-              bg: 'bg-amber-500/10 border-amber-500/20',
-            },
-          ].map((feature, i) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 12 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.4, delay: 0.5 + i * 0.08 }}
-            >
-              <Card className={`border ${feature.bg} bg-white/[0.02] backdrop-blur-xl h-full`}>
-                <CardContent className="p-4">
-                  <div className={`w-9 h-9 rounded-lg ${feature.bg} flex items-center justify-center mb-3`}>
-                    <feature.icon className={`h-4 w-4 ${feature.color}`} />
-                  </div>
-                  <h4 className="text-sm font-semibold text-white/90 mb-1">{feature.title}</h4>
-                  <p className="text-xs text-white/40 leading-relaxed">{feature.description}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        {/* Inline Widget Preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.65 }}
-          className="mt-8 flex justify-center"
-        >
-          <div className="rounded-2xl border border-emerald-500/20 bg-[#0d1117]/80 backdrop-blur-xl shadow-xl shadow-black/30 p-4 w-full max-w-xs">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold uppercase tracking-widest text-white/40">Widget Preview</span>
-              <Badge className={`text-[10px] px-1.5 py-0 ${
-                data?._meta.status === 'live'
-                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                  : data?._meta.status === 'estimated'
-                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                    : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-              }`}>
-                {isLoading ? 'LOADING' : data?._meta.status?.toUpperCase() ?? 'LIVE'}
-              </Badge>
-            </div>
-            {isLoading && !data ? (
-              <div className="flex items-center justify-center h-16">
-                <Loader2 className="h-5 w-5 text-emerald-400 animate-spin" />
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="flex items-end gap-1.5">
-                    <span className="text-3xl font-bold font-mono text-emerald-400">{displayScore}</span>
-                    <span className="text-sm font-mono text-white/30 mb-1">/100</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    {displayDelta >= 0 ? (
-                      <>
-                        <Plus className="h-3 w-3 text-emerald-400" />
-                        <span className="text-xs font-mono text-emerald-400">{displayDelta} from yesterday</span>
-                      </>
-                    ) : (
-                      <>
-                        <Minus className="h-3 w-3 text-red-400" />
-                        <span className="text-xs font-mono text-red-400">{Math.abs(displayDelta)} from yesterday</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <MiniSparkline data={displaySparkline} width={100} height={32} />
-              </div>
-            )}
-            {error && (
-              <p className="mt-2 text-[10px] text-white/30 text-center">Using fallback data — API unavailable</p>
-            )}
-          </div>
-        </motion.div>
-
-        {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.85 }}
-          className="mt-12 text-center"
-        >
-          <Button
-            onClick={onStartFree}
-            className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold px-8 py-3 rounded-lg transition-all hover:shadow-lg hover:shadow-emerald-500/20 text-base"
+    <motion.div
+      className="fixed bottom-5 right-5 z-50"
+      initial={{ opacity: 0, scale: 0.8, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      {/* Collapsed state — mini floating card */}
+      <AnimatePresence mode="wait">
+        {!isExpanded ? (
+          <motion.button
+            key="collapsed"
+            onClick={() => setIsExpanded(true)}
+            className="group relative flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-[#0d1117]/95 backdrop-blur-xl shadow-xl shadow-black/40 px-4 py-3 cursor-pointer hover:border-emerald-500/50 transition-all duration-200"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            aria-label="Expand AI Visibility Score"
           >
-            Track Your Score Live
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-          <div className="mt-3 flex items-center justify-center gap-1 text-xs text-white/30">
-            <ArrowRight className="h-3 w-3" />
-            No credit card required
-          </div>
-        </motion.div>
-      </div>
-    </section>
+            {/* Close button */}
+            <div
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => { e.stopPropagation(); setIsDismissed(true) }}
+            >
+              <X className="w-3 h-3 text-zinc-400" />
+            </div>
+
+            {/* Pin icon */}
+            <Pin className="w-3.5 h-3.5 text-emerald-400" />
+
+            {/* Score */}
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+            ) : (
+              <>
+                <span className="text-xl font-bold font-mono text-emerald-400">{displayScore}</span>
+                <span className="text-xs font-mono text-white/30">/100</span>
+              </>
+            )}
+
+            {/* Delta */}
+            {!isLoading && (
+              <span className={`inline-flex items-center gap-0.5 text-[10px] font-mono font-bold ${displayDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {displayDelta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                {displayDelta >= 0 ? '+' : ''}{displayDelta}
+              </span>
+            )}
+
+            {/* Expand hint */}
+            <ChevronUp className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition-colors" />
+          </motion.button>
+        ) : (
+          /* Expanded state — full widget */
+          <motion.div
+            key="expanded"
+            className="rounded-2xl border border-emerald-500/30 bg-[#0d1117]/95 backdrop-blur-xl shadow-2xl shadow-black/50 w-72 overflow-hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <Pin className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-white/50">AI Visibility</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="p-1 rounded hover:bg-white/5 transition-colors"
+                  aria-label="Minimize"
+                >
+                  <ChevronDown className="w-4 h-4 text-white/30" />
+                </button>
+                <button
+                  onClick={() => { setIsExpanded(false); setIsDismissed(true) }}
+                  className="p-1 rounded hover:bg-white/5 transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-4 h-4 text-white/30" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-16">
+                  <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* Score display */}
+                  <div className="flex items-end gap-2">
+                    <span className="text-4xl font-bold font-mono text-emerald-400">{displayScore}</span>
+                    <span className="text-sm font-mono text-white/30 mb-1.5">/100</span>
+                    <span className={`inline-flex items-center gap-0.5 text-xs font-mono font-bold mb-2 ${displayDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {displayDelta >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {displayDelta >= 0 ? '+' : ''}{displayDelta}
+                    </span>
+                  </div>
+
+                  {/* Sparkline */}
+                  <MiniSparkline data={displaySparkline} width={240} height={40} />
+
+                  {/* Sub-scores */}
+                  {data && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Trust', value: data.score.trust, color: 'bg-emerald-500' },
+                        { label: 'Fresh', value: data.score.freshness, color: 'bg-cyan-500' },
+                        { label: 'Auth', value: data.score.authority, color: 'bg-amber-500' },
+                      ].map(s => (
+                        <div key={s.label} className="text-center">
+                          <div className="text-[10px] text-white/40 mb-1">{s.label}</div>
+                          <div className="text-sm font-bold font-mono text-white/70">{s.value}</div>
+                          <div className="mt-1 h-1 rounded-full bg-white/5 overflow-hidden">
+                            <div className={`h-full rounded-full ${s.color}`} style={{ width: `${s.value}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Status badge */}
+                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-white/30">
+                    <span className={`w-1.5 h-1.5 rounded-full ${data?._meta.status === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`} />
+                    {data?._meta.status === 'live' ? 'Live data' : 'Demo data'}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* CTA */}
+            <div className="px-4 pb-4">
+              <Button
+                onClick={onStartFree}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs py-2.5 rounded-lg"
+              >
+                Track Your Score Live
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
