@@ -5,6 +5,7 @@ import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import ObservatoryResearchCard from '@/components/landing/ObservatoryResearchCard'
 import {
   Activity,
@@ -664,13 +665,15 @@ export default function ObservatorySection() {
           transition={{ duration: 0.6, delay: 0.7 }}
         >
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button
-              size="lg"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-8 shadow-lg shadow-emerald-500/20"
-            >
-              <Sparkles className="size-4 mr-2" />
-              Explore the Observatory
-            </Button>
+            <Link href="/observatory">
+              <Button
+                size="lg"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-8 shadow-lg shadow-emerald-500/20"
+              >
+                <Sparkles className="size-4 mr-2" />
+                Explore the Observatory
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="lg"

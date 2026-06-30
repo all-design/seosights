@@ -10,6 +10,7 @@ const navLinks = [
   { label: 'Features', href: '/#features', external: true },
   { label: 'Free Tools', href: '/free-ai-seo-tools', external: true },
   { label: 'Pricing', href: '/pricing', external: true },
+  { label: 'Observatory', href: '/observatory', external: true },
   { label: 'Blog', href: '/blog', external: true },
   { label: 'Affiliates', href: '/affiliates', external: true },
   { label: 'How It Works', href: '/#how-it-works', external: true },

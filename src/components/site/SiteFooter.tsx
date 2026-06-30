@@ -87,6 +87,14 @@ export default function SiteFooter() {
               ))}
               <li>
                 <Link
+                  href="/observatory"
+                  className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                >
+                  Observatory
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/prompt-library"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
