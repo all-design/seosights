@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Lock, Eye, EyeOff, Shield, AlertCircle, Loader2, Brain } from 'lucide-react'
 
-export default function ControlLoginPage() {
+function ControlLoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [secret, setSecret] = useState('')
@@ -55,7 +55,7 @@ export default function ControlLoginPage() {
               <Brain className="w-6 h-6 text-emerald-400" />
             </div>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">AI Operations Center™</h1>
+          <h1 className="text-xl font-bold text-white tracking-tight">AI Software Factory™</h1>
           <p className="text-slate-500 text-sm mt-1">Restricted Access</p>
         </div>
 
@@ -163,5 +163,22 @@ export default function ControlLoginPage() {
         </div>
       </motion.div>
     </div>
+  )
+}
+
+export default function ControlLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-950">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+            <p className="text-slate-500 text-sm">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <ControlLoginForm />
+    </Suspense>
   )
 }
