@@ -23,7 +23,7 @@ export default function ObservatoryFooter() {
       { label: 'Methodology', href: '#observatory-methodology' },
       { label: 'Data Integrity', href: '#observatory-methodology' },
       { label: 'Citation Warehouse', href: '#observatory-archive' },
-      { label: 'SeoSights', href: '#' },
+      { label: 'SeoSights', href: '/' },
     ],
   }
 

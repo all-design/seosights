@@ -335,3 +335,24 @@ Stage Summary:
 - Three data modes: Development/Preview/Production with strict gate
 - New moats implemented: AI Search Graph™, Evidence Explorer™, AI Search Timeline™, Observatory Citations™
 - All lint checks pass cleanly
+
+---
+Task ID: subdomain-routing
+Agent: main
+Task: Split SeoSights and Observatory into separate routes
+
+Work Log:
+- Created `/observatory` route at src/app/observatory/page.tsx — full Observatory standalone page
+- Redesigned homepage (src/app/page.tsx) as server component rendering SeoSightsPage
+- Rewrote SeoSightsPage.tsx inspired by Visi Insights reference: dark hero with "Will AI recommend your business?" headline, URL input + Try Free Demo CTA, tracked AI models row, social proof stats
+- Updated all links from ?view=observatory to /observatory throughout SeoSightsPage
+- Added seosights.com link in ObservatoryNavbar, updated ObservatoryFooter SeoSights link to "/"
+- Removed ObservatoryPage.tsx (unused, functionality moved to /observatory route)
+- Removed 'use client' from page.tsx — now server component
+- Lint passes cleanly, both pages verified with agent-browser
+
+Stage Summary:
+- seosights.com (/) → SeoSights SaaS landing: "Will AI recommend your business?" dark hero, URL input, three pillars, features, pricing
+- ai.seosights.com or /observatory → AI Search Observatory™: dark theme, Pulse, Weather, Index, Graph, Timeline, Evidence, Archive, Charts, Methodology, Citations
+- Architecture supports both host-based routing (ai.seosights.com) and path-based (/observatory)
+- Both pages verified working with agent-browser, no console errors

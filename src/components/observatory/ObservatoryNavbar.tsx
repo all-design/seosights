@@ -118,6 +118,12 @@ export default function ObservatoryNavbar({ onNavigate }: ObservatoryNavbarProps
               <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
               <span>{liveCount.toLocaleString()} responses archived</span>
             </div>
+            <a
+              href="/"
+              className="text-xs text-slate-500 hover:text-emerald-400 transition-colors"
+            >
+              seosights.com
+            </a>
             <Button
               size="sm"
               className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 text-xs h-7"
