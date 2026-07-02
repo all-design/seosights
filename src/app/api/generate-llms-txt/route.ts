@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     if (!content) {
       try {
-        const pageResult = await zai.functions.invoke('page_reader', { url })
+        const pageResult = await (zai as any).functions.invoke('page_reader', { url })
         if (pageResult) {
           const rawData = pageResult.data || pageResult
           const htmlContent = rawData.html || ''
@@ -107,7 +107,7 @@ Rules:
 
     let llmsTxt = ''
     try {
-      const result = await zai.chat.completions.create({
+      const result = await (zai as any).chat.completions.create({
         messages: [
           { role: 'system', content: llmsTxtSystemPrompt },
           { role: 'user', content: llmsTxtPrompt },
@@ -182,7 +182,7 @@ Rules:
 
     let llmsFullTxt = ''
     try {
-      const result = await zai.chat.completions.create({
+      const result = await (zai as any).chat.completions.create({
         messages: [
           { role: 'system', content: llmsFullTxtSystemPrompt },
           { role: 'user', content: llmsFullTxtPrompt },

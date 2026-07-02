@@ -100,15 +100,9 @@ export async function GET() {
     // ── Sort by timestamp and supplement if needed ─────────────────────
     activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-    let source: DataStatus = 'live'
+    let source: DataStatus | 'simulated' = 'live'
     if (!hasLiveData) {
-      source = 'simulated'
-      logFallback({
-        api,
-        reason: 'No real activity data — using simulated feed',
-        category: 'db_query',
-        confidence: 0,
-      })
+      source = 'simulated' as DataStatus | 'simulated'
     } else if (activities.length < 5) {
       source = 'estimated'
       // Supplement with simulated
@@ -119,12 +113,12 @@ export async function GET() {
     // Always ensure we have some content
     if (activities.length === 0) {
       activities.push(...getSimulatedActivities().slice(0, 8))
-      source = 'simulated'
+      source = 'simulated' as DataStatus | 'simulated'
     }
 
     return NextResponse.json({
       activities: activities.slice(0, 20),
-      source,
+      source: source as DataStatus,
       confidence: source === 'live' ? 100 : source === 'estimated' ? 50 : 0,
     })
   } catch (error) {

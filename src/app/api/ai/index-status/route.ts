@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const citationEvents = await safeQuery(
+    const citationEventsResult = await safeQuery(
       (d) => d.citationEvent.findMany({
         where: citationWhere,
         orderBy: { createdAt: 'desc' },
@@ -93,18 +93,20 @@ export async function GET(req: NextRequest) {
       }),
       []
     )
+    const citationEvents = citationEventsResult.data
 
     // ── Fetch latest VisibilitySnapshot for per-engine data ──────
     const snapshotWhere: Record<string, unknown> = { domain }
     if (userId) snapshotWhere.userId = userId
 
-    const latestSnapshot = await safeQuery(
+    const latestSnapshotResult = await safeQuery(
       (d) => d.visibilitySnapshot.findFirst({
         where: snapshotWhere,
         orderBy: { capturedAt: 'desc' },
       }),
       null
     )
+    const latestSnapshot = latestSnapshotResult.data
 
     // ── If no data at all, fall back to mock ─────────────────────
     if (citationEvents.length === 0 && !latestSnapshot) {

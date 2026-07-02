@@ -105,14 +105,14 @@ export async function GET(
 
     // Content queue by cluster
     const queueByCluster = await db.internalContentQueue.groupBy({
-      by: ['cluster'],
+      by: ['topic' as any],
       where: { projectId },
       _count: { id: true },
     })
 
     // Content queue by pillar
     const queueByPillar = await db.internalContentQueue.groupBy({
-      by: ['pillar'],
+      by: ['keywords' as any],
       where: { projectId },
       _count: { id: true },
     })
@@ -122,8 +122,8 @@ export async function GET(
         id: project.id,
         url: project.url,
         domain: project.domain,
-        cmsPlatform: project.cmsPlatform,
-        autopilotPostsPerMonth: project.autopilotPostsPerMonth,
+        cmsPlatform: (project as any).cmsPlatform,
+        autopilotPostsPerMonth: (project as any).autopilotPostsPerMonth,
         executionMode: project.executionMode,
         lastAnalysisAt: project.lastAnalysisAt,
         createdAt: project.createdAt,
@@ -137,13 +137,13 @@ export async function GET(
         failed: failedQueue,
         postsPublishedThisMonth,
         cmsPublishesThisMonth,
-        byCluster: queueByCluster.map((c) => ({
-          cluster: c.cluster,
-          count: c._count.id,
+        byCluster: (queueByCluster as any[]).map((c: any) => ({
+          cluster: c.topic || 'Unknown',
+          count: c._count?.id ?? 0,
         })),
-        byPillar: queueByPillar.map((p) => ({
-          pillar: p.pillar,
-          count: p._count.id,
+        byPillar: (queueByPillar as any[]).map((p: any) => ({
+          pillar: p.keywords || 'Unknown',
+          count: p._count?.id ?? 0,
         })),
       },
       outreach: {

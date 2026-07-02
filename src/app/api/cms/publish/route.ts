@@ -146,10 +146,9 @@ export async function POST(request: NextRequest) {
       await db.cMSPublishLog.create({
         data: {
           projectId,
-          agentId: 'cms-publisher',
-          contentType: 'blog_post',
-          title: articleData.title,
+          action: 'publish',
           status: 'failed',
+          error: message,
         },
       })
 
@@ -180,10 +179,9 @@ export async function POST(request: NextRequest) {
       await db.cMSPublishLog.create({
         data: {
           projectId,
-          agentId: 'cms-publisher',
-          contentType: 'blog_post',
-          title: articleData.title,
+          action: 'publish',
           status: 'failed',
+          error: errorDetail,
         },
       })
 
@@ -211,12 +209,10 @@ export async function POST(request: NextRequest) {
     await db.cMSPublishLog.create({
       data: {
         projectId,
-        agentId: 'cms-publisher',
-        contentType: 'blog_post',
-        title: articleData.title,
-        externalPostId,
-        postUrl,
-        status: publishStatus === 'publish' ? 'published' : 'draft',
+        action: 'publish',
+        status: publishStatus === 'publish' ? 'success' : 'pending',
+        cmsPostId: externalPostId,
+        cmsPostUrl: postUrl,
         publishedAt: publishStatus === 'publish' ? new Date() : null,
       },
     })

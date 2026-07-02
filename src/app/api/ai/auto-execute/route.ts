@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
     if (status) where.status = status
 
-    const executions = await safeQuery(
+    const executionsResult = await safeQuery(
       (d) => d.autoExecution.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -61,24 +61,29 @@ export async function GET(request: NextRequest) {
       }),
       [] as any[]
     )
+    const executions = executionsResult.data
 
     // Summary stats
-    const totalExecutions = await safeQuery(
+    const totalExecutionsResult = await safeQuery(
       (d) => d.autoExecution.count({ where: { domain } }),
       0
     )
-    const pendingCount = await safeQuery(
+    const totalExecutions = totalExecutionsResult.data
+    const pendingCountResult = await safeQuery(
       (d) => d.autoExecution.count({ where: { domain, status: 'pending' } }),
       0
     )
-    const successCount = await safeQuery(
+    const pendingCount = pendingCountResult.data
+    const successCountResult = await safeQuery(
       (d) => d.autoExecution.count({ where: { domain, status: 'success' } }),
       0
     )
-    const failedCount = await safeQuery(
+    const successCount = successCountResult.data
+    const failedCountResult = await safeQuery(
       (d) => d.autoExecution.count({ where: { domain, status: 'failed' } }),
       0
     )
+    const failedCount = failedCountResult.data
 
     return NextResponse.json({
       executions,
@@ -127,12 +132,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the action item exists
-    const actionItem = await safeQuery(
+    const actionItemResult = await safeQuery(
       (d) => d.actionItem.findUnique({
         where: { id: actionItemId },
       }),
       null as any
     )
+    const actionItem = actionItemResult.data
 
     if (!actionItem) {
       return NextResponse.json(
@@ -150,7 +156,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the AutoExecution with status "pending"
-    const execution = await safeQuery(
+    const executionResult = await safeQuery(
       (d) => d.autoExecution.create({
         data: {
           actionItemId,
@@ -165,6 +171,7 @@ export async function POST(request: NextRequest) {
       }),
       null as any
     )
+    const execution = executionResult.data
 
     // Update the ActionItem status to indicate auto-execution is queued
     await safeQuery(
@@ -177,6 +184,7 @@ export async function POST(request: NextRequest) {
       }),
       null as any
     )
+    // Result not needed — fire and forget update
 
     return NextResponse.json({ execution }, { status: 201 })
   } catch (error) {

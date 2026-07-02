@@ -34,9 +34,9 @@ export async function GET(
     // ── Step 1: Try in-memory queue first (same-process jobs) ────────
     const jobInfo = await getAuditJobStatus(jobId)
 
-    if (jobInfo && jobInfo.status !== 'unknown') {
+    if (jobInfo && (jobInfo.status as string) !== 'unknown') {
       // Found in the same-process queue — use its status
-      let analysis = null
+    let analysis: any = null
       if (jobInfo.status === 'completed' && jobInfo.data?.analysisId) {
         try {
           const analysisRecord = await db.analysis.findUnique({
@@ -118,8 +118,8 @@ export async function GET(
     const mappedStatus = statusMap[analysisRecord.status] || analysisRecord.status
 
     // Parse the result if completed
-    let analysis = null
-    let result = null
+    let analysis: any = null
+    let result: any = null
     if (analysisRecord.status === 'completed' && analysisRecord.result) {
       try {
         analysis = JSON.parse(analysisRecord.result)

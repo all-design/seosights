@@ -73,13 +73,12 @@ export async function POST(request: NextRequest) {
         await db.internalContentQueue.create({
           data: {
             projectId: project.id,
-            keywordTarget: topic.keyword,
-            suggestedTitle: topic.title,
-            pillar: topic.pillar,
-            cluster: topic.cluster,
+            title: topic.title,
+            topic: topic.cluster,
+            keywords: topic.keyword,
             status: 'pending',
-            scheduledFor: topic.scheduledFor,
-          },
+            scheduledAt: topic.scheduledFor,
+          } as any,
         })
       }
 
@@ -111,7 +110,7 @@ interface TopicEntry {
 
 async function generateTopicClusters(domain: string, count: number): Promise<TopicEntry[]> {
   try {
-    const zai = await getZAI()
+    const zai = await getZAI() as any
 
     const completion = await zai.chat.completions.create({
       messages: [

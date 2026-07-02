@@ -43,7 +43,7 @@ export async function GET(
     const domain = analysisId.split('-')[0] || 'report'
     const filename = `seosights-report-${domain}.pdf`
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

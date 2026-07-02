@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     let citationCount = 0
     let citationSources: string[] = []
     try {
-      const searchResults = await zai.functions.invoke('web_search', {
+      const searchResults = await (zai as any).functions.invoke('web_search', {
         query: `"${domain}" site:perplexity.ai OR site:chat.openai.com OR site:gemini.google.com`,
         num: 10,
       })
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     try {
       const protocol = domain.startsWith('http') ? '' : 'https://'
       const robotsUrl = `${protocol}${domain}/robots.txt`
-      const robotsResult = await zai.functions.invoke('page_reader', { url: robotsUrl })
+      const robotsResult = await (zai as any).functions.invoke('page_reader', { url: robotsUrl })
       if (robotsResult) {
         const rd = robotsResult.data || robotsResult
         robotsTxtContent = (rd.html || rd.text || '')
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     try {
       const protocol = domain.startsWith('http') ? '' : 'https://'
       const llmsUrl = `${protocol}${domain}/llms.txt`
-      const llmsResult = await zai.functions.invoke('page_reader', { url: llmsUrl })
+      const llmsResult = await (zai as any).functions.invoke('page_reader', { url: llmsUrl })
       if (llmsResult) {
         const ld = llmsResult.data || llmsResult
         const content = (ld.html || ld.text || '').trim()
@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
     // Check 5: AI Overview presence check via search
     let aiOverviewDetected = false
     try {
-      const overviewSearch = await zai.functions.invoke('web_search', {
+      const overviewSearch = await (zai as any).functions.invoke('web_search', {
         query: `${domain} AI overview Google`,
         num: 5,
       })

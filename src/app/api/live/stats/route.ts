@@ -129,7 +129,7 @@ function generateGrowthData(totalArticles: number) {
   const baseClicks = Math.max(10, totalArticles * 5)
   const baseImpressions = Math.max(50, totalArticles * 25)
 
-  const data = []
+  const data: any[] = []
   for (let i = 29; i >= 0; i--) {
     const date = new Date()
     date.setDate(date.getDate() - i)

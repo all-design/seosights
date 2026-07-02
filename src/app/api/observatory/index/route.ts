@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       }
 
       const allIndustries = await db.observatoryIndustry.findMany({
-        select: { indexScore: true, dataPoints: true },
+        select: { indexScore: true, dataPoints: true, trend: true },
       })
 
       const overallIndex = computeWeightedAverage(allIndustries)

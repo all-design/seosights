@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     // ── Step 3: Create Analysis record ──────────────────────────────
     const analysisSessionId = randomUUID()
-    let analysisId = analysisSessionId
+    let analysisId: string = analysisSessionId
 
     try {
       const analysisRecord = await db.analysis.create({

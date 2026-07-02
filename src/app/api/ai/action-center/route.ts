@@ -16,13 +16,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Check database for existing actions
-    const existing = await safeQuery(
+    const existingResult = await safeQuery(
       (d) => d.actionItem.findMany({
         where: { domain, status: 'pending' },
         orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
       }),
       [] as any[]
     )
+    const existing = existingResult.data
 
     if (existing.length > 0) {
       return NextResponse.json({
@@ -121,13 +122,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    const updated = await safeQuery(
+    const updatedResult = await safeQuery(
       (d) => d.actionItem.update({
         where: { id: actionId },
         data: { status, completedAt: status === 'completed' ? new Date() : null },
       }),
       null as any
     )
+    const updated = updatedResult.data
 
     return NextResponse.json({ action: updated })
   } catch (err) {

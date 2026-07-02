@@ -61,13 +61,14 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status
 
     // Fetch items — we'll sort by roiScore in-memory since we may need to recalculate
-    const items = await safeQuery(
+    const itemsResult = await safeQuery(
       (d) => d.actionItem.findMany({
         where,
         orderBy: { roiScore: 'desc' },
       }),
       [] as any[]
     )
+    const items = itemsResult.data
 
     // Calculate ROI on-the-fly if missing (roiScore === 0)
     const enrichedItems = items.map((item) => {
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch all pending items for this user+domain
-    const pendingItems = await safeQuery(
+    const pendingItemsResult = await safeQuery(
       (d) => d.actionItem.findMany({
         where: {
           domain,
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
       }),
       [] as any[]
     )
+    const pendingItems = pendingItemsResult.data
 
     if (pendingItems.length === 0) {
       return NextResponse.json({
@@ -162,7 +164,7 @@ export async function POST(request: NextRequest) {
     let updatedCount = 0
     for (let i = 0; i < itemsWithRoi.length; i++) {
       const item = itemsWithRoi[i]
-      const updateResult = await safeQuery(
+      const updateResult = (await safeQuery(
         (d) => d.actionItem.update({
           where: { id: item.id },
           data: {
@@ -171,7 +173,7 @@ export async function POST(request: NextRequest) {
           },
         }),
         null as any
-      )
+      )).data
       if (updateResult) updatedCount++
     }
 

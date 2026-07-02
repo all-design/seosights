@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Try to get feed items from database first
-    const existingItems = await safeQuery(
+    const existingItemsResult = await safeQuery(
       (d) => d.feedItem.findMany({
         where: { domain },
         orderBy: { createdAt: 'desc' },
@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       }),
       []
     )
+    const existingItems = existingItemsResult.data
 
     if (existingItems.length > 0) {
       return NextResponse.json({

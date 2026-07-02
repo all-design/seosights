@@ -53,13 +53,14 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
 
     // Fetch snapshots in chronological order
-    const snapshots = await safeQuery(
+    const snapshotsResult = await safeQuery(
       (d) => d.visibilitySnapshot.findMany({
         where,
         orderBy: { capturedAt: 'asc' },
       }),
       [] as any[]
     )
+    const snapshots = snapshotsResult.data
 
     // Build frames with score deltas
     const frames = snapshots.map((snap, idx) => {
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Count total frames from VisibilitySnapshot data in the date range
-    const totalFrames = await safeQuery(
+    const totalFramesResult = await safeQuery(
       (d) => d.visibilitySnapshot.count({
         where: {
           domain,
@@ -193,9 +194,10 @@ export async function POST(request: NextRequest) {
       }),
       0
     )
+    const totalFrames = totalFramesResult.data
 
     // Identify highlights for the session
-    const snapshots = await safeQuery(
+    const snapshotsResult = await safeQuery(
       (d) => d.visibilitySnapshot.findMany({
         where: {
           domain,
@@ -205,6 +207,7 @@ export async function POST(request: NextRequest) {
       }),
       [] as any[]
     )
+    const snapshots = snapshotsResult.data
 
     const highlightMoments: Array<{ capturedAt: string; delta: number; direction: string }> = []
     for (let i = 1; i < snapshots.length; i++) {
@@ -218,7 +221,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const session = await safeQuery(
+    const sessionResult = await safeQuery(
       (d) => d.replaySession.create({
         data: {
           userId,
@@ -233,6 +236,7 @@ export async function POST(request: NextRequest) {
       }),
       null as any
     )
+    const session = sessionResult.data
 
     return NextResponse.json({ session }, { status: 201 })
   } catch (error) {

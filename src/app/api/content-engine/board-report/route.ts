@@ -345,17 +345,10 @@ ${JSON.stringify(rawData, null, 2)}
 
 Write the report sections as JSON.`
 
-      const completion = await createChatCompletion({
-        model: 'gpt-4o-mini',
-        messages: [
+      const content = await createChatCompletion([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 2000,
-      })
-
-      const content = completion.choices?.[0]?.message?.content
+        ], { temperature: 0.4 })
       if (content) {
         // Try to parse JSON from AI response
         const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -418,7 +411,7 @@ Write the report sections as JSON.`
       period: periodLabel,
       executive_summary: buildExecutiveSummary(keyMetrics, periodLabel),
       sections: {
-        ...sections,
+        ...sections as any,
         forecast: {
           next_week_visibility: forecastVisibility,
           confidence: forecastConfidence,

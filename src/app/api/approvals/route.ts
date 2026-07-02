@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const status = action === 'approve' ? 'approved' : 'rejected'
 
-    const results = []
+    const results: any[] = []
     for (const id of approvalIds) {
       try {
         const updated = await db.approval.update({

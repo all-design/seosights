@@ -19,13 +19,14 @@ export async function GET(req: NextRequest) {
 
     // Check database for existing snapshots
     const since = new Date(Date.now() - days * 86400000)
-    const existing = await safeQuery(
+    const existingResult = await safeQuery(
       (d) => d.recommendationSnapshot.findMany({
         where: { domain, capturedAt: { gte: since } },
         orderBy: { capturedAt: 'desc' },
       }),
       []
     )
+    const existing = existingResult.data
 
     if (existing.length >= 3) {
       return NextResponse.json({
@@ -111,7 +112,7 @@ Return JSON:
 }
 
 function generateSimulationHistory(domain: string, days: number) {
-  const entries = []
+  const entries: any[] = []
   const baseScore = 55
   for (let i = days; i >= 0; i -= Math.max(1, Math.floor(days / 10))) {
     const date = new Date(Date.now() - i * 86400000)

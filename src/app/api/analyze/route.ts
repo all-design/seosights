@@ -494,7 +494,7 @@ export async function POST(request: NextRequest) {
     const analysisSessionId = randomUUID()
 
     // Create an Analysis record in the database
-    let analysisId = analysisSessionId
+    let analysisId: string = analysisSessionId
     try {
       const analysisRecord = await db.analysis.create({
         data: {
@@ -506,7 +506,7 @@ export async function POST(request: NextRequest) {
           userId: userId || null,
         }
       })
-      analysisId = analysisRecord.id
+      analysisId = analysisRecord.id as string
     } catch (dbError) {
       console.error('[analyze] Failed to create Analysis record:', dbError instanceof Error ? dbError.message : 'Unknown')
       // Continue with the session ID as fallback
@@ -515,7 +515,7 @@ export async function POST(request: NextRequest) {
     async function* generateEvents(): AsyncGenerator<string> {
       try {
         const { getZAI } = await import('@/lib/zai')
-        const zai = await getZAI()
+        const zai = await getZAI() as any
 
         // Create the token tracker for this analysis session
         const tokenTracker = new TokenTracker(analysisSessionId, {
@@ -1231,7 +1231,7 @@ export async function POST(request: NextRequest) {
 
         // Fire and forget webhook dispatch
         try {
-          const { WebhookDispatcher } = await import('@/lib/webhook-dispatcher')
+          const { WebhookDispatcher } = await import('@/lib/webhook-dispatcher') as any
           const dispatcher = new WebhookDispatcher()
           dispatcher.dispatch('system', { type: 'analysis.complete', domain, message: `Analysis complete for ${domain}` }).catch(() => {})
         } catch {}

@@ -65,7 +65,7 @@ const meshProviders: MeshProvider[] = [
   {
     name: 'OpenRouter',
     icon: Bot,
-    models: ['GLM 5.2', 'Qwen Coder 2.5'],
+    models: ['GLM 5.1', 'GLM Turbo', 'Qwen Coder 2.5'],
     speed: 'Fast (~120 tok/s)',
     status: 'online',
     requestsToday: 143,
@@ -98,14 +98,14 @@ const engineMappings: EngineMapping[] = [
     engine: 'Product Engine',
     icon: Landmark,
     primaryModel: 'Gemini Flash',
-    fallbackModel: 'GLM 5.2',
+    fallbackModel: 'GLM 5.1',
     llmUsage: 85,
     description: 'Reasoning for product decisions',
   },
   {
     engine: 'Architecture Engine',
     icon: Cpu,
-    primaryModel: 'GLM 5.2',
+    primaryModel: 'GLM 5.1',
     fallbackModel: 'Qwen Coder',
     llmUsage: 70,
     description: 'Code structure & planning',
@@ -113,7 +113,7 @@ const engineMappings: EngineMapping[] = [
   {
     engine: 'Engineering Engine',
     icon: Code2,
-    primaryModel: 'GLM 5.2',
+    primaryModel: 'GLM 5.1',
     fallbackModel: 'Gemini Flash',
     llmUsage: 95,
     description: '95% of cases — great for code',
@@ -129,7 +129,7 @@ const engineMappings: EngineMapping[] = [
   {
     engine: 'Review Engine',
     icon: Eye,
-    primaryModel: 'GLM 5.2 + Gemini Flash',
+    primaryModel: 'GLM 5.1 + Gemini Flash',
     fallbackModel: 'Groq',
     llmUsage: 60,
     description: 'Cross review with dual models',
@@ -138,7 +138,7 @@ const engineMappings: EngineMapping[] = [
     engine: 'Documentation Engine',
     icon: PenTool,
     primaryModel: 'Gemini Flash',
-    fallbackModel: 'GLM 5.2',
+    fallbackModel: 'GLM 5.1',
     llmUsage: 75,
     description: 'Narrative generation',
   },
@@ -208,7 +208,7 @@ const cacheStats = {
 }
 
 const footerStats = {
-  modelsAvailable: 7,
+  modelsAvailable: 9,
   freeTierLimits: 'Gemini: 15 RPM, Groq: 30 RPM, OpenRouter: 20 RPM',
   uptime: '99.97%',
   totalRoutedToday: 431,

@@ -185,7 +185,8 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
     try {
       await fetch('/api/control/logout', { method: 'POST' })
     } finally {
-      router.replace('/control/login')
+      // Use hard redirect to ensure cookie state is cleared
+      window.location.href = '/control/login'
     }
   }, [router])
 
@@ -357,7 +358,7 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
 // Custom hook for clock
 function useCurrentTime() {
   const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-US', { hour12: false }))
-  const timerRef = useRef<ReturnType<typeof setInterval>>()
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     timerRef.current = setInterval(() => {

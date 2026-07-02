@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     const [articles, briefs, existingNodes] = await Promise.all([
       db.contentArticle.findMany({
         where: { domain, status: 'published' },
-        select: { id: true, title: true, content: true, pillar: true, keywordTarget: true },
+        select: { id: true, title: true, content: true, pillar: true },
         take: 20,
       }),
       db.contentBrief.findMany({

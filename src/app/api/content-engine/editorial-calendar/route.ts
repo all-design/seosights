@@ -61,9 +61,6 @@ export async function GET(request: Request) {
         date: { gte: fromDate, lte: toDate },
       },
       orderBy: { date: 'asc' },
-      include: {
-        // Include linked brief and article if they exist via the IDs
-      },
     })
 
     // Enrich with brief/article data

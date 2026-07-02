@@ -31,7 +31,7 @@ function generateMockData(days: number) {
     }
   })
 
-  const costPerDay = []
+  const costPerDay: { date: string; cost: number }[] = []
   const now = new Date()
   for (let d = days - 1; d >= 0; d--) {
     const date = new Date(now)

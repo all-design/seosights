@@ -620,7 +620,7 @@ export async function POST() {
 // ─── Chart Data Generators ─────────────────────────────────────────
 
 function generateTrendData(days: number, startVal: number, endVal: number, source: string) {
-  const data = []
+  const data: any[] = []
   const now = new Date()
   for (let d = days - 1; d >= 0; d--) {
     const date = new Date(now.getTime() - d * 24 * 60 * 60 * 1000)
@@ -668,7 +668,7 @@ function generateCitationDistributionData() {
 }
 
 function generateWeatherHistoryData() {
-  const data = []
+  const data: any[] = []
   const now = new Date()
   for (let d = 29; d >= 0; d--) {
     const date = new Date(now.getTime() - d * 24 * 60 * 60 * 1000)

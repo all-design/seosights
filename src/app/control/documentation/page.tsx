@@ -6,7 +6,7 @@ import {
   ChevronRight, Clock, Scan, Layers, GitBranch, Box, Network,
   ArrowRight, Zap, FileText, Code2, Database, Webhook, TestTube,
   Palette, Eye, Package, Globe, Sparkles, History, Activity,
-  Bot, Branches, CalendarClock, Search, XCircle,
+  Bot, CalendarClock, Search, XCircle,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────

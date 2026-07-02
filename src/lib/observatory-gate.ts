@@ -63,5 +63,5 @@ export function createProductionGateResponse(error: string): NextResponse {
  * ```
  */
 export function productionGate(): { isSimulated: false } | Record<string, never> {
-  return isProduction() ? { isSimulated: false } : {}
+  return isProduction() ? { isSimulated: false } : {} as Record<string, never>
 }

@@ -10,7 +10,7 @@ import {
 
 interface SystemStatus {
   name: string
-  status: 'running' | 'healthy' | 'collecting' | 'idle' | 'warning' | 'monitoring' | 'learning'
+  status: 'running' | 'healthy' | 'collecting' | 'idle' | 'warning' | 'monitoring' | 'learning' | 'recording' | 'routing'
   health: number
   icon: React.ElementType
   description: string

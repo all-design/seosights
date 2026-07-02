@@ -198,7 +198,7 @@ export async function GET(req: NextRequest) {
     const snapshotWhereBase: Record<string, unknown> = { domain }
     if (userId) snapshotWhereBase.userId = userId
 
-    const beforeSnapshot = await safeQuery(
+    const beforeSnapshotResult = await safeQuery(
       (d) => d.visibilitySnapshot.findFirst({
         where: {
           ...snapshotWhereBase,
@@ -208,9 +208,10 @@ export async function GET(req: NextRequest) {
       }),
       null
     )
+    const beforeSnapshot = beforeSnapshotResult.data
 
     // ── Fetch "after" snapshot (closest to afterDate) ────────────
-    const afterSnapshot = await safeQuery(
+    const afterSnapshotResult = await safeQuery(
       (d) => d.visibilitySnapshot.findFirst({
         where: {
           ...snapshotWhereBase,
@@ -220,6 +221,7 @@ export async function GET(req: NextRequest) {
       }),
       null
     )
+    const afterSnapshot = afterSnapshotResult.data
 
     // ── If both snapshots missing, fall back to mock ─────────────
     if (!beforeSnapshot && !afterSnapshot) {
@@ -257,7 +259,7 @@ export async function GET(req: NextRequest) {
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const beforeCitations = await safeQuery(
+    const beforeCitationsResult = await safeQuery(
       (d) => d.citationEvent.findMany({
         where: {
           ...citationWhere,
@@ -267,8 +269,9 @@ export async function GET(req: NextRequest) {
       }),
       []
     )
+    const beforeCitations = beforeCitationsResult.data
 
-    const afterCitations = await safeQuery(
+    const afterCitationsResult = await safeQuery(
       (d) => d.citationEvent.findMany({
         where: {
           ...citationWhere,
@@ -278,6 +281,7 @@ export async function GET(req: NextRequest) {
       }),
       []
     )
+    const afterCitations = afterCitationsResult.data
 
     const gained = afterCitations
       .filter((e) => e.eventType === 'cited' || e.eventType === 'first_mention' || e.eventType === 'rank_up')

@@ -61,13 +61,14 @@ export async function GET(req: NextRequest) {
     const snapshotWhere: Record<string, unknown> = { domain }
     if (userId) snapshotWhere.userId = userId
 
-    const yourSnapshot = await safeQuery(
+    const yourSnapshotResult = await safeQuery(
       (d) => d.visibilitySnapshot.findFirst({
         where: snapshotWhere,
         orderBy: { capturedAt: 'desc' },
       }),
       null
     )
+    const yourSnapshot = yourSnapshotResult.data
 
     // ── Fetch IndustryBenchmark for competitor context ───────────
     let benchmark: {
@@ -79,19 +80,19 @@ export async function GET(req: NextRequest) {
     } | null = null
 
     if (industry) {
-      benchmark = await safeQuery(
+      benchmark = (await safeQuery(
         (d) => d.industryBenchmark.findUnique({
           where: { industry },
         }),
         null
-      )
+      )).data
     }
 
     // ── Fetch competitor domains from CitationEvent ──────────────
     const citationWhere: Record<string, unknown> = { domain }
     if (userId) citationWhere.userId = userId
 
-    const competitorEvents = await safeQuery(
+    const competitorEventsResult = await safeQuery(
       (d) => d.citationEvent.findMany({
         where: {
           ...citationWhere,
@@ -102,6 +103,7 @@ export async function GET(req: NextRequest) {
       }),
       []
     )
+    const competitorEvents = competitorEventsResult.data
 
     // ── Gather unique competitor domains ─────────────────────────
     const competitorDomains = [...new Set(
@@ -111,7 +113,7 @@ export async function GET(req: NextRequest) {
     )].slice(0, 5)
 
     // ── Fetch snapshots for each competitor ──────────────────────
-    const competitorSnapshots = competitorDomains.length > 0
+    const competitorSnapshotsResult = competitorDomains.length > 0
       ? await safeQuery(
           (d) => d.visibilitySnapshot.findMany({
             where: {
@@ -122,7 +124,8 @@ export async function GET(req: NextRequest) {
           }),
           []
         )
-      : []
+      : null
+    const competitorSnapshots = competitorSnapshotsResult ? competitorSnapshotsResult.data : []
 
     // ── Build rankings ───────────────────────────────────────────
     const yourScore = yourSnapshot?.overallScore ?? 0

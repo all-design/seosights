@@ -105,7 +105,7 @@ export async function GET(request: Request) {
     ]
 
     // Determine today's article (from calendar or in-progress)
-    let todayArticle = null
+    let todayArticle: any = null
     if (todayCalendar?.articleId) {
       todayArticle = await db.contentArticle.findUnique({
         where: { id: todayCalendar.articleId },

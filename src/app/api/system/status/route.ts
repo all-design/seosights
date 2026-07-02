@@ -61,7 +61,8 @@ async function checkDatabase(): Promise<ComponentStatus> {
 async function checkRedis(): Promise<ComponentStatus> {
   const start = Date.now()
   try {
-    const { redis } = await import('@/lib/redis')
+    const { getRedisConnection } = await import('@/lib/redis')
+    const redis = getRedisConnection()
     if (!redis || redis.status === 'wait' || redis.status === 'end') {
       return {
         status: 'degraded',

@@ -69,13 +69,13 @@ export async function POST(request: NextRequest) {
     const errors: string[] = []
     let lastProvider: string | null = null
 
-    for (const outreach of pendingOutreach) {
+    for (const outreach of pendingOutreach as any[]) {
       try {
         // ── Send Email ───────────────────────────────────────────────
         const emailResult = await sendEmail({
           to: outreach.targetEmail,
           subject: outreach.subject,
-          html: formatOutreachEmail(outreach.emailBody),
+          html: formatOutreachEmail(outreach.emailBody || outreach.body || ''),
           replyTo: 'outreach@seosights.com',
           headers: {
             'X-Entity-Ref-ID': `seosights-outreach-${outreach.id}`,
@@ -101,8 +101,8 @@ export async function POST(request: NextRequest) {
             where: { id: outreach.id },
             data: {
               status: 'failed',
-              errorMessage: emailResult.error || 'Email delivery failed',
-            },
+              error: emailResult.error || 'Email delivery failed',
+            } as any,
           })
           failed++
           errors.push(
@@ -117,11 +117,11 @@ export async function POST(request: NextRequest) {
           where: { id: outreach.id },
           data: {
             status: 'failed',
-            errorMessage,
-          },
+            error: errorMessage,
+          } as any,
         })
         failed++
-        errors.push(`${outreach.targetSite}: ${errorMessage}`)
+        errors.push(`${(outreach as any).targetSite || 'unknown'}: ${errorMessage}`)
       }
     }
 

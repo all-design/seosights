@@ -71,7 +71,7 @@ export async function GET() {
 
       // Unique domains from SourceTracking
       db.sourceTracking.findMany({
-        where: { ...productionGate() },
+        where: productionGate() as any,
         select: { domain: true },
         distinct: ['domain'],
       }),

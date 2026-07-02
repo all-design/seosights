@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // ── Step 1: Fetch the page ──
     let siteData: { title?: string; html?: string; text?: string } = { title: url, text: '' }
     try {
-      const pageResult = await zai.functions.invoke('page_reader', { url })
+      const pageResult = await (zai as any).functions.invoke('page_reader', { url })
       if (pageResult) {
         const rawData = pageResult.data || pageResult
         const htmlContent = rawData.html || ''
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     // ── Step 2: Try to fetch robots.txt ──
     let robotsTxt = ''
     try {
-      const robotsResult = await zai.functions.invoke('page_reader', {
+      const robotsResult = await (zai as any).functions.invoke('page_reader', {
         url: `${parsedUrl.origin}/robots.txt`,
       })
       if (robotsResult) {
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     // ── Step 3: Check for llms.txt ──
     let llmsTxtExists = false
     try {
-      const llmsResult = await zai.functions.invoke('page_reader', {
+      const llmsResult = await (zai as any).functions.invoke('page_reader', {
         url: `${parsedUrl.origin}/llms.txt`,
       })
       if (llmsResult) {
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
 Website: ${url}
 Domain: ${domain}
 Title: ${siteData.title}
-Content snippet: ${siteData.text.slice(0, 1500)}
+Content snippet: ${siteData.text?.slice(0, 1500) || ''}
 Robots.txt: ${robotsTxt.slice(0, 500) || 'Not found'}
 llms.txt present: ${llmsTxtExists}
 
@@ -197,7 +197,7 @@ IMPORTANT: Return ONLY raw JSON. No code fences.`
 
     let analysisResult: Record<string, unknown> = {}
     try {
-      const result = await zai.chat.completions.create({
+      const result = await (zai as any).chat.completions.create({
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: quickAnalysisPrompt },

@@ -68,7 +68,7 @@ const CHANGE_TYPES = [
 /**
  * Parse JSON from LLM response, handling markdown code blocks and trailing commas.
  */
-function parseLLMJson(raw: string): Record<string, unknown> {
+function parseLLMJson(raw: string): any {
   let cleaned = raw.trim()
   const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (jsonMatch) cleaned = jsonMatch[1].trim()
@@ -107,7 +107,7 @@ export async function GET() {
   }
 
   try {
-    const zai = await ZAI.create()
+    const zai = await ZAI.create() as any
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 1: Create daily crawl & query AI models

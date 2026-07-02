@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
     if (digestType) where.digestType = digestType
 
-    const digests = await safeQuery(
+    const digestsResult = await safeQuery(
       (d) => d.emailDigest.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -89,6 +89,7 @@ export async function GET(request: NextRequest) {
       }),
       []
     )
+    const digests = digestsResult.data
 
     return NextResponse.json({ digests, total: digests.length })
   } catch (error) {
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
     const { from, to } = getDateRangeForDigestType(digestType)
 
     // ── Fetch VisibilitySnapshots for the period ────────────────
-    const snapshots = await safeQuery(
+    const snapshotsResult = await safeQuery(
       (d) => d.visibilitySnapshot.findMany({
         where: {
           domain,
@@ -130,13 +131,14 @@ export async function POST(request: NextRequest) {
       }),
       [] as any[]
     )
+    const snapshots = snapshotsResult.data
 
     const scoreBefore = snapshots.length > 0 ? snapshots[0].overallScore : 0
     const scoreAfter = snapshots.length > 0 ? snapshots[snapshots.length - 1].overallScore : 0
     const scoreDelta = scoreAfter - scoreBefore
 
     // ── Fetch CitationEvents for the period ─────────────────────
-    const citationEvents = await safeQuery(
+    const citationEventsResult = await safeQuery(
       (d) => d.citationEvent.findMany({
         where: {
           domain,
@@ -145,6 +147,7 @@ export async function POST(request: NextRequest) {
       }),
       [] as any[]
     )
+    const citationEvents = citationEventsResult.data
 
     const citationsGained = citationEvents.filter(
       (e) => e.eventType === 'cited' || e.eventType === 'first_mention' || e.eventType === 'rank_up'
@@ -155,7 +158,7 @@ export async function POST(request: NextRequest) {
     ).length
 
     // ── Fetch FeedItems for the period ──────────────────────────
-    const feedItems = await safeQuery(
+    const feedItemsResult = await safeQuery(
       (d) => d.feedItem.findMany({
         where: {
           domain,
@@ -166,6 +169,7 @@ export async function POST(request: NextRequest) {
       }),
       [] as any[]
     )
+    const feedItems = feedItemsResult.data
 
     const feedHighlights = feedItems.map((item) => ({
       id: item.id,
@@ -176,7 +180,7 @@ export async function POST(request: NextRequest) {
     }))
 
     // ── Fetch ActionItems (new opportunities) for the period ────
-    const actionItems = await safeQuery(
+    const actionItemsResult = await safeQuery(
       (d) => d.actionItem.findMany({
         where: {
           domain,
@@ -189,6 +193,7 @@ export async function POST(request: NextRequest) {
       }),
       [] as any[]
     )
+    const actionItems = actionItemsResult.data
 
     const newOpportunities = actionItems.length
     const topOpportunity = actionItems.length > 0
@@ -220,7 +225,7 @@ export async function POST(request: NextRequest) {
     const subject = buildSubject(digestType, domain, scoreDelta, citationsGained)
 
     // ── Create the EmailDigest record ───────────────────────────
-    const digest = await safeQuery(
+    const digestResult = await safeQuery(
       (d) => d.emailDigest.create({
         data: {
           userId,
@@ -241,6 +246,7 @@ export async function POST(request: NextRequest) {
       }),
       null as any
     )
+    const digest = digestResult.data
 
     return NextResponse.json({ digest }, { status: 201 })
   } catch (error) {

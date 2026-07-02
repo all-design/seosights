@@ -21,7 +21,7 @@ export async function POST() {
 
     // ── 1. Create sample briefs ────────────────────────────────────────────
     const briefTopics = topics.slice(0, 15) // Use first 15 topics
-    const briefs = []
+    const briefs: any[] = []
 
     for (const topic of briefTopics) {
       const brief = await db.contentBrief.create({
@@ -67,7 +67,7 @@ export async function POST() {
     results.briefs = briefs.length
 
     // ── 2. Create sample articles ──────────────────────────────────────────
-    const articles = []
+    const articles: any[] = []
     const formats = ['blog', 'landing_page', 'case_study', 'linkedin', 'twitter_thread', 'newsletter', 'docs', 'vs_page']
 
     for (const brief of briefs.slice(0, 10)) {
@@ -210,7 +210,7 @@ export async function POST() {
     results.kpiEntries = kpiCount
 
     // ── 6. Create sample experiments ───────────────────────────────────────
-    const experiments = []
+    const experiments: any[] = []
     if (articles.length >= 4) {
       const exp = await db.contentExperiment.create({
         data: {

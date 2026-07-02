@@ -25,14 +25,14 @@ const C = {
 
 // ── Score Helpers ───────────────────────────────────────────────────
 function scoreRGB(score: number): [number, number, number] {
-  if (score >= 70) return C.emerald
-  if (score >= 40) return C.amber
-  return C.red
+  if (score >= 70) return [...C.emerald] as [number, number, number]
+  if (score >= 40) return [...C.amber] as [number, number, number]
+  return [...C.red] as [number, number, number]
 }
 function scoreBgRGB(score: number): [number, number, number] {
-  if (score >= 70) return C.bgGreen
-  if (score >= 40) return C.bgAmber
-  return C.bgRed
+  if (score >= 70) return [...C.bgGreen] as [number, number, number]
+  if (score >= 40) return [...C.bgAmber] as [number, number, number]
+  return [...C.bgRed] as [number, number, number]
 }
 function scoreLabel(score: number): string {
   if (score >= 70) return 'Good'
@@ -345,20 +345,20 @@ class PDFBuilder {
       styles: {
         fontSize: 7,
         cellPadding: 1.5,
-        textColor: C.dark as [number, number, number],
-        lineColor: C.border as [number, number, number],
+        textColor: [...C.dark] as [number, number, number],
+        lineColor: [...C.border] as [number, number, number],
         lineWidth: 0.15,
         overflow: 'linebreak',
       },
       headStyles: {
         fillColor: headerColor as [number, number, number],
-        textColor: C.white as [number, number, number],
+        textColor: [...C.white] as [number, number, number],
         fontStyle: 'bold',
         fontSize: 7,
         cellPadding: 2,
       },
       alternateRowStyles: {
-        fillColor: C.light as [number, number, number],
+        fillColor: [...C.light] as [number, number, number],
       },
       columnStyles: {},
       didDrawPage: () => {
@@ -366,7 +366,7 @@ class PDFBuilder {
       },
     })
     // Get the final Y position after the table
-    const finalY = (this.doc as unknown as Record<string, number>).lastAutoTable?.finalY ?? startY + 10
+    const finalY = (this.doc as unknown as Record<string, any>).lastAutoTable?.finalY ?? startY + 10
     this.y = finalY + 4
     // If we went past the page, we're on a new page
     if (this.y > PH - MB) {
@@ -820,7 +820,7 @@ class PDFBuilder {
     if (!data.roadmap?.quarters?.length) return this
     this.sectionTitle('12-Month Roadmap', C.emeraldDark)
 
-    const qColors: readonly [number, number, number][] = [C.emeraldDark, C.amberDark, C.cyanDark, C.dark]
+    const qColors: [number, number, number][] = [[...C.emeraldDark] as [number, number, number], [...C.amberDark] as [number, number, number], [...C.cyanDark] as [number, number, number], [...C.dark] as [number, number, number]]
     for (let i = 0; i < data.roadmap.quarters.length; i++) {
       const q = data.roadmap.quarters[i]
       this.ensureSpace(35)

@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     if (industry) dbFilter.industry = industry
     if (category) dbFilter.category = category
 
-    const dbPrompts = await safeQuery(
+    const dbPromptsResult = await safeQuery(
       (d) => d.promptTemplate.findMany({
         where: dbFilter,
         orderBy: { usageCount: 'desc' },
@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
       }),
       []
     )
+    const dbPrompts = dbPromptsResult.data
 
     if (dbPrompts.length > 0) {
       return NextResponse.json({

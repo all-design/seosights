@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic'
 /**
  * Parse JSON from LLM response, handling markdown code blocks and trailing commas.
  */
-function parseLLMJson(raw: string): Record<string, unknown> {
+function parseLLMJson(raw: string): any {
   let cleaned = raw.trim()
   const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (jsonMatch) cleaned = jsonMatch[1].trim()
@@ -64,7 +64,7 @@ export async function GET() {
   }
 
   try {
-    const zai = await ZAI.create()
+    const zai = await ZAI.create() as any
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
@@ -75,7 +75,7 @@ export async function GET() {
 
     try {
       const industries = await db.observatoryIndustry.findMany({
-        where: { isActive: true },
+        where: {},
       })
 
       // Also ensure we have default industries if none exist

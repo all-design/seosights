@@ -588,7 +588,7 @@ Prioritize: highest impact + lowest effort first. Always consider the sprint goa
     }
 
     // Save recommendations to database
-    const savedRecommendations = []
+    const savedRecommendations: any[] = []
     for (let i = 0; i < recommendations.length; i++) {
       const rec = recommendations[i]
       const saved = await db.aIDailyRecommendation.create({

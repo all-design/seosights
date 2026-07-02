@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const [entries, total] = await Promise.all([
       db.internalContentQueue.findMany({
         where,
-        orderBy: { scheduledFor: 'asc' },
+        orderBy: { scheduledAt: 'asc' },
         take: limit,
         skip: offset,
         include: {
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     // Create all 90 entries in bulk
     const result = await db.internalContentQueue.createMany({
-      data: queueEntries,
+      data: queueEntries as any,
     })
 
     console.log(

@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
     })
 
     const result = await db.outreachLog.createMany({
-      data: outreachEntries,
+      data: outreachEntries as any,
     })
 
     console.log(

@@ -36,10 +36,11 @@ export async function GET(req: NextRequest) {
 
     // Try database first
     if (industryId) {
-      const existing = await safeQuery(
+      const existingResult = await safeQuery(
         (d) => d.industryBenchmark.findUnique({ where: { industry: industryId } }),
         null
       )
+      const existing = existingResult.data
       if (existing) {
         return NextResponse.json({
           industry: existing,
@@ -47,10 +48,11 @@ export async function GET(req: NextRequest) {
         })
       }
     } else {
-      const all = await safeQuery(
+      const allResult = await safeQuery(
         (d) => d.industryBenchmark.findMany({ orderBy: { avgAIVisibility: 'desc' } }),
         []
       )
+      const all = allResult.data
       if (all.length > 0) {
         return NextResponse.json({
           industries: all,

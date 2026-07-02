@@ -163,14 +163,14 @@ export async function GET(req: NextRequest) {
     }
 
     const engines: EngineStatus[] = engineNames.map((engineKey) => {
-      const engineEvents = citationEvents.filter((e) => e.engine === engineKey)
-      const citedEvents = engineEvents.filter((e) => e.eventType === 'cited' || e.eventType === 'first_mention')
-      const lastEvent = engineEvents[0] // already ordered desc
+      const engineEvents = citationEvents.filter((e: any) => (e as any).engine === engineKey)
+      const citedEvents = engineEvents.filter((e: any) => (e as any).eventType === 'cited' || (e as any).eventType === 'first_mention')
+      const lastEvent = engineEvents[0] as any // already ordered desc
       return {
         name: engineLabelMap[engineKey] || engineKey,
         indexed: engineEvents.length > 0,
         citations: citedEvents.length,
-        lastCrawled: lastEvent?.createdAt?.toISOString() ?? null,
+        lastCrawled: lastEvent?.createdAt?.toISOString?.() ?? null,
       }
     })
 
@@ -190,7 +190,7 @@ export async function GET(req: NextRequest) {
         }
 
     // ── Build recent activity from FeedItems ─────────────────────
-    const recentActivity = recentFeedItems.map((item) => ({
+    const recentActivity = recentFeedItems.map((item: any) => ({
       id: item.id,
       type: item.itemType,
       title: item.title,
@@ -198,7 +198,7 @@ export async function GET(req: NextRequest) {
       engine: item.engine,
       delta: item.delta,
       severity: item.severity,
-      createdAt: item.createdAt.toISOString(),
+      createdAt: item.createdAt?.toISOString?.() ?? new Date().toISOString(),
     }))
 
     const response: MissionControlResponse = {

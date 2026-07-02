@@ -29,7 +29,10 @@ function ControlLoginForm() {
 
       if (res.ok && data.success) {
         const redirectTo = searchParams.get('from') || '/control'
-        router.push(redirectTo)
+        // Use hard redirect (window.location) instead of client-side navigation
+        // to ensure the httpOnly cookie is properly picked up by the browser
+        // on the next full page load
+        window.location.href = redirectTo
       } else {
         setError(data.error || 'Authentication failed')
       }

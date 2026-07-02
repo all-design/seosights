@@ -126,7 +126,7 @@ export async function GET(request: Request) {
     const totalEstimatedGainResult = await safeQuery(() => db.actionItem.aggregate({
       _sum: { estimatedScoreGain: true },
       where: { status: { in: ['pending', 'queued'] } },
-    }), { _sum: { estimatedScoreGain: 0 } }, api)
+    }), { _sum: { estimatedScoreGain: 0 } }, { api })
 
     const totalEstimatedGain = totalEstimatedGainResult.data._sum.estimatedScoreGain || 0
 
@@ -148,7 +148,7 @@ export async function GET(request: Request) {
     const avgDeltaResult = await safeQuery(() => db.emailDigest.aggregate({
       _avg: { scoreDelta: true },
       where: { status: 'sent' },
-    }), { _avg: { scoreDelta: null } }, api)
+    }), { _avg: { scoreDelta: null } }, { api })
 
     const avgScoreDelta = avgDeltaResult.data._avg.scoreDelta
       ? Math.round(avgDeltaResult.data._avg.scoreDelta * 10) / 10

@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
     if (prompt) where.prompt = { contains: prompt }
 
-    const snapshots = await safeQuery(
+    const snapshotsResult = await safeQuery(
       (d) => d.recommendationSnapshot.findMany({
         where,
         orderBy: { capturedAt: 'desc' },
@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
       }),
       [] as any[]
     )
+    const snapshots = snapshotsResult.data
 
     // Format response with snapshots and their associated diffs
     const results = snapshots.map((snap) => ({
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
     const { engines, overallScore } = generateSimulatedEngines(brand)
 
     // Find the most recent previous snapshot for the same domain+prompt
-    const previousSnapshot = await safeQuery(
+    const previousSnapshotResult = await safeQuery(
       (d) => d.recommendationSnapshot.findFirst({
         where: {
           domain,
@@ -133,9 +134,10 @@ export async function POST(request: NextRequest) {
       }),
       null as any
     )
+    const previousSnapshot = previousSnapshotResult.data
 
     // Create the new snapshot
-    const snapshot = await safeQuery(
+    const snapshotResult = await safeQuery(
       (d) => d.recommendationSnapshot.create({
         data: {
           userId: userId || null,
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
       }),
       null as any
     )
+    const snapshot = snapshotResult.data
 
     let diff: any = null
 
@@ -213,7 +216,7 @@ export async function POST(request: NextRequest) {
       if (scoreDelta !== 0) parts.push(`Score ${scoreDelta > 0 ? '+' : ''}${scoreDelta}`)
       const summary = parts.length > 0 ? parts.join('. ') : 'No significant changes detected'
 
-      diff = await safeQuery(
+      diff = (await safeQuery(
         (d) => d.recommendationDiff.create({
           data: {
             userId: userId || null,
@@ -227,7 +230,7 @@ export async function POST(request: NextRequest) {
           },
         }),
         null as any
-      )
+      )).data
     }
 
     return NextResponse.json({ snapshot, diff }, { status: 201 })
