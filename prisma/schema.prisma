@@ -2122,6 +2122,20 @@ model MCSystemStatus {
   updatedAt       DateTime   @updatedAt
 }
 
+model MCHeartbeat {
+  id                 String   @id @default(cuid())
+  status             String   @default("healthy")
+  ageStatus          String   @default("unknown")
+  qaStatus           String   @default("unknown")
+  czStatus           String   @default("unknown")
+  observatoryStatus  String   @default("unknown")
+  schedulerStatus    String   @default("unknown")
+  checksPerformed    String?
+  timestamp          DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 // ─── QA Engine Models ────────────────────────────────────────────────
 
 model QARun {
@@ -2151,6 +2165,9 @@ model QARun {
 
   reviewerResults     QAReviewerResult[]
   issues              QAIssue[]
+  perspectives        QAExecutivePerspective[]
+  boardReports        QABoardReport[]
+  pageTests           QAPageTest[]
 }
 
 model QAReviewerResult {
@@ -2166,18 +2183,81 @@ model QAReviewerResult {
 }
 
 model QAIssue {
-  id          String    @id @default(cuid())
-  runId       String
-  severity    String    @default("minor")
-  status      String    @default("open")
-  category    String    @default("general")
-  title       String
-  description String?
-  page        String?
-  element     String?
-  suggestion  String?
-  run         QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  runId             String
+  severity          String    @default("minor")
+  status            String    @default("open")
+  category          String    @default("general")
+  title             String
+  description       String?
+  page              String?
+  element           String?
+  suggestion        String?
+  reviewer          String?
+  expectedBehavior  String?
+  actualBehavior    String?
+  reproduction      String?
+  userImpact        String?
+  businessImpact    String?
+  fixSuggestion     String?
+  evidence          String?
+  run               QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model QAExecutivePerspective {
+  id             String   @id @default(cuid())
+  runId          String
+  role           String
+  analysis       String?
+  score          Int      @default(0)
+  topConcern     String?
+  recommendation String?
+  confidence     Float    @default(0)
+  run            QARun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model QABoardReport {
+  id              String    @id @default(cuid())
+  runId           String
+  date            DateTime  @default(now())
+  productScore    Int       @default(0)
+  uxScore         Int       @default(0)
+  engineeringScore Int      @default(0)
+  conversionScore Int       @default(0)
+  customerDelight Int       @default(0)
+  technicalDebt   Int       @default(0)
+  biggestRisk     String?
+  todayPriority   String?
+  confidence      Float     @default(0)
+  scoreDelta      Int       @default(0)
+  reportContent   String?
+  run             QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model QAPageTest {
+  id               String   @id @default(cuid())
+  runId            String
+  url              String?
+  route            String?
+  loadTime         Int      @default(0)
+  statusCode       Int      @default(200)
+  hasErrors        Boolean  @default(false)
+  errorCount       Int      @default(0)
+  consoleErrors    String?
+  networkErrors    String?
+  lighthouseScore  Int      @default(0)
+  accessibilityScore Int    @default(0)
+  clicksTested     Int      @default(0)
+  formsTested      Int      @default(0)
+  modalsOpened     Int      @default(0)
+  run              QARun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
