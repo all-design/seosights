@@ -599,3 +599,71 @@ export function getTaskModelMap(): Record<TaskType, string[]> {
 export function getTierConstraints(): Record<string, { allowedProviders: ProviderId[]; maxCostPerCall: number; preferFree: boolean }> {
   return { ...TIER_CONSTRAINTS }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Circuit Breaker — Provider Health Status
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ProviderHealthEntry {
+  provider: ProviderId
+  status: 'healthy' | 'degraded' | 'down' | 'cooldown'
+  lastSuccess: Date | null
+  lastFailure: Date | null
+  consecutiveFailures: number
+  cooldownUntil: Date | null
+  message?: string
+}
+
+// In-memory circuit breaker state
+const providerHealthMap = new Map<ProviderId, ProviderHealthEntry>()
+
+function initProviderHealth(provider: ProviderId): ProviderHealthEntry {
+  if (!providerHealthMap.has(provider)) {
+    providerHealthMap.set(provider, {
+      provider,
+      status: 'healthy',
+      lastSuccess: null,
+      lastFailure: null,
+      consecutiveFailures: 0,
+      cooldownUntil: null,
+    })
+  }
+  return providerHealthMap.get(provider)!
+}
+
+export function getProviderHealthStatus(): ProviderHealthEntry[] {
+  const allProviders: ProviderId[] = ['groq', 'gemini', 'openrouter', 'openai', 'zai', 'ollama']
+  return allProviders.map(p => {
+    const entry = initProviderHealth(p)
+    // Check if cooldown has expired
+    if (entry.cooldownUntil && new Date() > entry.cooldownUntil) {
+      entry.status = 'degraded'
+      entry.cooldownUntil = null
+      entry.consecutiveFailures = 0
+    }
+    return { ...entry }
+  })
+}
+
+export function recordProviderSuccess(provider: ProviderId): void {
+  const entry = initProviderHealth(provider)
+  entry.lastSuccess = new Date()
+  entry.consecutiveFailures = 0
+  entry.status = 'healthy'
+  entry.cooldownUntil = null
+}
+
+export function recordProviderFailure(provider: ProviderId, error?: string): void {
+  const entry = initProviderHealth(provider)
+  entry.lastFailure = new Date()
+  entry.consecutiveFailures++
+  
+  if (entry.consecutiveFailures >= 3) {
+    entry.status = 'cooldown'
+    // Cooldown for 5 minutes
+    entry.cooldownUntil = new Date(Date.now() + 5 * 60 * 1000)
+    entry.message = error || `${entry.consecutiveFailures} consecutive failures`
+  } else {
+    entry.status = 'degraded'
+  }
+}

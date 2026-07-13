@@ -2018,3 +2018,166 @@ model CMSPublishLog {
   @@index([status])
   @@index([articleId])
 }
+
+// ─── Growth Engine Models ────────────────────────────────────────────
+
+model GrowthDailySnapshot {
+  id                  String    @id @default(cuid())
+  date                DateTime  @unique
+  dailyBudget         Float     @default(20)
+  assetsPublished     Int       @default(0)
+  assetsRejected      Int       @default(0)
+  assetsMerged        Int       @default(0)
+  assetsArchived      Int       @default(0)
+  avgQualityScore     Float     @default(0)
+  avgConfidence       Float     @default(0)
+  aiVisibilityGain    Float     @default(0)
+  citationGain        Float     @default(0)
+  entityGrowth        Float     @default(0)
+  organicGrowth       Float     @default(0)
+  knowledgeCoverage   Float     @default(0)
+  platformValueAdded  Float     @default(0)
+  byTypeBreakdown     String    @default("{}")
+  predictionAccuracy  Float     @default(0)
+  successfulRate      Float     @default(0)
+  isSimulated         Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model GrowthOpportunity {
+  id              String    @id @default(cuid())
+  title           String
+  description     String?
+  type            String    @default("content")
+  status          String    @default("discovered")
+  priority        String    @default("medium")
+  estimatedImpact Float     @default(0)
+  confidence      Float     @default(0)
+  source          String?
+  data            String?
+  projectId       String?
+  assignedTo      String?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model GrowthAsset {
+  id                  String    @id @default(cuid())
+  title               String
+  type                String    @default("article")
+  reviewStatus        String    @default("draft")
+  executionStatus     String    @default("pending")
+  qualityScore        Float     @default(0)
+  confidence          Float     @default(0)
+  platformValue       Float     @default(0)
+  traffic24h          Int       @default(0)
+  impressions24h      Int       @default(0)
+  clicks24h           Int       @default(0)
+  citations7d         Int       @default(0)
+  conversions7d       Int       @default(0)
+  aiVisibilityDelta   Float     @default(0)
+  opportunityId       String?
+  content             String?
+  metadata            String?
+  publishedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model GrowthGovernorDecision {
+  id              String    @id @default(cuid())
+  decisionType    String
+  context         String?
+  decision        String
+  reasoning       String?
+  confidence      Float     @default(0)
+  impact          String?
+  isAutomated     Boolean   @default(true)
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ─── Mission Control System Status ────────────────────────────────────
+
+model MCSystemStatus {
+  id              String     @id @default(cuid())
+  systemName      String     @unique
+  displayName     String
+  status          String     @default("idle")
+  phase           String     @default("Idle")
+  progress        Int        @default(0)
+  reasoning       String?
+  startedAt       DateTime?
+  lastHeartbeat   DateTime   @default(now())
+  todayTotal      Int        @default(0)
+  todayCompleted  Int        @default(0)
+  todayFailed     Int        @default(0)
+  config          String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+// ─── QA Engine Models ────────────────────────────────────────────────
+
+model QARun {
+  id                  String    @id @default(cuid())
+  status              String    @default("running")
+  triggeredBy         String    @default("manual")
+  productScore        Int       @default(0)
+  uxScore             Int       @default(0)
+  engineeringScore    Int       @default(0)
+  securityScore       Int       @default(0)
+  performanceScore    Int       @default(0)
+  seoScore            Int       @default(0)
+  accessibilityScore  Int       @default(0)
+  conversionScore     Int       @default(0)
+  customerDelight     Int       @default(0)
+  technicalDebt       Int       @default(0)
+  criticalCount       Int       @default(0)
+  majorCount          Int       @default(0)
+  mediumCount         Int       @default(0)
+  minorCount          Int       @default(0)
+  startedAt           DateTime  @default(now())
+  completedAt         DateTime?
+  durationMs          Int?
+  summary             String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  reviewerResults     QAReviewerResult[]
+  issues              QAIssue[]
+}
+
+model QAReviewerResult {
+  id          String    @id @default(cuid())
+  runId       String
+  reviewer    String
+  score       Int       @default(0)
+  status      String    @default("pending")
+  findings    String?
+  durationMs  Int?
+  run         QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+model QAIssue {
+  id          String    @id @default(cuid())
+  runId       String
+  severity    String    @default("minor")
+  status      String    @default("open")
+  category    String    @default("general")
+  title       String
+  description String?
+  page        String?
+  element     String?
+  suggestion  String?
+  run         QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
