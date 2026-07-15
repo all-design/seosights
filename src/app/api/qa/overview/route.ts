@@ -17,7 +17,7 @@ export async function GET() {
   try {
     // ── 1. Latest completed run ──────────────────────────────────────────
     const latestRun = await db.qARun.findFirst({
-      where: { status: 'completed' },
+      where: { status: { in: ['completed', 'passed', 'failed', 'warning'] } },
       orderBy: { completedAt: 'desc' },
       include: {
         reviewerResults: {
