@@ -1,27 +1,233 @@
 'use client'
 
-import { Activity, Bell, Clock, Flame, Inbox, Lock, Mail, Trophy, Zap } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import {
+  Activity, Bell, Clock, Flame, Inbox, Lock, Mail, Trophy, Zap,
+  AlertTriangle, Target, Calendar, Star, Sparkles,
+} from 'lucide-react'
 
-const sections = [
-  { name: 'Daily Brief', icon: Mail, description: 'Morning AI briefing', status: 'active', items: 1 },
-  { name: 'Missions', icon: Zap, description: 'Today\'s tasks & rewards', status: 'active', items: 3 },
-  { name: 'Momentum', icon: Flame, description: '87% — 14-day streak', status: 'active', items: 0 },
-  { name: 'Streak', icon: Trophy, description: '14 days improving', status: 'active', items: 0 },
-  { name: 'Inbox', icon: Inbox, description: '7 unread notifications', status: 'active', items: 7 },
-  { name: 'Countdowns', icon: Clock, description: '2 active countdowns', status: 'active', items: 2 },
-  { name: 'Unlocks', icon: Lock, description: 'Vault items unlocking', status: 'idle', items: 0 },
-  { name: 'Notifications', icon: Bell, description: 'Real-time alerts', status: 'active', items: 12 },
-]
+// ── API Types ────────────────────────────────────────────────
 
-const inboxItems = [
-  { type: 'citation_change', headline: 'ChatGPT cited your pricing page', model: 'ChatGPT', time: '2m ago', unread: true },
-  { type: 'competitor_drop', headline: 'Competitor dropped from Claude top 10', model: 'Claude', time: '15m ago', unread: true },
-  { type: 'opportunity', headline: 'FAQ page opportunity: +4 AI Visibility', model: 'Perplexity', time: '1h ago', unread: true },
-  { type: 'prediction_result', headline: 'Your prediction was correct: +3 visibility', model: 'System', time: '2h ago', unread: false },
-  { type: 'streak_warning', headline: 'Streak at risk: no improvement today', model: 'System', time: '3h ago', unread: true },
-]
+interface EngagementMomentum {
+  id: string
+  domain: string
+  momentumScore: number
+  previousScore: number
+  delta: number
+  createdAt: string
+}
+
+interface EngagementBrief {
+  id: string
+  domain: string
+  briefDate: string
+  headline1: string
+  headline2: string | null
+  headline3: string | null
+  greeting: string | null
+  estimatedMinutes: number | null
+  aiVisibilityDelta: number | null
+  newOpportunities: number | null
+  unreadInbox: number | null
+  isRead: boolean | null
+  createdAt: string
+}
+
+interface EngagementMissionStep {
+  id: string
+  stepOrder: number
+  title: string
+  rewardText: string | null
+  isCompleted: boolean
+}
+
+interface EngagementMission {
+  id: string
+  domain: string
+  missionDate: string
+  title: string
+  difficulty: string | null
+  rewardVisibility: number | null
+  totalSteps: number | null
+  completedSteps: number | null
+  status: string
+  steps: EngagementMissionStep[]
+  createdAt: string
+}
+
+interface EngagementStreak {
+  id: string
+  domain: string
+  currentStreak: number
+  bestStreak: number
+  lastImprovedAt: string | null
+  streakType: string | null
+  createdAt: string
+}
+
+interface EngagementActivitySummary {
+  id: string
+  domain: string
+  summaryDate: string
+  opportunitiesFound: number
+  pagesImproved: number
+  competitorsDropped: number
+  signalsDetected: number
+  articlesPublished: number
+  createdAt: string
+}
+
+interface EngagementCountdown {
+  id: string
+  domain: string
+  countdownType: string
+  label: string
+  targetTime: string
+  isCompleted: boolean
+  remainingMs: number
+  remainingHuman: string
+}
+
+interface EngagementMysteryBox {
+  id: string
+  domain: string
+  revealDate: string
+  teaserText: string
+  revealedText: string | null
+  isRevealed: boolean
+  category: string | null
+  createdAt: string
+}
+
+interface EngagementCoach {
+  id: string
+  domain: string
+  coachDate: string
+  greeting: string | null
+  message: string | null
+  recommendedAction: string | null
+  estimatedMinutes: number | null
+  estimatedImpact: string | null
+  isCompleted: boolean
+  createdAt: string
+}
+
+interface EngagementSeason {
+  id: string
+  domain: string
+  seasonName: string
+  challenge: string | null
+  startDate: string
+  endDate: string
+  status: string
+  createdAt: string
+}
+
+interface EngagementWeeklyMission {
+  id: string
+  domain: string
+  title: string
+  targetValue: number | null
+  currentValue: number | null
+  unit: string | null
+  status: string
+  weekStart: string
+  rewardType: string | null
+  createdAt: string
+}
+
+interface EngagementData {
+  momentum: EngagementMomentum | null
+  brief: EngagementBrief | null
+  activeMission: EngagementMission | null
+  streak: EngagementStreak | null
+  activitySummary: EngagementActivitySummary | null
+  unreadInboxCount: number
+  countdowns: EngagementCountdown[]
+  mysteryBox: EngagementMysteryBox | null
+  coach: EngagementCoach | null
+  season: EngagementSeason | null
+  weeklyMission: EngagementWeeklyMission | null
+}
+
+// ── Component ────────────────────────────────────────────────
 
 export default function EngagementPage() {
+  const [data, setData] = useState<EngagementData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        setData(json.engagement ?? null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded h-8 w-64" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-32" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-28" />
+          ))}
+        </div>
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertTriangle className="w-12 h-12 text-red-400" />
+        <h2 className="text-lg font-semibold text-white">Failed to load engagement data</h2>
+        <p className="text-sm text-slate-400">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  if (!data) return null
+
+  // Derive section data from API response
+  const momentumScore = data.momentum?.momentumScore ?? 0
+  const momentumDelta = data.momentum?.previousScore
+    ? momentumScore - (data.momentum?.previousScore ?? 0)
+    : 0
+  const currentStreak = data.streak?.currentStreak ?? 0
+
+  // Brief headline: use headline1 as the primary headline
+  const briefHeadline = data.brief?.headline1 || data.brief?.greeting || null
+
+  const sections = [
+    { name: 'Daily Brief', icon: Mail, description: briefHeadline || 'No brief today', status: data.brief ? 'active' : 'idle', items: data.brief ? 1 : 0 },
+    { name: 'Missions', icon: Zap, description: data.activeMission ? data.activeMission.title : 'No active mission', status: data.activeMission ? 'active' : 'idle', items: data.activeMission ? 1 : 0 },
+    { name: 'Momentum', icon: Flame, description: `${Math.round(momentumScore)}%${momentumDelta > 0 ? ` — +${Math.round(momentumDelta)} from yesterday` : ''}`, status: momentumScore > 0 ? 'active' : 'idle', items: 0 },
+    { name: 'Streak', icon: Trophy, description: currentStreak > 0 ? `${currentStreak} day${currentStreak !== 1 ? 's' : ''} improving` : 'No streak', status: currentStreak > 0 ? 'active' : 'idle', items: 0 },
+    { name: 'Inbox', icon: Inbox, description: `${data.unreadInboxCount} unread notification${data.unreadInboxCount !== 1 ? 's' : ''}`, status: data.unreadInboxCount > 0 ? 'active' : 'idle', items: data.unreadInboxCount },
+    { name: 'Countdowns', icon: Clock, description: `${data.countdowns.length} active countdown${data.countdowns.length !== 1 ? 's' : ''}`, status: data.countdowns.length > 0 ? 'active' : 'idle', items: data.countdowns.length },
+    { name: 'Mystery Box', icon: Lock, description: data.mysteryBox ? (data.mysteryBox.teaserText || 'Vault item') : 'No mystery box', status: data.mysteryBox ? 'active' : 'idle', items: data.mysteryBox ? 1 : 0 },
+    { name: 'Notifications', icon: Bell, description: `${data.unreadInboxCount} unread`, status: data.unreadInboxCount > 0 ? 'active' : 'idle', items: data.unreadInboxCount },
+  ]
 
   return (
     <div className="space-y-6">
@@ -39,16 +245,37 @@ export default function EngagementPage() {
           <div>
             <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Current Momentum</div>
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-bold text-emerald-400">87%</span>
-              <span className="text-sm text-emerald-400/60">+5 from yesterday</span>
+              <span className="text-5xl font-bold text-emerald-400">{Math.round(momentumScore)}%</span>
+              {momentumDelta !== 0 && (
+                <span className={`text-sm ${momentumDelta > 0 ? 'text-emerald-400/60' : 'text-red-400/60'}`}>
+                  {momentumDelta > 0 ? '+' : ''}{Math.round(momentumDelta)} from yesterday
+                </span>
+              )}
             </div>
           </div>
           <div className="text-right">
             <div className="text-xs text-slate-500 uppercase">Active Streak</div>
-            <div className="text-2xl font-bold text-amber-400">14 days</div>
+            <div className="text-2xl font-bold text-amber-400">{currentStreak} day{currentStreak !== 1 ? 's' : ''}</div>
           </div>
         </div>
       </div>
+
+      {/* Coach Tip */}
+      {data.coach && (data.coach.message || data.coach.recommendedAction) && (
+        <div className="bg-slate-900 border border-cyan-500/20 rounded-xl p-5">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div>
+              <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-1">AI Coach</div>
+              {data.coach.message && <div className="text-sm text-slate-300">{data.coach.message}</div>}
+              {data.coach.recommendedAction && <div className="text-xs text-slate-500 mt-1">{data.coach.recommendedAction}</div>}
+              {data.coach.estimatedImpact && <div className="text-[10px] text-cyan-400/60 mt-1">Impact: {data.coach.estimatedImpact}</div>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Engagement Sections Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -57,7 +284,7 @@ export default function EngagementPage() {
           return (
             <div key={section.name} className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
               <div className="flex items-center justify-between mb-2">
-                <Icon className="w-5 h-5 text-emerald-400" />
+                <Icon className={`w-5 h-5 ${section.status === 'active' ? 'text-emerald-400' : 'text-slate-600'}`} />
                 {section.items > 0 && (
                   <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">{section.items}</span>
                 )}
@@ -69,24 +296,159 @@ export default function EngagementPage() {
         })}
       </div>
 
-      {/* Recent Inbox */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          <Inbox className="w-4 h-4 text-emerald-400" />
-          Recent Inbox
-        </h2>
-        <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
-          {inboxItems.map((item, i) => (
-            <div key={i} className={`flex items-center gap-3 p-3 rounded-lg ${item.unread ? 'bg-slate-800/50' : ''}`}>
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.unread ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-slate-300">{item.headline}</div>
-                <div className="text-[10px] text-slate-500">{item.model} · {item.time}</div>
+      {/* Active Mission */}
+      {data.activeMission && (
+        <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <Target className="w-4 h-4 text-emerald-400" />
+            Active Mission
+          </h2>
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-white">{data.activeMission.title}</div>
+              {data.activeMission.difficulty && (
+                <div className="text-xs text-slate-400 mt-1">Difficulty: {data.activeMission.difficulty}</div>
+              )}
+              <div className="flex items-center gap-3 mt-2">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400">
+                  {data.activeMission.status}
+                </span>
+                {data.activeMission.rewardVisibility != null && (
+                  <span className="text-[10px] text-amber-400">+{data.activeMission.rewardVisibility} AI Visibility</span>
+                )}
               </div>
             </div>
-          ))}
+          </div>
+          {data.activeMission.steps && data.activeMission.steps.length > 0 && (
+            <div className="space-y-2 ml-11">
+              {data.activeMission.steps.map((step) => (
+                <div key={step.id} className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    step.isCompleted ? 'bg-emerald-500/20' : 'bg-slate-700'
+                  }`}>
+                    {step.isCompleted && <div className="w-2 h-2 rounded-full bg-emerald-400" />}
+                  </div>
+                  <span className={`text-xs ${step.isCompleted ? 'text-slate-400 line-through' : 'text-slate-300'}`}>
+                    {step.title}
+                  </span>
+                  {step.rewardText && (
+                    <span className="text-[10px] text-amber-400 ml-auto">{step.rewardText}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Countdowns */}
+      {data.countdowns.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-emerald-400" />
+            Active Countdowns
+          </h2>
+          <div className="space-y-3">
+            {data.countdowns.map((countdown) => (
+              <div key={countdown.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs text-slate-300">{countdown.label || countdown.countdownType}</span>
+                </div>
+                <span className={`text-xs font-mono ${countdown.remainingMs < 3600000 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {countdown.remainingHuman}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Season / Weekly Mission */}
+      {(data.season || data.weeklyMission) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data.season && (
+            <div className="bg-slate-900 border border-amber-500/20 rounded-xl p-5">
+              <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-400" />
+                Current Season
+              </h2>
+              <div className="text-lg font-bold text-amber-400">{data.season.seasonName}</div>
+              {data.season.challenge && (
+                <div className="text-xs text-slate-400 mt-1">{data.season.challenge}</div>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  data.season.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                }`}>
+                  {data.season.status}
+                </span>
+              </div>
+            </div>
+          )}
+          {data.weeklyMission && (
+            <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-5">
+              <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <Target className="w-4 h-4 text-purple-400" />
+                Weekly Mission
+              </h2>
+              <div className="text-sm font-medium text-white">{data.weeklyMission.title}</div>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
+                  {data.weeklyMission.status}
+                </span>
+                {data.weeklyMission.rewardType && (
+                  <span className="text-[10px] text-amber-400">{data.weeklyMission.rewardType}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Activity Summary */}
+      {data.activitySummary && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-emerald-400" />
+            Today&apos;s Activity
+          </h2>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">{data.activitySummary.opportunitiesFound}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Opportunities</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-emerald-400">{data.activitySummary.pagesImproved}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Improved</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-cyan-400">{data.activitySummary.competitorsDropped}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Competitors Dropped</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-amber-400">{data.activitySummary.signalsDetected}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Signals</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-400">{data.activitySummary.articlesPublished}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Published</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state when no data at all */}
+      {!data.momentum && !data.brief && !data.activeMission && !data.streak && data.unreadInboxCount === 0 && data.countdowns.length === 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+          <Inbox className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-white">No engagement data yet</h3>
+          <p className="text-xs text-slate-500 mt-1">Engagement data will appear as you use the platform and complete missions.</p>
+        </div>
+      )}
     </div>
   )
 }

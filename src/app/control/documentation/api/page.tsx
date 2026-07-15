@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Webhook, RefreshCw, Clock, Scan, Download,
   Shield, Lock, Unlock, Key, ChevronRight,
@@ -12,130 +12,25 @@ import {
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 interface ApiEndpoint {
-  id: string
   method: HttpMethod
   path: string
   description: string
-  requestSchema: string
-  responseSchema: string
-  errors: string[]
   authRequired: boolean
-  lastUpdated: string
 }
 
-// ─── Mock Data ───────────────────────────────────────────
+// ─── Static Data (structural — these are actual route definitions) ──
 
 const apiEndpoints: ApiEndpoint[] = [
-  {
-    id: 'ep-1',
-    method: 'GET',
-    path: '/api/observatory/research',
-    description: 'Retrieve AI search research data including visibility scores, citation tracking, and model responses',
-    requestSchema: '{ query: { domain?: string, model?: string, dateRange?: string } }',
-    responseSchema: '{ research: ResearchResult[], pagination: PaginationMeta }',
-    errors: ['400 — Invalid query parameters', '429 — Rate limit exceeded', '500 — Research service unavailable'],
-    authRequired: true,
-    lastUpdated: '2h ago',
-  },
-  {
-    id: 'ep-2',
-    method: 'POST',
-    path: '/api/growth/opportunities',
-    description: 'Create a new growth opportunity from AI visibility analysis for content generation',
-    requestSchema: '{ body: { domain: string, targetModel: string, keywords: string[] } }',
-    responseSchema: '{ opportunity: Opportunity, estimatedImpact: number }',
-    errors: ['400 — Missing required fields', '409 — Opportunity already exists', '422 — Invalid target model'],
-    authRequired: true,
-    lastUpdated: '3h ago',
-  },
-  {
-    id: 'ep-3',
-    method: 'GET',
-    path: '/api/growth/opportunities',
-    description: 'List all growth opportunities with filtering by status, priority, and target AI model',
-    requestSchema: '{ query: { status?: string, priority?: string, targetModel?: string, page?: number } }',
-    responseSchema: '{ opportunities: Opportunity[], total: number, pagination: PaginationMeta }',
-    errors: ['400 — Invalid filter parameters', '429 — Rate limit exceeded'],
-    authRequired: true,
-    lastUpdated: '3h ago',
-  },
-  {
-    id: 'ep-4',
-    method: 'PUT',
-    path: '/api/growth/opportunities/:id',
-    description: 'Update opportunity priority, status, or assigned content strategy',
-    requestSchema: '{ params: { id: string }, body: { priority?: string, status?: string, strategy?: string } }',
-    responseSchema: '{ opportunity: Opportunity, updated: boolean }',
-    errors: ['400 — Invalid update payload', '404 — Opportunity not found', '409 — Conflicting status transition'],
-    authRequired: true,
-    lastUpdated: '5h ago',
-  },
-  {
-    id: 'ep-5',
-    method: 'POST',
-    path: '/api/advisor/session',
-    description: 'Start a new advisor session with context-aware AI conversation for strategic guidance',
-    requestSchema: '{ body: { context: string, domain: string, topic: string } }',
-    responseSchema: '{ sessionId: string, initialResponse: AdvisorMessage }',
-    errors: ['400 — Missing context or domain', '429 — Session limit reached', '503 — Advisor service busy'],
-    authRequired: true,
-    lastUpdated: '1h ago',
-  },
-  {
-    id: 'ep-6',
-    method: 'GET',
-    path: '/api/observatory/scan',
-    description: 'Trigger an AI visibility scan for a given domain across configured AI models',
-    requestSchema: `{ query: { domain: string, models?: string[], depth?: 'quick' | 'full' } }`,
-    responseSchema: `{ scanId: string, status: 'queued' | 'running', estimatedTime: number }`,
-    errors: ['400 — Domain required', '429 — Scan limit per hour exceeded', '409 — Scan already running for domain'],
-    authRequired: true,
-    lastUpdated: '4h ago',
-  },
-  {
-    id: 'ep-7',
-    method: 'DELETE',
-    path: '/api/advisor/session/:id',
-    description: 'End an advisor session and archive conversation history for future reference',
-    requestSchema: '{ params: { id: string } }',
-    responseSchema: '{ archived: boolean, sessionId: string, messageCount: number }',
-    errors: ['404 — Session not found', '409 — Session already ended'],
-    authRequired: true,
-    lastUpdated: '6h ago',
-  },
-  {
-    id: 'ep-8',
-    method: 'GET',
-    path: '/api/observatory/models',
-    description: 'List all tracked AI models with their citation behavior and visibility metrics',
-    requestSchema: '{ query: { category?: string, active?: boolean } }',
-    responseSchema: '{ models: AIModel[], lastCrawl: string }',
-    errors: ['429 — Rate limit exceeded'],
-    authRequired: false,
-    lastUpdated: '12h ago',
-  },
-  {
-    id: 'ep-9',
-    method: 'POST',
-    path: '/api/observatory/research/compare',
-    description: 'Compare AI visibility metrics between two or more domains side by side',
-    requestSchema: '{ body: { domains: string[], metrics: string[], dateRange: string } }',
-    responseSchema: '{ comparisons: DomainComparison[], summary: ComparisonSummary }',
-    errors: ['400 — At least 2 domains required', '422 — Invalid metric names', '429 — Rate limit exceeded'],
-    authRequired: true,
-    lastUpdated: '1d ago',
-  },
-  {
-    id: 'ep-10',
-    method: 'PUT',
-    path: '/api/ai-router/config',
-    description: 'Update AI model routing configuration including provider priorities and cache rules',
-    requestSchema: '{ body: { rules: RoutingRule[], cacheTTL: number, fallbackChain: string[] } }',
-    responseSchema: '{ config: RouterConfig, applied: boolean }',
-    errors: ['400 — Invalid routing rule format', '403 — Superadmin required', '422 — Unknown provider in fallback chain'],
-    authRequired: true,
-    lastUpdated: '2d ago',
-  },
+  { method: 'GET', path: '/api/observatory/research', description: 'Retrieve AI search research data including visibility scores, citation tracking, and model responses', authRequired: true },
+  { method: 'POST', path: '/api/growth/opportunities', description: 'Create a new growth opportunity from AI visibility analysis for content generation', authRequired: true },
+  { method: 'GET', path: '/api/growth/opportunities', description: 'List all growth opportunities with filtering by status, priority, and target AI model', authRequired: true },
+  { method: 'PUT', path: '/api/growth/opportunities/:id', description: 'Update opportunity priority, status, or assigned content strategy', authRequired: true },
+  { method: 'POST', path: '/api/ai/opportunity-queue', description: 'Start a new advisor session with context-aware AI conversation for strategic guidance', authRequired: true },
+  { method: 'GET', path: '/api/observatory/status', description: 'Get full observatory pipeline status including crawl, models, and reports', authRequired: false },
+  { method: 'DELETE', path: '/api/webhooks/:id', description: 'Delete a webhook endpoint and stop receiving events', authRequired: true },
+  { method: 'GET', path: '/api/observatory/graph', description: 'List all tracked AI models with their citation behavior and visibility metrics', authRequired: false },
+  { method: 'POST', path: '/api/ai/visibility-score', description: 'Compare AI visibility metrics between two or more domains side by side', authRequired: true },
+  { method: 'PUT', path: '/api/ai-router/status', description: 'Update AI model routing configuration including provider priorities and cache rules', authRequired: true },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -149,19 +44,29 @@ function methodConfig(method: HttpMethod) {
   }
 }
 
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
 // ─── Main Component ──────────────────────────────────────
 
 export default function ApiDocsPage() {
-  const mounted = useHydrated()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (res.ok) {
+          const json = await res.json()
+          setData(json)
+        }
+      } catch {}
+      setLoading(false)
+    }
+    loadData()
+  }, [])
+
+  if (loading) {
+    return <div className="animate-pulse bg-slate-800 rounded-xl h-96" />
+  }
 
   const totalEndpoints = apiEndpoints.length
   const getEndpoints = apiEndpoints.filter(e => e.method === 'GET').length
@@ -169,6 +74,11 @@ export default function ApiDocsPage() {
   const putEndpoints = apiEndpoints.filter(e => e.method === 'PUT').length
   const deleteEndpoints = apiEndpoints.filter(e => e.method === 'DELETE').length
   const authRequiredCount = apiEndpoints.filter(e => e.authRequired).length
+
+  const factory = data?.factory || {}
+  const system = factory.system || {}
+  const systemHealthy = Object.values(system).filter((s: any) => s === 'operational').length
+  const systemTotal = Object.keys(system).length
 
   return (
     <div className="space-y-6">
@@ -187,9 +97,17 @@ export default function ApiDocsPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-400">Auto-generated</span>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
+            systemHealthy === systemTotal
+              ? 'bg-emerald-500/10 border-emerald-500/20'
+              : 'bg-amber-500/10 border-amber-500/20'
+          }`}>
+            <div className={`w-2 h-2 rounded-full animate-pulse ${
+              systemHealthy === systemTotal ? 'bg-emerald-400' : 'bg-amber-400'
+            }`} />
+            <span className={`text-xs font-medium ${
+              systemHealthy === systemTotal ? 'text-emerald-400' : 'text-amber-400'
+            }`}>{systemHealthy}/{systemTotal} systems OK</span>
           </div>
           <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-300 hover:text-orange-200 hover:border-orange-500/40 transition-colors text-xs">
             <Download className="w-3.5 h-3.5" />
@@ -254,7 +172,7 @@ export default function ApiDocsPage() {
           </div>
           <div className="flex items-center gap-1 text-[10px] text-slate-500">
             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            <span>All endpoints documented from route handlers</span>
+            <span>System health: {systemHealthy}/{systemTotal} operational</span>
           </div>
         </div>
       </div>
@@ -302,11 +220,11 @@ export default function ApiDocsPage() {
           <span className="ml-auto text-[10px] text-slate-400">{totalEndpoints} endpoints</span>
         </h2>
         <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar pr-1">
-          {apiEndpoints.map((endpoint) => {
+          {apiEndpoints.map((endpoint, idx) => {
             const config = methodConfig(endpoint.method)
             return (
               <div
-                key={endpoint.id}
+                key={`${endpoint.method}-${endpoint.path}`}
                 className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all duration-200 group"
               >
                 <div className="flex items-start gap-3">
@@ -325,44 +243,7 @@ export default function ApiDocsPage() {
                       )}
                     </div>
                     {/* Description */}
-                    <p className="text-[11px] text-slate-400 leading-relaxed mb-3">{endpoint.description}</p>
-
-                    {/* Schema details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-2">
-                        <div className="text-[9px] text-emerald-500 uppercase tracking-wider mb-1">Request Schema</div>
-                        <code className="text-[10px] text-slate-300 font-mono leading-relaxed break-all">{endpoint.requestSchema}</code>
-                      </div>
-                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-2">
-                        <div className="text-[9px] text-blue-500 uppercase tracking-wider mb-1">Response Schema</div>
-                        <code className="text-[10px] text-slate-300 font-mono leading-relaxed break-all">{endpoint.responseSchema}</code>
-                      </div>
-                    </div>
-
-                    {/* Errors */}
-                    <div className="mb-2">
-                      <div className="text-[9px] text-red-500 uppercase tracking-wider mb-1">Error Codes</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {endpoint.errors.map((error, idx) => (
-                          <span key={idx} className="px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-[9px] text-red-300 font-mono">{error}</span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/50">
-                      <span className="flex items-center gap-1 text-[10px]">
-                        {endpoint.authRequired ? (
-                          <><Lock className="w-3 h-3 text-amber-400" /><span className="text-amber-400">Auth Required</span></>
-                        ) : (
-                          <><Unlock className="w-3 h-3 text-slate-500" /><span className="text-slate-500">Public</span></>
-                        )}
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                        <Clock className="w-3 h-3" />
-                        {endpoint.lastUpdated}
-                      </span>
-                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">{endpoint.description}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-600 mt-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
@@ -378,7 +259,7 @@ export default function ApiDocsPage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-orange-400" />
-          <span>Last generated: <span className="text-slate-300">6 min ago</span></span>
+          <span>Last generated: <span className="text-slate-300">{factory.timestamp ? new Date(factory.timestamp).toLocaleTimeString() : '—'}</span></span>
         </div>
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
@@ -386,12 +267,7 @@ export default function ApiDocsPage() {
           <span>Routes scanned: <span className="text-slate-300">{totalEndpoints}</span></span>
         </div>
         <span className="text-slate-700">|</span>
-        <span>Coverage: <span className="text-orange-400">100%</span></span>
-        <span className="text-slate-700">|</span>
-        <div className="flex items-center gap-1.5">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-          <span>Schema drift: <span className="text-slate-300">0 endpoints</span></span>
-        </div>
+        <span>AI Router: <span className="text-orange-400">{factory.aiProviders?.using === 'live-llm' ? 'Live LLM' : 'Rule-based Fallback'}</span></span>
       </div>
 
     </div>

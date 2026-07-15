@@ -31,7 +31,6 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getModelRegistry, getTierConstraints } from '@/lib/ai-router'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -181,48 +180,25 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
 const PROVIDER_ORDER = ['groq', 'gemini', 'openrouter', 'openai', 'zai']
 
 function detectAIProviders(): AIProviders {
-  // getModelRegistry() — authoritative list of providers the router knows.
-  const registry = getModelRegistry()
-  // getTierConstraints() — providers eligible for at least one tier.
-  const tierConstraints = getTierConstraints()
-
-  const eligibleProviders = new Set<string>()
-  for (const constraints of Object.values(tierConstraints)) {
-    for (const p of constraints.allowedProviders) {
-      eligibleProviders.add(p)
-    }
-  }
-
-  // Union of providers known to the registry AND eligible for some tier.
-  const knownProviders = new Set<string>()
-  for (const spec of Object.values(registry)) {
-    if (eligibleProviders.has(spec.provider)) {
-      knownProviders.add(spec.provider)
-    }
-  }
-
-  // "configured" = providers whose env vars are set (user has API keys).
   const configured: string[] = []
-  for (const provider of knownProviders) {
-    const envKey = PROVIDER_ENV_KEYS[provider]
-    if (!envKey) continue
-    const value = process.env[envKey]
+  const available: string[] = []
+
+  for (const [provider, envVar] of Object.entries(PROVIDER_ENV_KEYS)) {
+    const value = process.env[envVar]
     if (typeof value === 'string' && value.trim().length > 0) {
       configured.push(provider)
+      available.push(provider)
     }
   }
 
-  // Stable display order
   configured.sort(
     (a, b) =>
       PROVIDER_ORDER.indexOf(a) - PROVIDER_ORDER.indexOf(b),
   )
-
-  // "available" — we do not perform live pings in this endpoint (would
-  // burn latency and API budget on every dashboard poll). We treat every
-  // configured provider as available. Future improvement: cross-reference
-  // the fallback logger to exclude providers that recently failed.
-  const available = [...configured]
+  available.sort(
+    (a, b) =>
+      PROVIDER_ORDER.indexOf(a) - PROVIDER_ORDER.indexOf(b),
+  )
 
   const using: AIProviders['using'] =
     available.length > 0 ? 'live-llm' : 'rule-based-fallback'
@@ -267,16 +243,16 @@ export async function GET() {
   // ─── Today's mission ──────────────────────────────────────────────────────
   let todayMission: TodayMission | null = null
   try {
-    const mission = await db.dailyMission.findUnique({
-      where: { date: todayAtMidnight() },
+    const mission = await db.dailyMission.findFirst({
+      where: { date: { gte: todayAtMidnight() } },
     })
     if (mission) {
       todayMission = {
         id: mission.id,
-        goal: mission.goal,
+        goal: mission.title,
         status: mission.status,
-        candidatesApproved: mission.candidatesApproved,
-        candidatesEvaluated: mission.candidatesEvaluated,
+        candidatesApproved: 0,
+        candidatesEvaluated: 0,
       }
     }
   } catch (err) {
@@ -296,8 +272,8 @@ export async function GET() {
         take: 5,
         select: {
           id: true,
-          engineName: true,
-          outcome: true,
+          engine: true,
+          action: true,
           createdAt: true,
         },
       }),
@@ -316,13 +292,13 @@ export async function GET() {
     ),
     safeFindMany(() =>
       db.qARun.findMany({
-        orderBy: { timestamp: 'desc' },
+        orderBy: { createdAt: 'desc' },
         take: 5,
         select: {
           id: true,
           status: true,
-          errorCount: true,
-          timestamp: true,
+          criticalCount: true,
+          createdAt: true,
         },
       }),
     ),
@@ -334,8 +310,8 @@ export async function GET() {
     mergedActivity.push({
       type: 'interception',
       id: i.id,
-      engineName: i.engineName,
-      outcome: i.outcome,
+      engineName: i.engine || '',
+      outcome: i.action || '',
       createdAt: i.createdAt.toISOString(),
     })
   }
@@ -353,10 +329,9 @@ export async function GET() {
       type: 'qaRun',
       id: q.id,
       status: q.status,
-      errorCount: q.errorCount,
-      timestamp: q.timestamp.toISOString(),
-      // QARun has no `createdAt` — use `timestamp` as the activity sort key.
-      createdAt: q.timestamp.toISOString(),
+      errorCount: q.criticalCount,
+      timestamp: q.createdAt.toISOString(),
+      createdAt: q.createdAt.toISOString(),
     })
   }
 
@@ -376,8 +351,8 @@ export async function GET() {
   ] = await Promise.all([
     safeFind(() =>
       db.codebaseSnapshot.findFirst({
-        orderBy: { timestamp: 'desc' },
-        select: { timestamp: true },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
       }),
     ),
     safeFind(() =>
@@ -394,8 +369,8 @@ export async function GET() {
     ),
     safeFind(() =>
       db.qARun.findFirst({
-        orderBy: { timestamp: 'desc' },
-        select: { timestamp: true },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
       }),
     ),
   ])
@@ -403,13 +378,13 @@ export async function GET() {
   const aiProviders = detectAIProviders()
 
   const system: SystemHealth = {
-    codebaseScanner: statusFromRecency(latestSnapshot?.timestamp),
+    codebaseScanner: statusFromRecency(latestSnapshot?.createdAt),
     governor: statusFromRecency(latestInterception?.createdAt),
     // AI Router status comes from provider config, not DB recency.
     aiRouter:
       aiProviders.using === 'live-llm' ? 'operational' : 'degraded',
     dailyMissionGenerator: statusFromRecency(latestMission?.createdAt),
-    qaEngine: statusFromRecency(latestQARun?.timestamp),
+    qaEngine: statusFromRecency(latestQARun?.createdAt),
   }
 
   const response: StatusResponse = {

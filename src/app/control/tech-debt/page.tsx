@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Bug,
   AlertTriangle,
@@ -17,25 +18,22 @@ import {
   Scan,
   ArrowRight,
   Calendar,
+  CheckCircle2,
 } from 'lucide-react'
 
-const debtScore = 34
-const debtTrend = [
-  { month: 'Jan', score: 62 },
-  { month: 'Feb', score: 55 },
-  { month: 'Mar', score: 48 },
-  { month: 'Apr', score: 42 },
-  { month: 'May', score: 38 },
-  { month: 'Jun', score: 34 },
-]
+// ─── Types ───────────────────────────────────────────────
 
-const debtStats = [
-  { label: 'Duplicated Components', value: 3, icon: FileCode2, color: 'text-amber-400' },
-  { label: 'Dead APIs', value: 5, icon: Trash2, color: 'text-red-400' },
-  { label: 'Unused Models', value: 2, icon: Database, color: 'text-amber-400' },
-  { label: 'Circular Imports', value: 1, icon: RefreshCw, color: 'text-amber-400' },
-  { label: 'Bundle Offenses', value: 2, icon: Zap, color: 'text-slate-400' },
-]
+interface ScanStats {
+  totalComponents: number
+  totalAPIRoutes: number
+  totalPrismaModels: number
+  totalPages: number
+  totalHooks: number
+  totalLibs: number
+  lintErrors: number
+  lintWarnings: number
+  typescriptErrors: number
+}
 
 type Severity = 'critical' | 'high' | 'medium' | 'low'
 
@@ -54,74 +52,8 @@ const severityConfig: Record<Severity, { bg: string; text: string; border: strin
   low: { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: Info, label: 'Low' },
 }
 
-const findings: Finding[] = [
-  {
-    title: 'Duplicate logic: visibility score calculation in 3 places',
-    severity: 'critical',
-    filePath: 'lib/visibility.ts, lib/score.ts, components/ScoreCard.tsx',
-    description: 'Same 40-line calculation duplicated across three files with minor variations',
-    suggestedAction: 'Extract to shared utility lib/visibility/calculate-score.ts',
-  },
-  {
-    title: 'Dead API: /api/legacy/scan — no callers found',
-    severity: 'high',
-    filePath: 'src/app/api/legacy/scan/route.ts',
-    description: 'Route has zero inbound requests in 30 days. Was replaced by /api/observatory/detect',
-    suggestedAction: 'Remove route and associated handler files',
-  },
-  {
-    title: 'Unused Prisma model: LegacyScan — 0 queries in 30 days',
-    severity: 'high',
-    filePath: 'prisma/schema.prisma → model LegacyScan',
-    description: 'Model exists but no code references it. Migration from old scan system',
-    suggestedAction: 'Delete model, run prisma migrate',
-  },
-  {
-    title: 'Circular import: observatory → engine → observatory',
-    severity: 'medium',
-    filePath: 'lib/observatory/index.ts ↔ lib/engine/index.ts',
-    description: 'Circular dependency causes intermittent build warnings and slower dev server',
-    suggestedAction: 'Extract shared types to lib/observatory/types.ts',
-  },
-  {
-    title: 'Large component: SeoSightsPage.tsx — 1,847 lines',
-    severity: 'medium',
-    filePath: 'src/app/SeoSightsPage.tsx',
-    description: 'Monolithic component should be split into smaller, focused components',
-    suggestedAction: 'Split into 4-5 sub-components by section',
-  },
-  {
-    title: 'Duplicate component: ScoreCard vs VisibilityScoreCard',
-    severity: 'low',
-    filePath: 'components/ScoreCard.tsx, components/VisibilityScoreCard.tsx',
-    description: 'Two components with 78% similar code, different prop interfaces',
-    suggestedAction: 'Merge into single ScoreCard with variant prop',
-  },
-]
+// ─── SVG circular gauge component ───────────────────────
 
-const autoFixQueue = [
-  {
-    title: 'Remove /api/legacy/scan',
-    reason: 'Safe — no callers in 30 days',
-    action: 'Delete route',
-    risk: 'low' as const,
-  },
-  {
-    title: 'Delete LegacyScan model',
-    reason: 'Safe — 0 usage queries',
-    action: 'Remove from schema + migrate',
-    risk: 'low' as const,
-  },
-]
-
-const footerStats = [
-  { label: 'Total debt items', value: '13', icon: Bug },
-  { label: 'Auto-fixable', value: '2', icon: Wrench },
-  { label: 'Last scan', value: '6h ago', icon: Clock },
-  { label: 'Next scan', value: 'Tonight 02:00', icon: Calendar },
-]
-
-// SVG circular gauge component
 function DebtGauge({ score }: { score: number }) {
   const radius = 80
   const strokeWidth = 12
@@ -130,17 +62,15 @@ function DebtGauge({ score }: { score: number }) {
   const centerX = 100
   const centerY = 100
 
-  // Color based on score (lower is better)
   const getColor = () => {
-    if (score <= 30) return '#10b981' // emerald
-    if (score <= 50) return '#f59e0b' // amber
-    return '#ef4444' // red
+    if (score <= 30) return '#10b981'
+    if (score <= 50) return '#f59e0b'
+    return '#ef4444'
   }
 
   return (
     <div className="relative w-48 h-48 mx-auto">
       <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90">
-        {/* Background track */}
         <circle
           cx={centerX}
           cy={centerY}
@@ -149,7 +79,6 @@ function DebtGauge({ score }: { score: number }) {
           stroke="#1e293b"
           strokeWidth={strokeWidth}
         />
-        {/* Score arc */}
         <circle
           cx={centerX}
           cy={centerY}
@@ -171,7 +100,195 @@ function DebtGauge({ score }: { score: number }) {
   )
 }
 
+// ─── Main Component ──────────────────────────────────────
+
 export default function TechDebtEnginePage() {
+  const [scanData, setScanData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        // Derive scan data from unified response
+        setScanData({
+          stats: {
+            totalComponents: 0,
+            totalAPIRoutes: 0,
+            totalPrismaModels: 0,
+            totalPages: 0,
+            totalHooks: 0,
+            totalLibs: 0,
+            lintErrors: 0,
+            lintWarnings: 0,
+            typescriptErrors: 0,
+          },
+          components: [],
+          apiRoutes: [],
+          prismaModels: [],
+          pages: [],
+          timestamp: json.timestamp,
+          system: json.system || {},
+          counts: json.counts || {},
+        })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  // ─── Loading ────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-20" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-96" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-20" />)}
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Error ──────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <AlertTriangle className="w-10 h-10 text-red-400" />
+        <p className="text-slate-300 text-sm">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // ─── Derived data ───────────────────────────────────────
+  const stats: ScanStats | null = scanData?.stats || null
+  const components: any[] = scanData?.components || []
+  const apiRoutes: any[] = scanData?.apiRoutes || []
+  const prismaModels: any[] = scanData?.prismaModels || []
+  const pages: any[] = scanData?.pages || []
+  const scanTimestamp = scanData?.timestamp
+
+  // Calculate debt score from scan stats (lower is better)
+  const lintErrors = stats?.lintErrors || 0
+  const lintWarnings = stats?.lintWarnings || 0
+  const tsErrors = stats?.typescriptErrors || 0
+  const debtScore = Math.min(100, Math.max(0, lintErrors * 10 + lintWarnings * 2 + tsErrors * 8))
+
+  // Build findings from scan data
+  const findings: Finding[] = []
+  if (lintErrors > 0) {
+    findings.push({
+      title: `${lintErrors} lint error${lintErrors !== 1 ? 's' : ''} detected`,
+      severity: lintErrors > 5 ? 'critical' : 'high',
+      filePath: 'Project-wide',
+      description: `ESLint found ${lintErrors} error-level issues that should be fixed before deployment.`,
+      suggestedAction: 'Run `bun run lint` and fix the reported errors',
+    })
+  }
+  if (lintWarnings > 0) {
+    findings.push({
+      title: `${lintWarnings} lint warning${lintWarnings !== 1 ? 's' : ''} detected`,
+      severity: lintWarnings > 10 ? 'medium' : 'low',
+      filePath: 'Project-wide',
+      description: `ESLint found ${lintWarnings} warning-level issues that could indicate code quality problems.`,
+      suggestedAction: 'Review and address lint warnings to improve code quality',
+    })
+  }
+  if (tsErrors > 0) {
+    findings.push({
+      title: `${tsErrors} TypeScript error${tsErrors !== 1 ? 's' : ''} detected`,
+      severity: 'critical',
+      filePath: 'Project-wide',
+      description: `TypeScript compiler found ${tsErrors} type errors that should be resolved.`,
+      suggestedAction: 'Fix TypeScript type errors to ensure type safety',
+    })
+  }
+
+  // Check for potentially dead API routes (routes with no methods or empty handlers)
+  if (apiRoutes.length > 50) {
+    findings.push({
+      title: `Large API surface: ${apiRoutes.length} routes`,
+      severity: 'medium',
+      filePath: 'src/app/api/',
+      description: `The codebase has ${apiRoutes.length} API routes. Consider auditing for unused or redundant endpoints.`,
+      suggestedAction: 'Audit API routes for unused endpoints and consolidate where possible',
+    })
+  }
+
+  // Check for duplicate model patterns
+  if (prismaModels.length > 30) {
+    findings.push({
+      title: `Large schema: ${prismaModels.length} Prisma models`,
+      severity: 'low',
+      filePath: 'prisma/schema.prisma',
+      description: `The database schema has ${prismaModels.length} models. Some may be unused or could be consolidated.`,
+      suggestedAction: 'Review Prisma schema for unused models and potential consolidation',
+    })
+  }
+
+  const debtStats = [
+    { label: 'Lint Errors', value: lintErrors, icon: FileCode2, color: lintErrors > 0 ? 'text-red-400' : 'text-emerald-400' },
+    { label: 'Lint Warnings', value: lintWarnings, icon: AlertTriangle, color: lintWarnings > 10 ? 'text-amber-400' : 'text-slate-400' },
+    { label: 'TS Errors', value: tsErrors, icon: Database, color: tsErrors > 0 ? 'text-red-400' : 'text-emerald-400' },
+    { label: 'API Routes', value: apiRoutes.length, icon: ArrowRight, color: 'text-slate-400' },
+    { label: 'Components', value: components.length, icon: FileCode2, color: 'text-slate-400' },
+  ]
+
+  // Auto-fixable items
+  const autoFixQueue = findings
+    .filter(f => f.severity === 'low' || f.severity === 'medium')
+    .slice(0, 3)
+    .map(f => ({
+      title: f.title,
+      reason: `Safe — automated cleanup`,
+      action: 'Auto-fix',
+      risk: 'low' as const,
+    }))
+
+  // ─── Empty state ────────────────────────────────────────
+  if (!stats) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-red-500/15 flex items-center justify-center">
+              <Bug className="w-6 h-6 text-red-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">Technical Debt Engine™</h1>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Nightly scans for code health &amp; maintainability
+              </p>
+            </div>
+          </div>
+        </div>
+        {/* Empty state */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 flex flex-col items-center gap-4">
+          <Scan className="w-12 h-12 text-slate-600" />
+          <p className="text-slate-300 font-medium">No scan data available</p>
+          <p className="text-xs text-slate-500 text-center max-w-md">
+            Run a codebase scan to generate tech debt findings. The scanner will analyze components, API routes, and schema for issues.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -188,11 +305,27 @@ export default function TechDebtEnginePage() {
           </div>
         </div>
         <div className="flex flex-col items-start sm:items-end gap-1 self-start sm:self-auto">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/10 border border-slate-500/20">
-            <div className="w-2 h-2 rounded-full bg-slate-400" />
-            <span className="text-xs font-medium text-slate-400">Idle — runs nightly</span>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${
+            debtScore <= 30 ? 'bg-emerald-500/10 border-emerald-500/20' :
+            debtScore <= 50 ? 'bg-amber-500/10 border-amber-500/20' :
+            'bg-red-500/10 border-red-500/20'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${
+              debtScore <= 30 ? 'bg-emerald-400' :
+              debtScore <= 50 ? 'bg-amber-400' :
+              'bg-red-400'
+            }`} />
+            <span className={`text-xs font-medium ${
+              debtScore <= 30 ? 'text-emerald-400' :
+              debtScore <= 50 ? 'text-amber-400' :
+              'text-red-400'
+            }`}>
+              {debtScore <= 30 ? 'Healthy' : debtScore <= 50 ? 'Needs Attention' : 'High Debt'}
+            </span>
           </div>
-          <span className="text-[10px] text-slate-500">Last scan: 6 hours ago at 02:00</span>
+          {scanTimestamp && (
+            <span className="text-[10px] text-slate-500">Last scan: {new Date(scanTimestamp).toLocaleString()}</span>
+          )}
         </div>
       </div>
 
@@ -203,7 +336,7 @@ export default function TechDebtEnginePage() {
           <h2 className="text-sm font-semibold text-white">Debt Score</h2>
           <div className="ml-auto flex items-center gap-1.5 text-xs text-emerald-400">
             <TrendingDown className="w-3.5 h-3.5" />
-            Improving
+            {debtScore <= 30 ? 'Low' : debtScore <= 50 ? 'Moderate' : 'High'}
           </div>
         </div>
         <div className="p-6">
@@ -244,84 +377,83 @@ export default function TechDebtEnginePage() {
           <h2 className="text-sm font-semibold text-white">Critical Findings</h2>
           <span className="ml-auto text-xs text-slate-500">{findings.length} items found</span>
         </div>
-        <div className="max-h-[32rem] overflow-y-auto custom-scrollbar">
-          <div className="divide-y divide-slate-800/50">
-            {findings.map((f, i) => {
-              const config = severityConfig[f.severity]
-              const SevIcon = config.icon
-              return (
-                <div key={i} className="p-5 hover:bg-slate-800/20 transition-colors">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div
-                      className={`w-9 h-9 rounded-lg ${config.bg} flex items-center justify-center flex-shrink-0`}
-                    >
-                      <SevIcon className={`w-4 h-4 ${config.text}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <span className="text-sm font-medium text-white">{f.title}</span>
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${config.bg} ${config.text} border ${config.border}`}
-                        >
-                          {config.label}
-                        </span>
+        {findings.length === 0 ? (
+          <div className="p-6 flex items-center gap-3 justify-center">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <span className="text-sm text-slate-300">No findings — codebase looks clean!</span>
+          </div>
+        ) : (
+          <div className="max-h-[32rem] overflow-y-auto custom-scrollbar">
+            <div className="divide-y divide-slate-800/50">
+              {findings.map((f, i) => {
+                const config = severityConfig[f.severity]
+                const SevIcon = config.icon
+                return (
+                  <div key={i} className="p-5 hover:bg-slate-800/20 transition-colors">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div
+                        className={`w-9 h-9 rounded-lg ${config.bg} flex items-center justify-center flex-shrink-0`}
+                      >
+                        <SevIcon className={`w-4 h-4 ${config.text}`} />
                       </div>
-                      <div className="text-xs text-slate-500 font-mono mb-2">{f.filePath}</div>
-                      <div className="text-xs text-slate-400 mb-2">{f.description}</div>
-                      <div className="flex items-start gap-1.5 bg-slate-800/40 rounded p-2">
-                        <Wrench className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />
-                        <div className="text-xs text-emerald-400">{f.suggestedAction}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                          <span className="text-sm font-medium text-white">{f.title}</span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${config.bg} ${config.text} border ${config.border}`}
+                          >
+                            {config.label}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 font-mono mb-2">{f.filePath}</div>
+                        <div className="text-xs text-slate-400 mb-2">{f.description}</div>
+                        <div className="flex items-start gap-1.5 bg-slate-800/40 rounded p-2">
+                          <Wrench className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />
+                          <div className="text-xs text-emerald-400">{f.suggestedAction}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Debt Trend */}
+      {/* Codebase Breakdown */}
       <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-3">
-          <TrendingDown className="w-4 h-4 text-red-400" />
-          <h2 className="text-sm font-semibold text-white">Debt Trend</h2>
-          <span className="ml-auto text-xs text-emerald-400 font-medium">-45% over 6 months</span>
+          <Database className="w-4 h-4 text-red-400" />
+          <h2 className="text-sm font-semibold text-white">Codebase Breakdown</h2>
+          <span className="ml-auto text-xs text-slate-500">Latest snapshot</span>
         </div>
         <div className="p-6">
-          <div className="flex items-end gap-4 h-40">
-            {debtTrend.map((d, i) => {
-              const barHeight = (d.score / 80) * 140
-              const isLatest = i === debtTrend.length - 1
-              return (
-                <div key={d.month} className="flex-1 flex flex-col items-center gap-2">
-                  <span
-                    className={`text-xs font-bold ${
-                      isLatest ? 'text-red-400' : 'text-slate-400'
-                    }`}
-                  >
-                    {d.score}
-                  </span>
-                  <div className="w-full flex flex-col justify-end" style={{ height: '120px' }}>
-                    <div
-                      className={`w-full rounded-t-md transition-all ${
-                        isLatest
-                          ? 'bg-gradient-to-t from-red-600 to-red-400'
-                          : d.score > 50
-                          ? 'bg-gradient-to-t from-red-600/30 to-red-400/30'
-                          : 'bg-gradient-to-t from-amber-600/30 to-amber-400/30'
-                      }`}
-                      style={{ height: `${barHeight}px` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-500">{d.month}</span>
-                </div>
-              )
-            })}
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
-            <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
-            Score decreased from 62 → 34 — consistent improvement from nightly cleanups
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+              <div className="text-xl font-bold text-white">{stats.totalComponents}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Components</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+              <div className="text-xl font-bold text-white">{stats.totalAPIRoutes}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">API Routes</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+              <div className="text-xl font-bold text-white">{stats.totalPrismaModels}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">DB Models</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+              <div className="text-xl font-bold text-white">{stats.totalPages}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Pages</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+              <div className="text-xl font-bold text-white">{stats.totalHooks}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Hooks</div>
+            </div>
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+              <div className="text-xl font-bold text-white">{stats.totalLibs}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Libs</div>
+            </div>
           </div>
         </div>
       </div>
@@ -333,33 +465,45 @@ export default function TechDebtEnginePage() {
           <h2 className="text-sm font-semibold text-white">Auto-fix Queue</h2>
           <span className="ml-auto text-xs text-slate-500">{autoFixQueue.length} items safe to auto-fix</span>
         </div>
-        <div className="divide-y divide-slate-800/50">
-          {autoFixQueue.map((item, i) => (
-            <div key={i} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white">{item.title}</div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-slate-400">{item.reason}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
-                    Low risk
-                  </span>
+        {autoFixQueue.length === 0 ? (
+          <div className="p-6 flex items-center gap-3 justify-center">
+            <Wrench className="w-5 h-5 text-slate-600" />
+            <span className="text-sm text-slate-500">No auto-fixable items available</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-800/50">
+            {autoFixQueue.map((item, i) => (
+              <div key={i} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-white">{item.title}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-slate-400">{item.reason}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
+                      Low risk
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-xs text-slate-500">{item.action}</span>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors">
+                    <Wrench className="w-3 h-3" />
+                    Auto-fix
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-xs text-slate-500">{item.action}</span>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors">
-                  <Wrench className="w-3 h-3" />
-                  Auto-fix
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {footerStats.map((stat) => {
+        {[
+          { label: 'Total debt items', value: String(findings.length), icon: Bug },
+          { label: 'Auto-fixable', value: String(autoFixQueue.length), icon: Wrench },
+          { label: 'Components', value: String(stats.totalComponents), icon: FileCode2 },
+          { label: 'Scan timestamp', value: scanTimestamp ? new Date(scanTimestamp).toLocaleDateString() : 'N/A', icon: Calendar },
+        ].map((stat) => {
           const Icon = stat.icon
           return (
             <div

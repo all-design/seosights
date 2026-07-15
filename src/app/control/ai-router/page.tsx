@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Route,
   Zap,
@@ -26,131 +27,50 @@ import {
   GitBranch,
   Terminal,
   Gauge,
+  AlertTriangle,
 } from 'lucide-react'
 
-// ── Mock Data ──────────────────────────────────────────────
+// ── API Types ────────────────────────────────────────────────
 
-interface MeshProvider {
-  name: string
-  icon: React.ElementType
-  models: string[]
-  speed: string
-  status: 'online' | 'offline' | 'degraded'
-  requestsToday: number
-  color: string
-  description: string
+interface ModelInfo {
+  key: string
+  id: string
+  free: boolean
+  contextWindow: number
+  speed: 'ultra' | 'fast' | 'medium' | 'slow'
+  quality: 'basic' | 'good' | 'excellent' | 'state_of_art'
+  costPer1kInput?: number
+  costPer1kOutput?: number
 }
 
-const meshProviders: MeshProvider[] = [
-  {
-    name: 'Groq',
-    icon: Zap,
-    models: ['Llama 3.3 70B', 'Mixtral 8x7B'],
-    speed: 'Ultra Fast (~200 tok/s)',
-    status: 'online',
-    requestsToday: 87,
-    color: 'amber',
-    description: 'Instant inference — best for quick completions',
-  },
-  {
-    name: 'Gemini Flash',
-    icon: Globe,
-    models: ['Gemini 2.0 Flash'],
-    speed: 'Fast (~150 tok/s)',
-    status: 'online',
-    requestsToday: 156,
-    color: 'cyan',
-    description: 'Reasoning & planning — free tier, generous limits',
-  },
-  {
-    name: 'OpenRouter',
-    icon: Bot,
-    models: ['GLM 5.1', 'GLM Turbo', 'Qwen Coder 2.5'],
-    speed: 'Fast (~120 tok/s)',
-    status: 'online',
-    requestsToday: 143,
-    color: 'emerald',
-    description: 'Free tier models — great for code generation',
-  },
-  {
-    name: 'Ollama',
-    icon: Server,
-    models: ['Llama 3.3 70B (local)'],
-    speed: 'Medium (~40 tok/s)',
-    status: 'online',
-    requestsToday: 45,
-    color: 'rose',
-    description: 'Local fallback — offline safe, no rate limits',
-  },
-]
-
-interface EngineMapping {
-  engine: string
-  icon: React.ElementType
-  primaryModel: string
-  fallbackModel: string
-  llmUsage: number
-  description: string
+interface ProviderStatus {
+  id: string
+  configured: boolean
+  hasEnvVar: string | null
+  models: ModelInfo[]
 }
 
-const engineMappings: EngineMapping[] = [
-  {
-    engine: 'Product Engine',
-    icon: Landmark,
-    primaryModel: 'Gemini Flash',
-    fallbackModel: 'GLM 5.1',
-    llmUsage: 85,
-    description: 'Reasoning for product decisions',
-  },
-  {
-    engine: 'Architecture Engine',
-    icon: Cpu,
-    primaryModel: 'GLM 5.1',
-    fallbackModel: 'Qwen Coder',
-    llmUsage: 70,
-    description: 'Code structure & planning',
-  },
-  {
-    engine: 'Engineering Engine',
-    icon: Code2,
-    primaryModel: 'GLM 5.1',
-    fallbackModel: 'Gemini Flash',
-    llmUsage: 95,
-    description: '95% of cases — great for code',
-  },
-  {
-    engine: 'QA Engine',
-    icon: Shield,
-    primaryModel: 'Deterministic',
-    fallbackModel: 'LLM (reports only)',
-    llmUsage: 5,
-    description: 'Playwright, ESLint, Vitest',
-  },
-  {
-    engine: 'Review Engine',
-    icon: Eye,
-    primaryModel: 'GLM 5.1 + Gemini Flash',
-    fallbackModel: 'Groq',
-    llmUsage: 60,
-    description: 'Cross review with dual models',
-  },
-  {
-    engine: 'Documentation Engine',
-    icon: PenTool,
-    primaryModel: 'Gemini Flash',
-    fallbackModel: 'GLM 5.1',
-    llmUsage: 75,
-    description: 'Narrative generation',
-  },
-  {
-    engine: 'Observatory',
-    icon: Search,
-    primaryModel: 'Deterministic',
-    fallbackModel: 'LLM (narratives only)',
-    llmUsage: 5,
-    description: 'Crawlers + LLM for narratives',
-  },
-]
+interface ProviderHealthItem {
+  providerId: string
+  state: 'closed' | 'open' | 'half-open'
+  failures: number
+  lastFailure: string | null
+  cooldownUntil: string | null
+}
+
+interface AIRouterData {
+  providers: ProviderStatus[]
+  tierConstraints: Record<string, { allowedProviders: string[]; maxCostPerCall: number; preferFree: boolean }>
+  providerHealth: ProviderHealthItem[]
+  summary: {
+    configuredCount: number
+    totalProviders: number
+    overallStatus: 'ok' | 'degraded' | 'down'
+    message: string
+  }
+}
+
+// ── Static data (architecture, not mock data) ────────────────
 
 interface RoutingPrinciple {
   title: string
@@ -174,7 +94,7 @@ const routingPrinciples: RoutingPrinciple[] = [
   },
   {
     title: 'Cache Results — Reuse If Same Task Hash Already Solved',
-    description: 'Every task generates a hash. If we already solved an identical task, return the cached result. 86% cache hit rate today.',
+    description: 'Every task generates a hash. If we already solved an identical task, return the cached result.',
     icon: Database,
     color: 'amber',
   },
@@ -199,22 +119,38 @@ const deterministicTasks: DeterministicTask[] = [
   { task: 'Performance', tool: 'Lighthouse', reason: 'Metric thresholds — no interpretation', icon: Gauge },
 ]
 
-const cacheStats = {
-  totalRequests: 431,
-  cacheHits: 372,
-  cacheMisses: 59,
-  hitRate: 86,
-  estimatedSavings: 86,
+// Engine → Model Mapping (static architecture reference)
+interface EngineMapping {
+  engine: string
+  icon: React.ElementType
+  primaryModel: string
+  fallbackModel: string
+  llmUsage: number
+  description: string
 }
 
-const footerStats = {
-  modelsAvailable: 9,
-  freeTierLimits: 'Gemini: 15 RPM, Groq: 30 RPM, OpenRouter: 20 RPM',
-  uptime: '99.97%',
-  totalRoutedToday: 431,
+const engineMappings: EngineMapping[] = [
+  { engine: 'Product Engine', icon: Landmark, primaryModel: 'Gemini Flash', fallbackModel: 'GLM 5.1', llmUsage: 85, description: 'Reasoning for product decisions' },
+  { engine: 'Architecture Engine', icon: Cpu, primaryModel: 'GLM 5.1', fallbackModel: 'Qwen Coder', llmUsage: 70, description: 'Code structure & planning' },
+  { engine: 'Engineering Engine', icon: Code2, primaryModel: 'GLM 5.1', fallbackModel: 'Gemini Flash', llmUsage: 95, description: '95% of cases — great for code' },
+  { engine: 'QA Engine', icon: Shield, primaryModel: 'Deterministic', fallbackModel: 'LLM (reports only)', llmUsage: 5, description: 'Playwright, ESLint, Vitest' },
+  { engine: 'Review Engine', icon: Eye, primaryModel: 'GLM 5.1 + Gemini Flash', fallbackModel: 'Groq', llmUsage: 60, description: 'Cross review with dual models' },
+  { engine: 'Documentation Engine', icon: PenTool, primaryModel: 'Gemini Flash', fallbackModel: 'GLM 5.1', llmUsage: 75, description: 'Narrative generation' },
+  { engine: 'Observatory', icon: Search, primaryModel: 'Deterministic', fallbackModel: 'LLM (narratives only)', llmUsage: 5, description: 'Crawlers + LLM for narratives' },
+]
+
+// ── Provider → icon / color map ──────────────────────────────
+
+const providerMeta: Record<string, { icon: React.ElementType; color: string; description: string }> = {
+  groq: { icon: Zap, color: 'amber', description: 'Instant inference — best for quick completions' },
+  gemini: { icon: Globe, color: 'cyan', description: 'Reasoning & planning — free tier, generous limits' },
+  openrouter: { icon: Bot, color: 'emerald', description: 'Free tier models — great for code generation' },
+  openai: { icon: Bot, color: 'violet', description: 'Premium models — high quality reasoning' },
+  zai: { icon: Bot, color: 'emerald', description: 'ZAI SDK models — GLM variants' },
+  ollama: { icon: Server, color: 'rose', description: 'Local fallback — offline safe, no rate limits' },
 }
 
-// ── Helper ──────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────
 
 function statusDot(status: 'online' | 'offline' | 'degraded') {
   if (status === 'online') return <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> Online</span>
@@ -228,13 +164,106 @@ function colorClasses(color: string) {
     cyan:    { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400', glow: 'shadow-cyan-500/5', iconBg: 'bg-cyan-500/20' },
     emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', glow: 'shadow-emerald-500/5', iconBg: 'bg-emerald-500/20' },
     rose:    { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', glow: 'shadow-rose-500/5', iconBg: 'bg-rose-500/20' },
+    violet:  { bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-400', glow: 'shadow-violet-500/5', iconBg: 'bg-violet-500/20' },
   }
   return map[color] || map.emerald
 }
 
-// ── Component ───────────────────────────────────────────────
+function speedLabel(speed: string): string {
+  switch (speed) {
+    case 'ultra': return 'Ultra Fast (~200 tok/s)'
+    case 'fast': return 'Fast (~120 tok/s)'
+    case 'medium': return 'Medium (~40 tok/s)'
+    case 'slow': return 'Slow (~15 tok/s)'
+    default: return speed
+  }
+}
+
+function providerOnlineStatus(p: ProviderStatus, health?: ProviderHealthItem): 'online' | 'offline' | 'degraded' {
+  if (!p.configured) return 'offline'
+  if (health && health.state === 'open') return 'degraded'
+  return 'online'
+}
+
+// ── Component ────────────────────────────────────────────────
 
 export default function AIRouterPage() {
+  const [data, setData] = useState<AIRouterData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch AI router status')
+        const json = await res.json()
+        // Extract AI router data from unified API response
+        const aiProviders = json.aiProviders || { configured: [], available: [], using: 'rule-based-fallback' }
+        const providers: ProviderStatus[] = aiProviders.configured.map((id: string) => ({
+          id,
+          configured: true,
+          hasEnvVar: null,
+          models: [],
+        }))
+        setData({
+          providers,
+          tierConstraints: {},
+          providerHealth: [],
+          summary: {
+            configuredCount: aiProviders.configured.length,
+            totalProviders: 5,
+            overallStatus: aiProviders.using === 'live-llm' ? 'ok' as const : 'degraded' as const,
+            message: aiProviders.using === 'live-llm' ? 'AI providers operational' : 'Using rule-based fallback',
+          },
+        })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-16" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-56" />
+          ))}
+        </div>
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertTriangle className="w-12 h-12 text-red-400" />
+        <h2 className="text-lg font-semibold text-white">Failed to load AI Router status</h2>
+        <p className="text-sm text-slate-400">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  if (!data) return null
+
+  const totalModels = data.providers.reduce((sum, p) => sum + p.models.length, 0)
+
   return (
     <div className="space-y-8">
 
@@ -247,9 +276,17 @@ export default function AIRouterPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-white tracking-tight">AI Router™</h1>
-              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-[11px] font-semibold uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Routing
+              <span className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider ${
+                data.summary.overallStatus === 'ok'
+                  ? 'bg-emerald-500/15 border border-emerald-500/25 text-emerald-400'
+                  : data.summary.overallStatus === 'degraded'
+                  ? 'bg-amber-500/15 border border-amber-500/25 text-amber-400'
+                  : 'bg-red-500/15 border border-red-500/25 text-red-400'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                  data.summary.overallStatus === 'ok' ? 'bg-emerald-400' : data.summary.overallStatus === 'degraded' ? 'bg-amber-400' : 'bg-red-400'
+                }`} />
+                {data.summary.overallStatus === 'ok' ? 'Routing' : data.summary.overallStatus === 'degraded' ? 'Degraded' : 'Down'}
               </span>
             </div>
             <p className="text-sm text-slate-400 mt-0.5">Free AI Mesh™ — Intelligent model routing for zero-cost operations</p>
@@ -257,7 +294,7 @@ export default function AIRouterPage() {
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <Clock className="w-3.5 h-3.5" />
-          <span>Last updated: just now</span>
+          <span>{data.summary.message}</span>
         </div>
       </div>
 
@@ -280,7 +317,6 @@ export default function AIRouterPage() {
               </div>
             </div>
           </div>
-          {/* Connector lines visual hint */}
           <div className="flex justify-center mt-1">
             <div className="w-px h-4 bg-slate-700" />
           </div>
@@ -293,45 +329,68 @@ export default function AIRouterPage() {
         </div>
 
         {/* Provider Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {meshProviders.map((provider) => {
-            const c = colorClasses(provider.color)
-            const Icon = provider.icon
-            return (
-              <div
-                key={provider.name}
-                className={`rounded-xl ${c.bg} border ${c.border} p-4 shadow-lg ${c.glow} transition-all duration-150 hover:scale-[1.02]`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-lg ${c.iconBg} flex items-center justify-center`}>
-                      <Icon className={`w-4 h-4 ${c.text}`} />
+        {data.providers.length === 0 ? (
+          <div className="text-center py-12">
+            <Bot className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">No AI providers registered</p>
+            <p className="text-xs text-slate-600 mt-1">Configure provider API keys to enable the AI Router</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {data.providers.map((provider) => {
+              const meta = providerMeta[provider.id] || { icon: Bot, color: 'emerald', description: 'AI provider' }
+              const c = colorClasses(meta.color)
+              const Icon = meta.icon
+              const healthItem = data.providerHealth.find(h => h.providerId === provider.id)
+              const onlineStatus = providerOnlineStatus(provider, healthItem)
+
+              return (
+                <div
+                  key={provider.id}
+                  className={`rounded-xl ${c.bg} border ${c.border} p-4 shadow-lg ${c.glow} transition-all duration-150 hover:scale-[1.02]`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg ${c.iconBg} flex items-center justify-center`}>
+                        <Icon className={`w-4 h-4 ${c.text}`} />
+                      </div>
+                      <span className="text-sm font-semibold text-white capitalize">{provider.id}</span>
                     </div>
-                    <span className="text-sm font-semibold text-white">{provider.name}</span>
+                    {statusDot(onlineStatus)}
                   </div>
-                  {statusDot(provider.status)}
-                </div>
-                <p className="text-xs text-slate-400 mb-3">{provider.description}</p>
-                <div className="space-y-1.5">
-                  {provider.models.map((model) => (
-                    <div key={model} className="flex items-center gap-1.5 text-xs text-slate-300">
-                      <GitBranch className="w-3 h-3 text-slate-500" />
-                      <span>{model}</span>
+                  <p className="text-xs text-slate-400 mb-3">{meta.description}</p>
+                  {provider.models.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {provider.models.map((model) => (
+                        <div key={model.key} className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-300 min-w-0">
+                            <GitBranch className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                            <span className="truncate">{model.id}</span>
+                          </div>
+                          {model.free && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 flex-shrink-0">FREE</span>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <p className="text-xs text-slate-600 italic">No models registered</p>
+                  )}
+                  <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Speed</span>
+                    <span className={`text-xs font-medium ${c.text}`}>
+                      {provider.models.length > 0 ? speedLabel(provider.models[0].speed) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Models</span>
+                    <span className="text-xs font-mono text-white">{provider.models.length}</span>
+                  </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">Speed</span>
-                  <span className={`text-xs font-medium ${c.text}`}>{provider.speed}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">Requests today</span>
-                  <span className="text-xs font-mono text-white">{provider.requestsToday}</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {/* ── Section 3: Engine → Model Mapping ──────────────── */}
@@ -342,14 +401,12 @@ export default function AIRouterPage() {
           <span className="text-xs text-slate-500 ml-1">— Which engine uses which model</span>
         </div>
         <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
-          {/* Table Header */}
           <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
             <div className="col-span-3">Engine</div>
             <div className="col-span-3">Primary Model</div>
             <div className="col-span-3">Fallback Model</div>
             <div className="col-span-3">LLM Usage</div>
           </div>
-          {/* Rows */}
           {engineMappings.map((mapping, i) => {
             const Icon = mapping.icon
             const barColor = mapping.llmUsage >= 80 ? 'bg-emerald-500' : mapping.llmUsage >= 40 ? 'bg-cyan-500' : 'bg-amber-500'
@@ -430,14 +487,12 @@ export default function AIRouterPage() {
           <span className="text-xs text-slate-500 ml-1">— Tasks that DON&apos;T use LLM</span>
         </div>
         <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
-          {/* Table Header */}
           <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
             <div className="col-span-1">#</div>
             <div className="col-span-3">Task</div>
             <div className="col-span-3">Tool</div>
             <div className="col-span-5">Why No LLM Needed</div>
           </div>
-          {/* Rows */}
           {deterministicTasks.map((task, i) => {
             const Icon = task.icon
             return (
@@ -472,62 +527,40 @@ export default function AIRouterPage() {
           <span className="text-xs text-slate-500 ml-1">— Task hash cache performance</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Total Requests */}
           <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-4 h-4 text-slate-400" />
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Total Requests</span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Total Models</span>
             </div>
-            <p className="text-3xl font-bold text-white font-mono">{cacheStats.totalRequests}</p>
-            <p className="text-xs text-slate-500 mt-1">Today</p>
+            <p className="text-3xl font-bold text-white font-mono">{totalModels}</p>
+            <p className="text-xs text-slate-500 mt-1">Available across all providers</p>
           </div>
 
-          {/* Cache Hits */}
           <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-5">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Cache Hits</span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Configured</span>
             </div>
-            <p className="text-3xl font-bold text-emerald-400 font-mono">{cacheStats.cacheHits}</p>
-            <div className="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
-                style={{ width: `${cacheStats.hitRate}%` }}
-              />
-            </div>
-            <p className="text-xs text-emerald-400/70 mt-1">{cacheStats.hitRate}% hit rate</p>
+            <p className="text-3xl font-bold text-emerald-400 font-mono">{data.summary.configuredCount}</p>
+            <p className="text-xs text-emerald-400/70 mt-1">of {data.summary.totalProviders} providers</p>
           </div>
 
-          {/* Cache Misses */}
           <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
             <div className="flex items-center gap-2 mb-2">
               <XCircle className="w-4 h-4 text-amber-400" />
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Cache Misses</span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Unconfigured</span>
             </div>
-            <p className="text-3xl font-bold text-amber-400 font-mono">{cacheStats.cacheMisses}</p>
-            <div className="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-amber-500 transition-all"
-                style={{ width: `${Math.round((cacheStats.cacheMisses / cacheStats.totalRequests) * 100)}%` }}
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-1">{Math.round((cacheStats.cacheMisses / cacheStats.totalRequests) * 100)}% miss rate</p>
+            <p className="text-3xl font-bold text-amber-400 font-mono">{data.summary.totalProviders - data.summary.configuredCount}</p>
+            <p className="text-xs text-slate-500 mt-1">Missing API keys</p>
           </div>
 
-          {/* Estimated Savings */}
           <div className="rounded-xl bg-cyan-500/5 border border-cyan-500/20 p-5">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-cyan-400" />
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Est. Savings</span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Free Models</span>
             </div>
-            <p className="text-3xl font-bold text-cyan-400 font-mono">{cacheStats.estimatedSavings}%</p>
-            <div className="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-cyan-500 transition-all"
-                style={{ width: `${cacheStats.estimatedSavings}%` }}
-              />
-            </div>
-            <p className="text-xs text-cyan-400/70 mt-1">of LLM calls avoided</p>
+            <p className="text-3xl font-bold text-cyan-400 font-mono">{data.providers.reduce((sum, p) => sum + p.models.filter(m => m.free).length, 0)}</p>
+            <p className="text-xs text-cyan-400/70 mt-1">Zero-cost models available</p>
           </div>
         </div>
       </section>
@@ -537,19 +570,19 @@ export default function AIRouterPage() {
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <Bot className="w-3.5 h-3.5 text-slate-500" />
-            <span>Models available: <span className="text-white font-mono">{footerStats.modelsAvailable}</span></span>
+            <span>Models available: <span className="text-white font-mono">{totalModels}</span></span>
           </div>
           <div className="flex items-center gap-2">
             <Zap className="w-3.5 h-3.5 text-amber-500" />
-            <span>Free tier limits: <span className="text-slate-300">{footerStats.freeTierLimits}</span></span>
+            <span>Providers: <span className="text-white font-mono">{data.summary.configuredCount}/{data.summary.totalProviders}</span> configured</span>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Uptime: <span className="text-emerald-400 font-mono">{footerStats.uptime}</span></span>
+            <span>Status: <span className={data.summary.overallStatus === 'ok' ? 'text-emerald-400 font-mono' : 'text-amber-400 font-mono'}>{data.summary.overallStatus}</span></span>
           </div>
           <div className="flex items-center gap-2">
             <Route className="w-3.5 h-3.5 text-cyan-500" />
-            <span>Total routed today: <span className="text-cyan-400 font-mono">{footerStats.totalRoutedToday}</span></span>
+            <span>Free models: <span className="text-cyan-400 font-mono">{data.providers.reduce((sum, p) => sum + p.models.filter(m => m.free).length, 0)}</span></span>
           </div>
         </div>
       </footer>

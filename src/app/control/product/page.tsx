@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Package,
   Clock,
@@ -22,156 +23,239 @@ import {
   FileText,
   BarChart3,
   Zap,
+  AlertCircle,
+  RefreshCw,
+  Shield,
+  Eye,
 } from 'lucide-react'
 
-// ── Mock Data ──────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────
 
-const productScore = 72
-
-const keyFindings = [
-  { text: 'Onboarding funnel has 34% drop-off at step 2 (Sign Up → First Scan)', severity: 'high' },
-  { text: 'Dashboard engagement up 12% week-over-week — new quick actions helping', severity: 'positive' },
-  { text: '"Custom Reports" feature has 0 active users in 45 days', severity: 'critical' },
-  { text: 'Mobile conversion rate is 2.3x lower than desktop', severity: 'high' },
-]
-
-const recommendedPriorities = [
-  { rank: 1, text: 'Fix onboarding step 2 drop-off — projected +22% activation', impact: 'high' },
-  { rank: 2, text: 'Remove or sunset "Custom Reports" — zero usage, maintenance burden', impact: 'medium' },
-  { rank: 3, text: 'Optimize mobile conversion — responsive overhaul for scan flow', impact: 'high' },
-  { rank: 4, text: 'Simplify dashboard — 7 widgets competing for attention', impact: 'medium' },
-  { rank: 5, text: 'Promote "Quick Actions" — highest engagement feature right now', impact: 'low' },
-]
-
-const funnelSteps = [
-  { name: 'Landing', count: 12480, rate: 100, dropOff: 0 },
-  { name: 'Sign Up', count: 8360, rate: 67, dropOff: 33 },
-  { name: 'First Scan', count: 5510, rate: 44, dropOff: 34 },
-  { name: 'Dashboard', count: 3720, rate: 30, dropOff: 33 },
-  { name: 'Upgrade', count: 930, rate: 7.4, dropOff: 75 },
-]
-
-const features = [
-  { name: 'Quick Actions', users: 2840, lastUsed: '2h ago', status: 'hot' as const },
-  { name: 'AI Visibility Score', users: 2310, lastUsed: '15m ago', status: 'hot' as const },
-  { name: 'Competitor Tracking', users: 1890, lastUsed: '1h ago', status: 'hot' as const },
-  { name: 'Scan Dashboard', users: 1650, lastUsed: '30m ago', status: 'alive' as const },
-  { name: 'Keyword Monitor', users: 1200, lastUsed: '3h ago', status: 'alive' as const },
-  { name: 'Alert System', users: 980, lastUsed: '5h ago', status: 'alive' as const },
-  { name: 'PDF Reports', users: 620, lastUsed: '2d ago', status: 'alive' as const },
-  { name: 'Team Sharing', users: 340, lastUsed: '5d ago', status: 'lukewarm' as const },
-  { name: 'API Access', users: 210, lastUsed: '8d ago', status: 'lukewarm' as const },
-  { name: 'Bulk Operations', users: 180, lastUsed: '12d ago', status: 'lukewarm' as const },
-  { name: 'Custom Reports', users: 0, lastUsed: '45d ago', status: 'dead' as const },
-  { name: 'White Label', users: 3, lastUsed: '38d ago', status: 'dead' as const },
-  { name: 'Webhook Builder', users: 0, lastUsed: '60d ago', status: 'dead' as const },
-]
-
-const complexityData = [
-  { month: 'Oct', score: 42 },
-  { month: 'Nov', score: 48 },
-  { month: 'Dec', score: 53 },
-  { month: 'Jan', score: 58 },
-  { month: 'Feb', score: 65 },
-  { month: 'Mar', score: 71 },
-]
-
-const recommendations = {
-  remove: [
-    'Custom Reports — 0 users in 45 days, costs ~4h/week maintenance',
-    'White Label — 3 enterprise users, not worth the code surface area',
-    'Webhook Builder — never adopted, replaced by Zapier integration',
-  ],
-  simplify: [
-    'Dashboard: 7 widgets → 3 default + optional panel (reduce cognitive load)',
-    'Onboarding: 5-step funnel → 3-step with progressive disclosure',
-    'Settings: 12 tabs → 4 categories with nested sections',
-  ],
-  prioritize: [
-    'Onboarding step 2 fix — single highest ROI opportunity',
-    'Mobile responsive scan flow — 40% of traffic, 2.3x lower conversion',
-    'Quick Actions expansion — users love it, build more',
-    'Dashboard personalization — let users pin what matters',
-  ],
+interface QAData {
+  score: number
+  warnings: number
+  degraded: number
+  critical: number
+  passRate: number
+  totalTests: number
+  passed: number
+  lastRun: string | null
 }
 
-// ── Component ──────────────────────────────────────────────
+interface FeatureAdoption {
+  featureKey: string
+  featureName: string
+  activeUsersToday: number
+  activeUsers7dAvg: number
+  adoptionRate: number
+  retention7d: number
+  status: 'adopted' | 'at_risk' | 'low_adoption'
+  trend: 'up' | 'stable' | 'down'
+}
+
+interface FeatureValidation {
+  featureKey: string
+  featureName: string
+  usedCount: number
+  avgSessionMin: number
+  avgSessionSec: number
+  convLift: number
+  decision: 'KEEP' | 'REVIEW' | 'KILL'
+}
+
+interface RecentDecision {
+  id: string
+  changeTitle: string
+  changeType: string
+  aiScoreDelta: number
+  createdAt: string
+}
+
+interface TopInsight {
+  id: string
+  title: string
+  insightType: string
+  priority: string
+  description: string
+  confidence: number
+  status: string
+}
+
+interface ProductData {
+  qa: QAData
+  featureAdoption: FeatureAdoption[]
+  featureValidation: FeatureValidation[]
+  recentDecisions: RecentDecision[]
+  topInsights: TopInsight[]
+  summary: {
+    adoptedCount: number
+    atRiskCount: number
+    lowAdoptionCount: number
+    keepCount: number
+    reviewCount: number
+    killCount: number
+  }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────
+
+function statusIcon(status: string) {
+  switch (status) {
+    case 'adopted': return <Flame className="w-4 h-4 text-rose-400" />
+    case 'at_risk': return <AlertTriangle className="w-4 h-4 text-amber-400" />
+    case 'low_adoption': return <Skull className="w-4 h-4 text-red-400" />
+    default: return null
+  }
+}
+
+function statusBadge(status: string) {
+  switch (status) {
+    case 'adopted': return 'bg-rose-500/15 text-rose-400 border-rose-500/20'
+    case 'at_risk': return 'bg-amber-500/15 text-amber-400 border-amber-500/20'
+    case 'low_adoption': return 'bg-red-500/15 text-red-400 border-red-500/20'
+    default: return 'bg-slate-500/15 text-slate-400 border-slate-500/20'
+  }
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case 'adopted': return 'Hot'
+    case 'at_risk': return 'At Risk'
+    case 'low_adoption': return 'Dead'
+    default: return status
+  }
+}
+
+function decisionConfig(decision: string) {
+  switch (decision) {
+    case 'KEEP': return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', icon: CheckCircle2 }
+    case 'REVIEW': return { color: 'text-amber-400', bg: 'bg-amber-500/15', icon: Eye }
+    case 'KILL': return { color: 'text-red-400', bg: 'bg-red-500/15', icon: XCircle }
+    default: return { color: 'text-slate-400', bg: 'bg-slate-500/15', icon: AlertCircle }
+  }
+}
+
+function scoreColor(score: number) {
+  if (score >= 80) return 'text-emerald-400'
+  if (score >= 60) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+function scoreRing(score: number) {
+  if (score >= 80) return 'stroke-emerald-400'
+  if (score >= 60) return 'stroke-amber-400'
+  return 'stroke-red-400'
+}
+
+function trendIcon(trend: string) {
+  switch (trend) {
+    case 'up': return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+    case 'down': return <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+    default: return <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+  }
+}
+
+// ─── Component ──────────────────────────────────────────────────
 
 export default function ProductEnginePage() {
+  const [data, setData] = useState<ProductData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const maxComplexity = Math.max(...complexityData.map(d => d.score))
-
-  const statusIcon = (status: string) => {
-    switch (status) {
-      case 'hot': return <Flame className="w-4 h-4 text-rose-400" />
-      case 'alive': return <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-      case 'lukewarm': return <AlertTriangle className="w-4 h-4 text-amber-400" />
-      case 'dead': return <Skull className="w-4 h-4 text-red-400" />
-      default: return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch product data')
+        const json = await res.json()
+        const qaRun = json.productQA || json.latestQA || null
+        // Derive product data from unified response
+        const derived: ProductData = {
+          qa: {
+            score: qaRun?.productScore ?? 0,
+            warnings: qaRun?.majorCount ?? 0,
+            degraded: qaRun?.mediumCount ?? 0,
+            critical: qaRun?.criticalCount ?? 0,
+            passRate: qaRun?.productScore ?? 0,
+            totalTests: (qaRun?.criticalCount ?? 0) + (qaRun?.majorCount ?? 0) + (qaRun?.mediumCount ?? 0) + (qaRun?.minorCount ?? 0),
+            passed: (qaRun?.mediumCount ?? 0) + (qaRun?.minorCount ?? 0),
+            lastRun: qaRun?.completedAt ?? qaRun?.createdAt ?? null,
+          },
+          featureAdoption: [],
+          featureValidation: [],
+          recentDecisions: [],
+          topInsights: [],
+          summary: {
+            adoptedCount: 0,
+            atRiskCount: 0,
+            lowAdoptionCount: 0,
+            keepCount: 0,
+            reviewCount: 0,
+            killCount: 0,
+          },
+        }
+        setData(derived)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
     }
+    loadData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-rose-500/15 border border-rose-500/20 flex items-center justify-center">
+              <Package className="w-6 h-6 text-rose-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Product Engine</h1>
+              <p className="text-sm text-slate-400 mt-0.5">Autonomous Product Lead</p>
+            </div>
+          </div>
+        </div>
+        <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
+      </div>
+    )
   }
 
-  const statusBadge = (status: string) => {
-    switch (status) {
-      case 'hot': return 'bg-rose-500/15 text-rose-400 border-rose-500/20'
-      case 'alive': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-      case 'lukewarm': return 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-      case 'dead': return 'bg-red-500/15 text-red-400 border-red-500/20'
-      default: return 'bg-slate-500/15 text-slate-400 border-slate-500/20'
-    }
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-rose-500/15 border border-rose-500/20 flex items-center justify-center">
+            <Package className="w-6 h-6 text-rose-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Product Engine</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Autonomous Product Lead</p>
+          </div>
+        </div>
+        <div className="bg-slate-900 border border-red-500/20 rounded-xl p-8 text-center">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+          <p className="text-red-400 text-sm font-medium">Failed to load product data</p>
+          <p className="text-slate-500 text-xs mt-1">{error}</p>
+          <button
+            onClick={() => { setLoading(true); setError(null); setData(null); }}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
-  const severityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'text-red-400'
-      case 'high': return 'text-amber-400'
-      case 'positive': return 'text-emerald-400'
-      default: return 'text-slate-400'
-    }
-  }
+  if (!data) return null
 
-  const severityDot = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'bg-red-400'
-      case 'high': return 'bg-amber-400'
-      case 'positive': return 'bg-emerald-400'
-      default: return 'bg-slate-400'
-    }
-  }
-
-  const impactColor = (impact: string) => {
-    switch (impact) {
-      case 'high': return 'bg-rose-500/15 text-rose-400'
-      case 'medium': return 'bg-amber-500/15 text-amber-400'
-      case 'low': return 'bg-slate-500/15 text-slate-400'
-      default: return 'bg-slate-500/15 text-slate-400'
-    }
-  }
-
-  const scoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-400'
-    if (score >= 60) return 'text-amber-400'
-    return 'text-red-400'
-  }
-
-  const scoreRing = (score: number) => {
-    if (score >= 80) return 'stroke-emerald-400'
-    if (score >= 60) return 'stroke-amber-400'
-    return 'stroke-red-400'
-  }
-
-  const scoreGlow = (score: number) => {
-    if (score >= 80) return 'shadow-emerald-400/20'
-    if (score >= 60) return 'shadow-amber-400/20'
-    return 'shadow-red-400/20'
-  }
-
-  // Funnel bar colors — gradient from green to red
-  const funnelColor = (rate: number) => {
-    if (rate >= 60) return 'bg-emerald-500'
-    if (rate >= 30) return 'bg-amber-500'
-    return 'bg-rose-500'
-  }
+  const qaScore = data.qa.score
 
   return (
     <div className="space-y-6">
@@ -193,11 +277,15 @@ export default function ProductEnginePage() {
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            Last run: 03:00 AM
-          </div>
-          <span className="text-slate-700">|</span>
+          {data.qa.lastRun && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                Last run: {new Date(data.qa.lastRun).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+              <span className="text-slate-700">|</span>
+            </>
+          )}
           <div className="flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5" />
             Next review: 03:00 AM
@@ -210,159 +298,124 @@ export default function ProductEnginePage() {
         <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
           <Star className="w-4 h-4 text-rose-400" />
           <h2 className="text-sm font-semibold text-white">Executive Product Review</h2>
-          <span className="text-[10px] text-slate-500 ml-auto">March 5, 2026 — Morning Report</span>
+          <span className="text-[10px] text-slate-500 ml-auto">
+            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+          </span>
         </div>
 
         <div className="p-5">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Score */}
+            {/* QA Score */}
             <div className="flex flex-col items-center justify-center py-4">
               <div className="relative w-36 h-36">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="52" fill="none" className="stroke-slate-800" strokeWidth="8" />
                   <circle
                     cx="60" cy="60" r="52" fill="none"
-                    className={scoreRing(productScore)}
+                    className={scoreRing(qaScore)}
                     strokeWidth="8"
                     strokeLinecap="round"
-                    strokeDasharray={`${(productScore / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`}
+                    strokeDasharray={`${(qaScore / 100) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`}
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className={`text-4xl font-bold ${scoreColor(productScore)}`}>{productScore}</span>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">Product Score</span>
+                  <span className={`text-4xl font-bold ${scoreColor(qaScore)}`}>{qaScore}</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider">QA Score</span>
                 </div>
               </div>
-              <div className={`mt-3 text-xs font-medium px-3 py-1 rounded-full ${productScore >= 80 ? 'bg-emerald-500/15 text-emerald-400' : productScore >= 60 ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'}`}>
-                {productScore >= 80 ? 'Healthy' : productScore >= 60 ? 'Needs Attention' : 'Critical'}
+              <div className={`mt-3 text-xs font-medium px-3 py-1 rounded-full ${qaScore >= 80 ? 'bg-emerald-500/15 text-emerald-400' : qaScore >= 60 ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'}`}>
+                {qaScore >= 80 ? 'Healthy' : qaScore >= 60 ? 'Needs Attention' : 'Critical'}
               </div>
             </div>
 
-            {/* Key Findings */}
+            {/* QA Metrics */}
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Key Findings</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">QA Metrics</h3>
               <div className="space-y-3">
-                {keyFindings.map((finding, i) => (
-                  <div key={i} className="flex items-start gap-2.5">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${severityDot(finding.severity)}`} />
-                    <span className={`text-sm leading-relaxed ${severityColor(finding.severity)}`}>
-                      {finding.text}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recommended Priorities */}
-            <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Recommended Priorities</h3>
-              <div className="space-y-2.5">
-                {recommendedPriorities.map((p) => (
-                  <div key={p.rank} className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-md bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center flex-shrink-0">
-                      {p.rank}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-300 leading-snug">{p.text}</p>
-                      <span className={`inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${impactColor(p.impact)}`}>
-                        {p.impact} impact
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Onboarding Funnel ──────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-rose-400" />
-          <h2 className="text-sm font-semibold text-white">Onboarding Funnel</h2>
-          <span className="text-[10px] text-rose-400/60 ml-auto">Overall conversion: 7.4%</span>
-        </div>
-
-        <div className="p-5">
-          <div className="space-y-3">
-            {funnelSteps.map((step, i) => (
-              <div key={step.name}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-white">{step.name}</span>
-                    {i > 0 && (
-                      <span className="text-[10px] text-red-400/70 flex items-center gap-0.5">
-                        <ArrowDown className="w-3 h-3" />
-                        -{step.dropOff}% drop-off
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500">{step.count.toLocaleString()} users</span>
-                    <span className={`text-sm font-bold min-w-[3rem] text-right ${
-                      step.rate >= 60 ? 'text-emerald-400' : step.rate >= 30 ? 'text-amber-400' : 'text-rose-400'
-                    }`}>
-                      {step.rate}%
-                    </span>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300">Pass Rate</span>
+                  <span className={`text-sm font-bold ${scoreColor(data.qa.passRate)}`}>{data.qa.passRate}%</span>
                 </div>
-                <div className="w-full h-8 bg-slate-800 rounded-lg overflow-hidden relative">
-                  <div
-                    className={`h-full rounded-lg ${funnelColor(step.rate)} transition-all duration-700 relative`}
-                    style={{ width: `${step.rate}%` }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/5" />
-                  </div>
-                  {step.rate < 50 && (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">
-                      {step.rate}%
-                    </span>
-                  )}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-300">Tests</span>
+                  <span className="text-sm font-bold text-white">{data.qa.passed}/{data.qa.totalTests}</span>
                 </div>
-                {i < funnelSteps.length - 1 && (
-                  <div className="flex justify-center my-1">
-                    <ArrowDown className="w-4 h-4 text-slate-700" />
+                {data.qa.critical > 0 && (
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-red-400" />
+                    <span className="text-sm text-red-400">{data.qa.critical} critical issue{data.qa.critical !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+                {data.qa.warnings > 0 && (
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-amber-400" />
+                    <span className="text-sm text-amber-400">{data.qa.warnings} warning{data.qa.warnings !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+                {data.qa.degraded > 0 && (
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-orange-400" />
+                    <span className="text-sm text-orange-400">{data.qa.degraded} degraded</span>
+                  </div>
+                )}
+                {data.qa.critical === 0 && data.qa.warnings === 0 && (
+                  <div className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5" />
+                    <span className="text-sm text-emerald-400">All tests passing</span>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+            </div>
 
-          {/* Funnel summary */}
-          <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-3 gap-4 text-center">
+            {/* Top Insights */}
             <div>
-              <div className="text-lg font-bold text-rose-400">75%</div>
-              <div className="text-[10px] text-slate-500 uppercase">Drop at Upgrade</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-amber-400">34%</div>
-              <div className="text-[10px] text-slate-500 uppercase">Biggest Step Drop</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-emerald-400">7.4%</div>
-              <div className="text-[10px] text-slate-500 uppercase">End-to-End Conv.</div>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">AI Insights</h3>
+              {data.topInsights && data.topInsights.length > 0 ? (
+                <div className="space-y-2.5">
+                  {data.topInsights.map((insight) => (
+                    <div key={insight.id} className="flex items-start gap-2.5">
+                      <span className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
+                        insight.priority === 'high' ? 'bg-red-500/15 text-red-400' :
+                        insight.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' :
+                        'bg-slate-800 text-slate-300'
+                      }`}>
+                        {insight.priority === 'high' ? '!' : insight.priority === 'medium' ? '?' : 'i'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-300 leading-snug">{insight.title}</p>
+                        {insight.description && (
+                          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{insight.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <Sparkles className="w-6 h-6 text-slate-700 mx-auto mb-2" />
+                  <p className="text-slate-500 text-xs">No AI insights yet</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Feature Usage ──────────────────────────────── */}
+      {/* ── Feature Adoption ──────────────────────────────── */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-rose-400" />
-          <h2 className="text-sm font-semibold text-white">Feature Usage</h2>
-          <span className="text-[10px] text-slate-500 ml-auto">13 features tracked</span>
+          <h2 className="text-sm font-semibold text-white">Feature Adoption</h2>
+          <span className="text-[10px] text-slate-500 ml-auto">{data.featureAdoption.length} features tracked</span>
         </div>
 
         <div className="p-5">
           {/* Legend */}
           <div className="flex flex-wrap gap-3 mb-4">
             {[
-              { label: 'Hot', icon: Flame, color: 'text-rose-400 bg-rose-500/15 border-rose-500/20' },
-              { label: 'Alive', icon: CheckCircle2, color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
-              { label: 'Lukewarm', icon: AlertTriangle, color: 'text-amber-400 bg-amber-500/15 border-amber-500/20' },
-              { label: 'Dead', icon: Skull, color: 'text-red-400 bg-red-500/15 border-red-500/20' },
+              { label: 'Adopted', icon: Flame, color: 'text-rose-400 bg-rose-500/15 border-rose-500/20' },
+              { label: 'At Risk', icon: AlertTriangle, color: 'text-amber-400 bg-amber-500/15 border-amber-500/20' },
+              { label: 'Low Adoption', icon: Skull, color: 'text-red-400 bg-red-500/15 border-red-500/20' },
             ].map(({ label, icon: Icon, color }) => (
               <div key={label} className={`flex items-center gap-1.5 text-[10px] font-medium px-2 py-1 rounded-full border ${color}`}>
                 <Icon className="w-3 h-3" />
@@ -372,222 +425,179 @@ export default function ProductEnginePage() {
           </div>
 
           {/* Feature list */}
-          <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
-            {features.map((feature) => (
-              <div
-                key={feature.name}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
-                  feature.status === 'dead'
-                    ? 'bg-red-500/5 border-red-500/15'
-                    : feature.status === 'hot'
-                    ? 'bg-rose-500/5 border-rose-500/10'
-                    : 'bg-slate-800/30 border-slate-800'
-                }`}
-              >
-                {statusIcon(feature.status)}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white">{feature.name}</div>
-                  <div className="text-[11px] text-slate-500">Last used: {feature.lastUsed}</div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className={`text-sm font-bold ${
-                    feature.status === 'hot' ? 'text-rose-400' :
-                    feature.status === 'alive' ? 'text-emerald-400' :
-                    feature.status === 'lukewarm' ? 'text-amber-400' :
-                    'text-red-400'
-                  }`}>
-                    {feature.users.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-slate-600">users</div>
-                </div>
-                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusBadge(feature.status)}`}>
-                  {feature.status}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Summary bar */}
-          <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-4">
-            <div className="flex items-center gap-1.5 text-xs text-rose-400">
-              <Flame className="w-3.5 h-3.5" />
-              {features.filter(f => f.status === 'hot').length} hot
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-400">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              {features.filter(f => f.status === 'alive').length} alive
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-amber-400">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              {features.filter(f => f.status === 'lukewarm').length} lukewarm
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-red-400">
-              <Skull className="w-3.5 h-3.5" />
-              {features.filter(f => f.status === 'dead').length} dead — candidates for removal
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Complexity Score ───────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-rose-400" />
-            <h2 className="text-sm font-semibold text-white">Complexity Score</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Is the product getting too complex?</span>
-            <span className="text-xs font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">Trending Up</span>
-          </div>
-        </div>
-
-        <div className="p-5">
-          {/* Current score callout */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="text-5xl font-bold text-amber-400">71</div>
-            <div>
-              <div className="text-sm text-slate-300 flex items-center gap-1">
-                <TrendingUp className="w-4 h-4 text-amber-400" />
-                +6 from last month
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                Above healthy threshold (50). Consider simplification.
-              </div>
-            </div>
-          </div>
-
-          {/* Trend visualization */}
-          <div className="flex items-end gap-2 h-40">
-            {complexityData.map((d, i) => {
-              const height = (d.score / maxComplexity) * 100
-              const isLatest = i === complexityData.length - 1
-              const isHigh = d.score >= 65
-              return (
-                <div key={d.month} className="flex-1 flex flex-col items-center gap-1.5">
-                  <div className="text-xs font-bold text-slate-400">{d.score}</div>
-                  <div className="w-full relative" style={{ height: '120px' }}>
-                    <div
-                      className={`absolute bottom-0 w-full rounded-t-lg transition-all duration-500 ${
-                        isLatest
-                          ? isHigh ? 'bg-rose-500/60 border border-rose-400/30' : 'bg-amber-500/60 border border-amber-400/30'
-                          : isHigh ? 'bg-rose-500/25' : 'bg-amber-500/20'
-                      }`}
-                      style={{ height: `${height}%` }}
-                    >
-                      {isLatest && (
-                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-rose-400 shadow-lg shadow-rose-400/50" />
-                      )}
+          {data.featureAdoption.length > 0 ? (
+            <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
+              {data.featureAdoption.map((feature) => (
+                <div
+                  key={feature.featureKey}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
+                    feature.status === 'low_adoption'
+                      ? 'bg-red-500/5 border-red-500/15'
+                      : feature.status === 'adopted'
+                      ? 'bg-rose-500/5 border-rose-500/10'
+                      : 'bg-slate-800/30 border-slate-800'
+                  }`}
+                >
+                  {statusIcon(feature.status)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white">{feature.featureName}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-slate-500">{feature.activeUsersToday} users today</span>
+                      <span className="text-slate-700">·</span>
+                      <span className="text-[11px] text-slate-500">7d avg: {feature.activeUsers7dAvg}</span>
                     </div>
                   </div>
-                  <div className={`text-[10px] font-medium ${isLatest ? 'text-rose-400' : 'text-slate-500'}`}>
-                    {d.month}
+                  <div className="text-right flex-shrink-0">
+                    <div className={`text-sm font-bold ${
+                      feature.status === 'adopted' ? 'text-rose-400' :
+                      feature.status === 'at_risk' ? 'text-amber-400' :
+                      'text-red-400'
+                    }`}>
+                      {feature.adoptionRate}%
+                    </div>
+                    <div className="flex items-center justify-end gap-1">
+                      {trendIcon(feature.trend)}
+                      <span className="text-[10px] text-slate-600">adoption</span>
+                    </div>
                   </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusBadge(feature.status)}`}>
+                    {statusLabel(feature.status)}
+                  </span>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BarChart3 className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+              <p className="text-slate-500 text-xs">No feature adoption data yet</p>
+            </div>
+          )}
 
-          {/* Threshold line legend */}
-          <div className="mt-3 flex items-center gap-4 text-[10px] text-slate-500">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0.5 bg-emerald-500 rounded" />
-              Healthy (≤50)
+          {/* Summary bar */}
+          {data.summary && (
+            <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-4">
+              <div className="flex items-center gap-1.5 text-xs text-rose-400">
+                <Flame className="w-3.5 h-3.5" />
+                {data.summary.adoptedCount} adopted
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-amber-400">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {data.summary.atRiskCount} at risk
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-red-400">
+                <Skull className="w-3.5 h-3.5" />
+                {data.summary.lowAdoptionCount} low — candidates for removal
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0.5 bg-amber-500 rounded" />
-              Caution (51-65)
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0.5 bg-rose-500 rounded" />
-              Over-complex (&gt;65)
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* ── Recommendations ────────────────────────────── */}
+      {/* ── Feature Validation ─────────────────────────────── */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-rose-400" />
-          <h2 className="text-sm font-semibold text-white">AI Recommendations</h2>
-          <span className="text-[10px] text-slate-500 ml-auto">Generated by Product Engine</span>
+          <Shield className="w-4 h-4 text-rose-400" />
+          <h2 className="text-sm font-semibold text-white">Feature Validation</h2>
+          <span className="text-[10px] text-slate-500 ml-auto">Keep / Review / Kill decisions</span>
         </div>
 
         <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* What to Remove */}
-            <div className="bg-slate-800/50 border border-red-500/10 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center">
-                  <Trash2 className="w-4 h-4 text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">What to Remove</h3>
-                  <p className="text-[10px] text-slate-500">Dead weight slowing you down</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {recommendations.remove.map((item, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <XCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-slate-300 leading-relaxed">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* What to Simplify */}
-            <div className="bg-slate-800/50 border border-amber-500/10 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center">
-                  <Minimize2 className="w-4 h-4 text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">What to Simplify</h3>
-                  <p className="text-[10px] text-slate-500">Reduce complexity, increase clarity</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {recommendations.simplify.map((item, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <ChevronRight className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-slate-300 leading-relaxed">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* What to Prioritize Next */}
-            <div className="bg-slate-800/50 border border-rose-500/10 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-rose-500/15 flex items-center justify-center">
-                  <Target className="w-4 h-4 text-rose-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">What to Prioritize Next</h3>
-                  <p className="text-[10px] text-slate-500">Highest ROI opportunities</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {recommendations.prioritize.map((item, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-md bg-rose-500/15 text-[10px] font-bold text-rose-400 flex items-center justify-center flex-shrink-0">
-                      {i + 1}
+          {data.featureValidation.length > 0 ? (
+            <div className="space-y-2">
+              {data.featureValidation.map((feature) => {
+                const decCfg = decisionConfig(feature.decision)
+                const DecIcon = decCfg.icon
+                return (
+                  <div
+                    key={feature.featureKey}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
+                      feature.decision === 'KILL'
+                        ? 'bg-red-500/5 border-red-500/15'
+                        : feature.decision === 'KEEP'
+                        ? 'bg-emerald-500/5 border-emerald-500/10'
+                        : 'bg-amber-500/5 border-amber-500/10'
+                    }`}
+                  >
+                    <DecIcon className={`w-4 h-4 flex-shrink-0 ${decCfg.color}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white">{feature.featureName}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {feature.usedCount} uses · {feature.avgSessionMin}m {feature.avgSessionSec}s avg · +{feature.convLift}% conv lift
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${decCfg.bg} ${decCfg.color}`}>
+                      {feature.decision}
                     </span>
-                    <span className="text-sm text-slate-300 leading-relaxed">{item}</span>
                   </div>
-                ))}
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Shield className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+              <p className="text-slate-500 text-xs">No feature validation data yet</p>
+            </div>
+          )}
+
+          {/* Validation summary */}
+          {data.summary && (
+            <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-4">
+              <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {data.summary.keepCount} keep
               </div>
+              <div className="flex items-center gap-1.5 text-xs text-amber-400">
+                <Eye className="w-3.5 h-3.5" />
+                {data.summary.reviewCount} review
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-red-400">
+                <XCircle className="w-3.5 h-3.5" />
+                {data.summary.killCount} kill
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Recent Decisions ───────────────────────────────── */}
+      {data.recentDecisions && data.recentDecisions.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-rose-400" />
+            <h2 className="text-sm font-semibold text-white">Recent Product Decisions</h2>
+            <span className="text-[10px] text-slate-500 ml-auto">{data.recentDecisions.length} recent</span>
+          </div>
+          <div className="p-5">
+            <div className="space-y-2">
+              {data.recentDecisions.map((decision) => (
+                <div key={decision.id} className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-800">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    decision.aiScoreDelta >= 0 ? 'bg-emerald-500/15' : 'bg-red-500/15'
+                  }`}>
+                    {decision.aiScoreDelta >= 0 ? (
+                      <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 text-red-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{decision.changeTitle}</div>
+                    <div className="text-[11px] text-slate-500">{decision.changeType} · {new Date(decision.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                  </div>
+                  <div className={`text-sm font-bold ${decision.aiScoreDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {decision.aiScoreDelta >= 0 ? '+' : ''}{decision.aiScoreDelta}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Footer Note ────────────────────────────────── */}
       <div className="flex items-center justify-center gap-2 text-[10px] text-slate-600 py-4">
         <Package className="w-3.5 h-3.5 text-rose-400/40" />
-        Product Engine runs nightly at 03:00 AM — next review in ~18 hours
+        Product Engine runs nightly at 03:00 AM
       </div>
     </div>
   )

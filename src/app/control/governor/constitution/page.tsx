@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Scale, Lock, RefreshCw, Eye, ListChecks,
   Code2, FlaskConical, BookOpen, Gauge as GaugeIcon,
@@ -12,6 +12,40 @@ import {
 
 // ─── Types ───────────────────────────────────────────────
 
+interface GovernorStats {
+  totalIntercepted: number
+  totalApproved: number
+  rejectionRate: number
+  violationsPrevented: number
+  recentInterceptions: Array<{
+    id: string
+    engineName?: string
+    outcome: string
+    ruleApplied?: string
+    createdAt: string
+  }>
+}
+
+interface FactoryStatus {
+  ok: boolean
+  system: {
+    codebaseScanner: string
+    governor: string
+    aiRouter: string
+    dailyMissionGenerator: string
+    qaEngine: string
+  }
+  counts: {
+    factoryTasks: number
+    governorInterceptions: number
+    dailyMissions: number
+    qaRuns: number
+    codebaseSnapshots: number
+    engineeringMemories: number
+    factoryChangelogs: number
+  }
+}
+
 type Priority = 'P1' | 'P2' | 'P3' | 'P4' | 'P5'
 
 interface GrowthPriority {
@@ -21,40 +55,15 @@ interface GrowthPriority {
   description: string
 }
 
-interface GoldenRule {
-  id: string
-  text: string
-}
-
 interface QualityGate {
   label: string
   target: string
   icon: typeof ShieldCheck
 }
 
-interface MissionItem {
-  label: string
-  icon: typeof TrendingUp
-}
+// ─── Static Constitution Content ─────────────────────────
 
-interface LearningOutput {
-  label: string
-  icon: typeof Brain
-}
-
-// ─── Mock Data ───────────────────────────────────────────
-
-const missionItems: MissionItem[] = [
-  { label: 'AI Visibility', icon: Eye },
-  { label: 'Product Quality', icon: Star },
-  { label: 'User Value', icon: TrendingUp },
-  { label: 'Research Quality', icon: FlaskConical },
-  { label: 'Documentation Coverage', icon: BookOpen },
-  { label: 'Automation', icon: Settings2 },
-  { label: 'Stability', icon: ShieldCheck },
-]
-
-const goldenRules: GoldenRule[] = [
+const goldenRules = [
   { id: 'g1', text: 'Never create features because they are interesting. Only create features because evidence supports them.' },
   { id: 'g2', text: 'Never duplicate functionality. Extend existing systems first.' },
   { id: 'g3', text: 'Never publish simulated research.' },
@@ -65,16 +74,8 @@ const goldenRules: GoldenRule[] = [
 ]
 
 const developmentLoop: string[] = [
-  'Observe',
-  'Discover',
-  'Prioritize',
-  'Design',
-  'Implement',
-  'Test',
-  'Document',
-  'Deploy Candidate',
-  'Measure',
-  'Learn',
+  'Observe', 'Discover', 'Prioritize', 'Design', 'Implement',
+  'Test', 'Document', 'Deploy Candidate', 'Measure', 'Learn',
 ]
 
 const decisionQuestions: string[] = [
@@ -95,12 +96,7 @@ const growthPriorities: GrowthPriority[] = [
 ]
 
 const pipelineStages: string[] = [
-  'Branch',
-  'Code',
-  'QA',
-  'Documentation',
-  'Review',
-  'Human Approval',
+  'Branch', 'Code', 'QA', 'Documentation', 'Review', 'Human Approval',
 ]
 
 const qualityGates: QualityGate[] = [
@@ -113,28 +109,65 @@ const qualityGates: QualityGate[] = [
   { label: 'Observatory', target: 'No simulated data', icon: Eye },
 ]
 
-const learningOutputs: LearningOutput[] = [
-  { label: 'Growth Memory', icon: TrendingUp },
-  { label: 'Engineering Memory', icon: Code2 },
-  { label: 'Documentation', icon: BookOpen },
-  { label: 'Knowledge Graph', icon: Network },
-  { label: 'Confidence', icon: Activity },
-  { label: 'Replay', icon: Repeat },
-]
-
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
 // ─── Main Component ──────────────────────────────────────
 
 export default function ConstitutionPage() {
-  const mounted = useHydrated()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-20" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-slate-900 border border-red-500/30 rounded-xl p-8 text-center">
+        <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-white mb-2">Failed to load Constitution data</h2>
+        <p className="text-sm text-slate-400 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-400 hover:bg-fuchsia-500/25 transition-colors text-sm"
+        >
+          <RefreshCw className="w-4 h-4 inline mr-2" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  const factory = data?.factory || {}
+  const recentInterceptions = factory.recentInterceptions || []
+  const systemHealth = factory.system || {}
+  const counts = factory.counts || {}
+  const totalIntercepted = counts.governorInterceptions ?? 0
+  const totalApproved = recentInterceptions.filter((i: any) => i.outcome === 'approved').length
+  const violationsPrevented = totalIntercepted - totalApproved
 
   return (
     <div className="space-y-6">
@@ -178,12 +211,12 @@ export default function ConstitutionPage() {
             <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Ratified</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-white">Never</div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Last Modified</div>
+            <div className="text-2xl font-bold text-white">{totalIntercepted}</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Interceptions</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-emerald-400">0</div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Amendments</div>
+            <div className="text-2xl font-bold text-emerald-400">{violationsPrevented}</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Violations Prevented</div>
           </div>
         </div>
         <p className="text-center text-xs text-slate-400 mt-4 italic">
@@ -223,7 +256,15 @@ export default function ConstitutionPage() {
           <span className="text-[10px] text-slate-500 uppercase tracking-wider">Article II</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {missionItems.map((m) => {
+          {[
+            { label: 'AI Visibility', icon: Eye },
+            { label: 'Product Quality', icon: Star },
+            { label: 'User Value', icon: TrendingUp },
+            { label: 'Research Quality', icon: FlaskConical },
+            { label: 'Documentation Coverage', icon: BookOpen },
+            { label: 'Automation', icon: Settings2 },
+            { label: 'Stability', icon: ShieldCheck },
+          ].map((m) => {
             const Icon = m.icon
             return (
               <div
@@ -275,7 +316,6 @@ export default function ConstitutionPage() {
           <span className="text-[10px] text-slate-500 uppercase tracking-wider">Article IV</span>
         </div>
 
-        {/* Loop nodes — flex-wrap with arrows */}
         <div className="flex flex-wrap items-center gap-2">
           {developmentLoop.map((step, idx) => (
             <div key={step} className="flex items-center gap-2">
@@ -290,7 +330,6 @@ export default function ConstitutionPage() {
           ))}
         </div>
 
-        {/* Repeat arrow back to Observe */}
         <div className="mt-4 flex items-center gap-3 bg-fuchsia-500/5 border border-fuchsia-500/15 rounded-lg p-3">
           <Repeat className="w-4 h-4 text-fuchsia-400 flex-shrink-0" />
           <span className="text-xs text-slate-300">
@@ -360,12 +399,10 @@ export default function ConstitutionPage() {
           ))}
         </div>
 
-        {/* Arrows down to verdict */}
         <div className="flex justify-center my-3">
           <ArrowDown className="w-4 h-4 text-slate-600" />
         </div>
 
-        {/* Reject callout */}
         <div className="bg-gradient-to-r from-red-500/10 via-fuchsia-500/5 to-transparent border border-red-500/30 rounded-lg p-4 flex items-center gap-3">
           <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
           <p className="text-sm text-white font-semibold">
@@ -393,7 +430,6 @@ export default function ConstitutionPage() {
                 key={p.rank}
                 className="flex items-center gap-4 bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 hover:border-fuchsia-500/30 transition-colors"
               >
-                {/* Rank badge */}
                 <div
                   className="w-12 h-12 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/20 flex items-center justify-center flex-shrink-0"
                   style={{ opacity: Math.max(0.4, intensity) }}
@@ -404,7 +440,6 @@ export default function ConstitutionPage() {
                   <div className="text-sm font-semibold text-white">{p.title}</div>
                   <div className="text-[11px] text-slate-400">{p.description}</div>
                 </div>
-                {/* Priority bar */}
                 <div className="hidden sm:flex flex-col items-end flex-shrink-0">
                   <div className="w-24 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
                     <div
@@ -449,7 +484,6 @@ export default function ConstitutionPage() {
           ))}
         </div>
 
-        {/* No direct to production warning */}
         <div className="mt-4 flex items-center gap-2 bg-red-500/5 border border-red-500/20 rounded-lg p-3">
           <Ban className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
           <span className="text-[11px] text-red-300">
@@ -519,7 +553,14 @@ export default function ConstitutionPage() {
         </div>
         <p className="text-xs text-slate-400 mb-4">Every completed task must update:</p>
         <div className="flex flex-wrap gap-2">
-          {learningOutputs.map((out) => {
+          {[
+            { label: 'Growth Memory', icon: TrendingUp },
+            { label: 'Engineering Memory', icon: Code2 },
+            { label: 'Documentation', icon: BookOpen },
+            { label: 'Knowledge Graph', icon: Network },
+            { label: 'Confidence', icon: Activity },
+            { label: 'Replay', icon: Repeat },
+          ].map((out) => {
             const Icon = out.icon
             return (
               <span
@@ -564,7 +605,6 @@ export default function ConstitutionPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* "Features built" — struck through */}
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5 flex flex-col items-center justify-center text-center">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Not</span>
             <div className="flex items-center gap-2 relative">
@@ -576,7 +616,6 @@ export default function ConstitutionPage() {
             <span className="text-[10px] text-slate-600 mt-2">Vanity metric</span>
           </div>
 
-          {/* "Platform Value Added" — highlighted */}
           <div className="bg-gradient-to-br from-fuchsia-500/15 to-slate-900 border border-fuchsia-500/30 rounded-xl p-5 flex flex-col items-center justify-center text-center">
             <span className="text-[10px] text-fuchsia-400 uppercase tracking-wider mb-2">But</span>
             <div className="flex items-center gap-2">
@@ -609,7 +648,7 @@ export default function ConstitutionPage() {
           <div className="flex items-start gap-2">
             <ShieldCheck className="w-3.5 h-3.5 text-fuchsia-400 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-slate-300">
-              All engines are bound by this document.
+              All engines are bound by this document. <span className="text-slate-400">{totalIntercepted} interceptions enforced so far.</span>
             </p>
           </div>
           <div className="flex items-start gap-2">
@@ -620,7 +659,6 @@ export default function ConstitutionPage() {
           </div>
         </div>
 
-        {/* Seal row */}
         <div className="mt-5 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 flex items-center justify-center">
@@ -632,7 +670,7 @@ export default function ConstitutionPage() {
             </div>
           </div>
           <div className="text-[10px] text-slate-500">
-            Ratified Day 1 · Last Modified: Never · Amendments: 0
+            Ratified Day 1 · Amendments: 0 · Interceptions: {totalIntercepted}
           </div>
         </div>
       </div>

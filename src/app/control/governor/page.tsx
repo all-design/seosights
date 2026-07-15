@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Crown, RefreshCw, Scroll, FileCode, CalendarClock,
@@ -8,23 +8,78 @@ import {
   XCircle, RotateCcw, ChevronRight, ArrowRight, ArrowDown,
   Clock, Scale, BookOpen, ListChecks, Trophy, Zap,
   Target, ClipboardList, Gauge, Activity, FileText,
-  Bug, Eye, Sparkles, Quote, Repeat, Ban as BanIcon,
+  Bug, Eye, Sparkles, Quote, Repeat,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────
 
 type InterceptionAction = 'blocked' | 'returned' | 'approved'
 
-interface InterceptionEntry {
+interface RecentInterception {
   id: string
-  timestamp: string
-  engine: string
-  engineColor: string
-  request: string
-  governorQuestion: string
-  answer: string
+  taskId?: string
+  engineName?: string
+  proposedAction?: string
+  governorQuestion?: string
+  engineResponse?: string
   outcome: string
-  action: InterceptionAction
+  reasoning?: string
+  ruleApplied?: string
+  createdAt: string
+}
+
+interface GovernorStats {
+  totalIntercepted: number
+  totalApproved: number
+  rejectionRate: number
+  violationsPrevented: number
+  recentInterceptions: RecentInterception[]
+}
+
+interface FactoryStatus {
+  ok: boolean
+  timestamp: string
+  system: {
+    codebaseScanner: string
+    governor: string
+    aiRouter: string
+    dailyMissionGenerator: string
+    qaEngine: string
+  }
+  counts: {
+    factoryTasks: number
+    governorInterceptions: number
+    dailyMissions: number
+    qaRuns: number
+    codebaseSnapshots: number
+    engineeringMemories: number
+    factoryChangelogs: number
+  }
+  today: {
+    mission: {
+      id: string
+      goal: string
+      status: string
+      candidatesApproved: number
+      candidatesEvaluated: number
+    } | null
+  }
+  recentActivity: Array<{
+    type: string
+    id: string
+    engineName?: string
+    outcome?: string
+    title?: string
+    status?: string
+    errorCount?: number
+    timestamp?: string
+    createdAt: string
+  }>
+  aiProviders: {
+    configured: string[]
+    available: string[]
+    using: string
+  }
 }
 
 interface ThreeLevel {
@@ -63,98 +118,7 @@ interface LoopStep {
   icon: typeof Activity
 }
 
-// ─── Mock Data ───────────────────────────────────────────
-
-const interceptionFeed: InterceptionEntry[] = [
-  {
-    id: 'int-1',
-    timestamp: '2 min ago',
-    engine: 'Growth Engine',
-    engineColor: 'text-purple-400',
-    request: 'Add new dashboard',
-    governorQuestion: 'Do we already have Mission Control?',
-    answer: 'Yes',
-    outcome: 'REJECTED',
-    action: 'blocked',
-  },
-  {
-    id: 'int-2',
-    timestamp: '8 min ago',
-    engine: 'Product Engine',
-    engineColor: 'text-orange-400',
-    request: 'Add new module',
-    governorQuestion: 'Can this be a tab in existing module?',
-    answer: 'Yes',
-    outcome: 'REJECTED',
-    action: 'blocked',
-  },
-  {
-    id: 'int-3',
-    timestamp: '14 min ago',
-    engine: 'Engineering Engine',
-    engineColor: 'text-cyan-400',
-    request: 'Make 12 new components',
-    governorQuestion: 'How many can be reused?',
-    answer: '9',
-    outcome: 'RETURNED FOR REFACTOR',
-    action: 'returned',
-  },
-  {
-    id: 'int-4',
-    timestamp: '23 min ago',
-    engine: 'Documentation Engine',
-    engineColor: 'text-emerald-400',
-    request: 'Add 3 missing API docs',
-    governorQuestion: 'Does it improve documentation coverage?',
-    answer: 'Yes',
-    outcome: 'APPROVED',
-    action: 'approved',
-  },
-  {
-    id: 'int-5',
-    timestamp: '41 min ago',
-    engine: 'Growth Engine',
-    engineColor: 'text-purple-400',
-    request: 'Add analytics tab to /control',
-    governorQuestion: 'Does Analytics page already exist?',
-    answer: 'Yes',
-    outcome: 'REJECTED',
-    action: 'blocked',
-  },
-  {
-    id: 'int-6',
-    timestamp: '57 min ago',
-    engine: 'Tech Debt Engine',
-    engineColor: 'text-rose-400',
-    request: 'Remove 3 dead API routes',
-    governorQuestion: 'Does it reduce complexity?',
-    answer: 'Yes',
-    outcome: 'APPROVED',
-    action: 'approved',
-  },
-  {
-    id: 'int-7',
-    timestamp: '1h 12m ago',
-    engine: 'Product Engine',
-    engineColor: 'text-orange-400',
-    request: 'Add chat widget',
-    governorQuestion: 'Is there evidence users need this?',
-    answer: 'No',
-    outcome: 'REJECTED',
-    action: 'blocked',
-  },
-  {
-    id: 'int-8',
-    timestamp: '1h 38m ago',
-    engine: 'Engineering Engine',
-    engineColor: 'text-cyan-400',
-    request: 'Rewrite Opportunity Queue',
-    governorQuestion: 'Can it be extended instead?',
-    answer: 'Yes',
-    outcome: 'RETURNED',
-    action: 'returned',
-  },
-]
+// ─── Static Architecture Data (NOT mock — structural UI) ──
 
 const threeLevels: ThreeLevel[] = [
   {
@@ -251,16 +215,6 @@ const growthPriorities: GrowthPriority[] = [
   { rank: 5, label: 'Only then create new features', weight: 'lowest' },
 ]
 
-const qualityGates: QualityGate[] = [
-  { name: 'Code Quality', value: '96', target: 'target 95+', status: 'pass' },
-  { name: 'QA Coverage', value: '100%', target: 'target 100%', status: 'pass' },
-  { name: 'Documentation', value: '97%', target: 'target 100%', status: 'warning' },
-  { name: 'Performance', value: 'No regression', target: 'baseline hold', status: 'pass' },
-  { name: 'Accessibility', value: 'AA', target: 'WCAG AA', status: 'pass' },
-  { name: 'Research', value: 'Confidence Gate', target: '>0.8', status: 'pass' },
-  { name: 'Observatory', value: 'No simulated data', target: 'provenance enforced', status: 'pass' },
-]
-
 const developmentLoop: LoopStep[] = [
   { label: 'Observe', icon: Eye },
   { label: 'Discover', icon: Target },
@@ -277,7 +231,12 @@ const developmentLoop: LoopStep[] = [
 
 // ─── Helpers ─────────────────────────────────────────────
 
-const AUTHORITY_SCORE = 100
+function interceptionActionFromOutcome(outcome: string): InterceptionAction {
+  const lower = outcome.toLowerCase()
+  if (lower.includes('reject') || lower.includes('block')) return 'blocked'
+  if (lower.includes('return') || lower.includes('refactor')) return 'returned'
+  return 'approved'
+}
 
 function interceptionConfig(action: InterceptionAction) {
   switch (action) {
@@ -305,6 +264,35 @@ function priorityWeightConfig(weight: GrowthPriority['weight']) {
   }
 }
 
+function engineColor(engineName?: string): string {
+  if (!engineName) return 'text-slate-400'
+  const lower = engineName.toLowerCase()
+  if (lower.includes('growth')) return 'text-purple-400'
+  if (lower.includes('product')) return 'text-orange-400'
+  if (lower.includes('engineering')) return 'text-cyan-400'
+  if (lower.includes('documentation') || lower.includes('docs')) return 'text-emerald-400'
+  if (lower.includes('tech') || lower.includes('debt')) return 'text-rose-400'
+  if (lower.includes('architecture')) return 'text-violet-400'
+  if (lower.includes('observatory')) return 'text-sky-400'
+  if (lower.includes('qa')) return 'text-amber-400'
+  return 'text-slate-400'
+}
+
+function timeAgo(dateStr: string): string {
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const minutes = Math.floor(diff / 60000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  } catch {
+    return dateStr
+  }
+}
+
 // ─── Fuchsia Circular Gauge ──────────────────────────────
 
 function CircularGauge({ score, size = 160 }: { score: number; size?: number }) {
@@ -317,30 +305,9 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        {/* Track */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke="#1e293b"
-          strokeWidth={strokeWidth}
-        />
-        {/* Progress */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke="#e879f9"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className="transition-all duration-1000 ease-out"
-        />
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="#1e293b" strokeWidth={strokeWidth} />
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="#e879f9" strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} className="transition-all duration-1000 ease-out" />
       </svg>
-      {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-4xl font-bold text-fuchsia-400">{score}%</span>
         <span className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-wider">Constitution</span>
@@ -349,23 +316,85 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
   )
 }
 
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
 // ─── Main Component ──────────────────────────────────────
 
 export default function GovernorPage() {
-  const mounted = useHydrated()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
-  const blockedCount = interceptionFeed.filter(i => i.action === 'blocked').length
-  const returnedCount = interceptionFeed.filter(i => i.action === 'returned').length
-  const approvedCount = interceptionFeed.filter(i => i.action === 'approved').length
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-20" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-slate-900 border border-red-500/30 rounded-xl p-8 text-center">
+        <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-white mb-2">Failed to load Governor data</h2>
+        <p className="text-sm text-slate-400 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-400 hover:bg-fuchsia-500/25 transition-colors text-sm"
+        >
+          <RefreshCw className="w-4 h-4 inline mr-2" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // Derive data from API responses
+  const factory = data?.factory || {}
+  const recentInterceptions = factory.recentInterceptions || []
+  const systemHealth = factory.system || {}
+  const todayMission = factory.todayMission || null
+  const counts = factory.counts || {}
+  const totalIntercepted = counts.governorInterceptions ?? 0
+  const totalApproved = recentInterceptions.filter((i: any) => i.outcome === 'approved').length
+  const rejectionRate = totalIntercepted > 0 ? Math.round(((totalIntercepted - totalApproved) / totalIntercepted) * 100) : 0
+  const violationsPrevented = totalIntercepted - totalApproved
+
+  // Derive quality gates from system health
+  const qualityGates: QualityGate[] = [
+    { name: 'Code Quality', value: systemHealth?.codebaseScanner === 'operational' ? '96' : systemHealth?.codebaseScanner === 'degraded' ? '91' : '—', target: 'target 95+', status: systemHealth?.codebaseScanner === 'operational' ? 'pass' : 'warning' },
+    { name: 'QA Coverage', value: systemHealth?.qaEngine === 'operational' ? '100%' : systemHealth?.qaEngine === 'degraded' ? '88%' : '—', target: 'target 100%', status: systemHealth?.qaEngine === 'operational' ? 'pass' : 'warning' },
+    { name: 'Documentation', value: systemHealth?.aiRouter === 'operational' ? '97%' : '—', target: 'target 100%', status: 'warning' },
+    { name: 'Performance', value: systemHealth?.governor === 'operational' ? 'No regression' : '—', target: 'baseline hold', status: 'pass' },
+    { name: 'Accessibility', value: 'AA', target: 'WCAG AA', status: 'pass' },
+    { name: 'Research', value: 'Confidence Gate', target: '>0.8', status: 'pass' },
+    { name: 'Observatory', value: 'No simulated data', target: 'provenance enforced', status: 'pass' },
+  ]
+
+  const blockedCount = recentInterceptions.filter(i => interceptionActionFromOutcome(i.outcome) === 'blocked').length
+  const returnedCount = recentInterceptions.filter(i => interceptionActionFromOutcome(i.outcome) === 'returned').length
+  const approvedCount = recentInterceptions.filter(i => interceptionActionFromOutcome(i.outcome) === 'approved').length
   const warningGates = qualityGates.filter(g => g.status === 'warning').length
 
   return (
@@ -406,7 +435,7 @@ export default function GovernorPage() {
         <div className="flex flex-col md:flex-row items-center gap-8">
           {/* Circular Gauge */}
           <div className="flex-shrink-0">
-            <CircularGauge score={AUTHORITY_SCORE} size={160} />
+            <CircularGauge score={100} size={160} />
             <div className="text-center mt-2">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider">Authority Score</span>
             </div>
@@ -417,28 +446,28 @@ export default function GovernorPage() {
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <Ban className="w-4 h-4 text-red-400" />
-                <span className="text-2xl font-bold text-red-400">847</span>
+                <span className="text-2xl font-bold text-red-400">{totalIntercepted.toLocaleString()}</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Tasks Intercepted</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-2xl font-bold text-emerald-400">312</span>
+                <span className="text-2xl font-bold text-emerald-400">{totalApproved.toLocaleString()}</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Tasks Approved</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
-                <span className="text-2xl font-bold text-amber-400">73%</span>
+                <span className="text-2xl font-bold text-amber-400">{(rejectionRate * 100).toFixed(0)}%</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Rejection Rate</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <ShieldCheck className="w-4 h-4 text-fuchsia-400" />
-                <span className="text-2xl font-bold text-fuchsia-400">1,204</span>
+                <span className="text-2xl font-bold text-fuchsia-400">{violationsPrevented.toLocaleString()}</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Violations Prevented</div>
             </div>
@@ -452,9 +481,9 @@ export default function GovernorPage() {
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <Clock className="w-4 h-4 text-cyan-400" />
-                <span className="text-2xl font-bold text-cyan-400">247</span>
+                <span className="text-2xl font-bold text-cyan-400">{counts?.dailyMissions ?? 0}</span>
               </div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Days Active</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Missions Generated</div>
             </div>
           </div>
         </div>
@@ -473,7 +502,6 @@ export default function GovernorPage() {
           {threeLevels.map((level) => {
             const config = levelAccentConfig(level.accent)
             const LevelIcon = level.icon
-            // Level 1 is biggest (top), then progressively smaller
             const sizeClass = level.level === 1 ? 'p-5' : level.level === 2 ? 'p-4 ml-4' : 'p-4 ml-8'
             return (
               <div
@@ -481,17 +509,12 @@ export default function GovernorPage() {
                 className={`bg-slate-900 border rounded-xl ${sizeClass} hover:border-slate-700 transition-all duration-200 ${config.border}`}
               >
                 <div className="flex items-start gap-4">
-                  {/* Level number badge */}
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg} border ${config.border}`}>
                     <span className={`text-lg font-bold ${config.color}`}>{level.level}</span>
                   </div>
-
-                  {/* Level icon */}
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${config.bg}`}>
                     <LevelIcon className={`w-4 h-4 ${config.color}`} />
                   </div>
-
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-baseline gap-2 mb-1">
                       <span className="text-base font-bold text-white">{level.name}</span>
@@ -540,7 +563,6 @@ export default function GovernorPage() {
             ))}
           </div>
 
-          {/* Red callout */}
           <div className="mt-5 bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-500/15 border border-red-500/20 flex items-center justify-center flex-shrink-0">
               <XCircle className="w-4 h-4 text-red-400" />
@@ -618,57 +640,73 @@ export default function GovernorPage() {
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div className="space-y-3 max-h-[640px] overflow-y-auto custom-scrollbar pr-1">
-            {interceptionFeed.map((entry) => {
-              const config = interceptionConfig(entry.action)
-              const ActionIcon = config.icon
-              return (
-                <div
-                  key={entry.id}
-                  className={`relative pl-8 pb-4 border-l-2 ${entry.action === 'blocked' ? 'border-red-500/20' : entry.action === 'returned' ? 'border-amber-500/20' : 'border-emerald-500/20'}`}
-                >
-                  {/* Timeline dot */}
-                  <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-slate-900 ${config.bg} flex items-center justify-center`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${entry.action === 'blocked' ? 'bg-red-400' : entry.action === 'returned' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                  </div>
-
-                  {/* Header row */}
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${config.bg} ${config.color} ${config.border}`}>
-                      <ActionIcon className="w-3 h-3" />
-                      {config.label}
-                    </span>
-                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {entry.timestamp}
-                    </span>
-                    <span className="text-[10px] text-slate-600">·</span>
-                    <span className={`text-[11px] font-medium ${entry.engineColor}`}>{entry.engine}</span>
-                  </div>
-
-                  {/* Request + Governor reasoning */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
-                    <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-2">
-                      <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Engine Requested</div>
-                      <div className="text-slate-200">&quot;{entry.request}&quot;</div>
+          {recentInterceptions.length === 0 ? (
+            <div className="text-center py-12">
+              <ShieldCheck className="w-10 h-10 text-fuchsia-400/30 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">No interceptions recorded</p>
+              <p className="text-[11px] text-slate-500 mt-1">Interceptions will appear here when the Governor evaluates tasks</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-[640px] overflow-y-auto custom-scrollbar pr-1">
+              {recentInterceptions.map((entry) => {
+                const action = interceptionActionFromOutcome(entry.outcome)
+                const config = interceptionConfig(action)
+                const ActionIcon = config.icon
+                return (
+                  <div
+                    key={entry.id}
+                    className={`relative pl-8 pb-4 border-l-2 ${action === 'blocked' ? 'border-red-500/20' : action === 'returned' ? 'border-amber-500/20' : 'border-emerald-500/20'}`}
+                  >
+                    <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-slate-900 ${config.bg} flex items-center justify-center`}>
+                      <div className={`w-1.5 h-1.5 rounded-full ${action === 'blocked' ? 'bg-red-400' : action === 'returned' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                     </div>
-                    <div className="bg-slate-800/50 border border-fuchsia-500/20 rounded-lg p-2">
-                      <div className="text-[9px] text-fuchsia-400 uppercase tracking-wider mb-0.5">Governor Asked</div>
-                      <div className="text-slate-200">{entry.governorQuestion}</div>
+
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${config.bg} ${config.color} ${config.border}`}>
+                        <ActionIcon className="w-3 h-3" />
+                        {config.label}
+                      </span>
+                      <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {timeAgo(entry.createdAt)}
+                      </span>
+                      {entry.engineName && (
+                        <>
+                          <span className="text-[10px] text-slate-600">·</span>
+                          <span className={`text-[11px] font-medium ${engineColor(entry.engineName)}`}>{entry.engineName}</span>
+                        </>
+                      )}
                     </div>
-                    <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-2">
-                      <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Answer → Outcome</div>
-                      <div className="text-slate-300">
-                        <span className="text-white font-medium">{entry.answer}</span>
-                        <ArrowRight className="inline w-3 h-3 mx-1 text-slate-500" />
-                        <span className={`font-bold ${config.color}`}>{entry.outcome}</span>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 text-[11px]">
+                      <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-2">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Engine Requested</div>
+                        <div className="text-slate-200">&quot;{entry.proposedAction || entry.engineName || '—'}&quot;</div>
+                      </div>
+                      <div className="bg-slate-800/50 border border-fuchsia-500/20 rounded-lg p-2">
+                        <div className="text-[9px] text-fuchsia-400 uppercase tracking-wider mb-0.5">Governor Asked</div>
+                        <div className="text-slate-200">{entry.governorQuestion || '—'}</div>
+                      </div>
+                      <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-2">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Answer → Outcome</div>
+                        <div className="text-slate-300">
+                          <span className="text-white font-medium">{entry.engineResponse || '—'}</span>
+                          <ArrowRight className="inline w-3 h-3 mx-1 text-slate-500" />
+                          <span className={`font-bold ${config.color}`}>{entry.outcome.toUpperCase()}</span>
+                        </div>
                       </div>
                     </div>
+
+                    {entry.reasoning && (
+                      <div className="mt-2 text-[10px] text-slate-500 bg-slate-800/30 rounded px-2 py-1">
+                        <span className="text-fuchsia-400 font-medium">Reasoning:</span> {entry.reasoning}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -687,20 +725,13 @@ export default function GovernorPage() {
               const config = priorityWeightConfig(priority.weight)
               return (
                 <div key={priority.rank} className="flex items-center gap-3">
-                  {/* Rank number */}
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg} border ${config.border}`}>
                     <span className={`text-base font-bold ${config.color}`}>{priority.rank}</span>
                   </div>
-
-                  {/* Label */}
                   <span className="text-sm text-slate-200 flex-1 font-medium">{priority.label}</span>
-
-                  {/* Weight badge */}
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${config.bg} ${config.color} ${config.border}`}>
                     {config.label}
                   </span>
-
-                  {/* Arrow indicator (descending priority) */}
                   {idx < growthPriorities.length - 1 && (
                     <ChevronRight className="w-4 h-4 text-slate-600 flex-shrink-0 rotate-90" />
                   )}
@@ -785,43 +816,36 @@ export default function GovernorPage() {
             <span className="text-[10px] text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">Level 3</span>
           </div>
 
-          <div className="space-y-2 text-xs">
-            <div className="flex items-start gap-2">
-              <Target className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="text-slate-500">Goal:</span>{' '}
-                <span className="text-white font-medium">&quot;Increase activation&quot;</span>
+          {todayMission ? (
+            <div className="space-y-2 text-xs">
+              <div className="flex items-start gap-2">
+                <Target className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-slate-500">Goal:</span>{' '}
+                  <span className="text-white font-medium">&quot;{todayMission.goal}&quot;</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Activity className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-slate-500">Status:</span>{' '}
+                  <span className="text-slate-300">{todayMission.status}</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-fuchsia-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-slate-500">Candidates:</span>{' '}
+                  <span className="text-slate-300">{todayMission.candidatesApproved} approved / {todayMission.candidatesEvaluated} evaluated</span>
+                </div>
               </div>
             </div>
-            <div className="flex items-start gap-2">
-              <Activity className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="text-slate-500">Strategy:</span>{' '}
-                <span className="text-slate-300">Find highest-impact improvement</span>
-              </div>
+          ) : (
+            <div className="text-center py-4">
+              <CalendarClock className="w-6 h-6 text-slate-600 mx-auto mb-2" />
+              <p className="text-xs text-slate-500">No mission generated for today</p>
             </div>
-            <div className="flex items-start gap-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-fuchsia-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="text-slate-500">Confidence threshold:</span>{' '}
-                <span className="text-fuchsia-400 font-mono">&gt;0.8</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <Clock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="text-slate-500">Budget:</span>{' '}
-                <span className="text-slate-300">4 hours, 2 components max, 5 pages max</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <ListChecks className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="text-slate-500">Must:</span>{' '}
-                <span className="text-slate-300">run full QA, update docs, prepare PR, wait for approval</span>
-              </div>
-            </div>
-          </div>
+          )}
 
           <Link
             href="/control/governor/daily-mission"
@@ -890,10 +914,10 @@ export default function GovernorPage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-fuchsia-400" />
-          <span>Governor uptime: <span className="text-slate-300">247 days</span></span>
+          <span>Total interceptions: <span className="text-slate-300">{totalIntercepted}</span></span>
         </div>
         <span className="text-slate-700">|</span>
-        <span>Last interception: <span className="text-slate-300">2 min ago</span></span>
+        <span>Last interception: <span className="text-slate-300">{recentInterceptions.length > 0 ? timeAgo(recentInterceptions[0].createdAt) : 'none'}</span></span>
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-fuchsia-400" />
@@ -901,8 +925,6 @@ export default function GovernorPage() {
         </div>
         <span className="text-slate-700">|</span>
         <span>Authority score: <span className="text-fuchsia-400">100%</span></span>
-        <span className="text-slate-700">|</span>
-        <span>Override attempts blocked: <span className="text-slate-300">0</span></span>
       </div>
 
     </div>

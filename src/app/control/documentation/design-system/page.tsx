@@ -1,56 +1,13 @@
 'use client'
 
-import { useSyncExternalStore, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Palette, RefreshCw, CheckCircle2, ChevronRight, Clock,
   Layers, Type, Space, Sparkles, Box, MousePointer,
   Camera, Search, Filter,
 } from 'lucide-react'
 
-// ─── Types ───────────────────────────────────────────────
-
-interface DesignCategory {
-  name: string
-  icon: React.ComponentType<{ className?: string }>
-  componentCount: number
-  documentedCount: number
-  coverage: number
-}
-
-interface DesignComponent {
-  name: string
-  purpose: string
-  propsCount: number
-  variants: number
-  states: number
-  dependencies: number
-  usedByCount: number
-  status: 'complete' | 'partial' | 'undocumented'
-}
-
-// ─── Mock Data ───────────────────────────────────────────
-
-const designCategories: DesignCategory[] = [
-  { name: 'Buttons', icon: MousePointer, componentCount: 12, documentedCount: 12, coverage: 100 },
-  { name: 'Cards', icon: Layers, componentCount: 8, documentedCount: 7, coverage: 88 },
-  { name: 'Inputs', icon: Box, componentCount: 14, documentedCount: 12, coverage: 86 },
-  { name: 'Typography', icon: Type, componentCount: 6, documentedCount: 6, coverage: 100 },
-  { name: 'Spacing', icon: Space, componentCount: 4, documentedCount: 4, coverage: 100 },
-  { name: 'Animation', icon: Sparkles, componentCount: 9, documentedCount: 6, coverage: 67 },
-  { name: 'Icons', icon: Palette, componentCount: 24, documentedCount: 24, coverage: 100 },
-  { name: 'Tokens', icon: Box, componentCount: 18, documentedCount: 16, coverage: 89 },
-]
-
-const designComponents: DesignComponent[] = [
-  { name: 'Button', purpose: 'Primary action trigger with multiple variants', propsCount: 12, variants: 6, states: 5, dependencies: 3, usedByCount: 142, status: 'complete' },
-  { name: 'Card', purpose: 'Container for grouped content and actions', propsCount: 8, variants: 4, states: 3, dependencies: 2, usedByCount: 89, status: 'complete' },
-  { name: 'Input', purpose: 'Text input with validation and formatting', propsCount: 18, variants: 5, states: 4, dependencies: 4, usedByCount: 67, status: 'partial' },
-  { name: 'Dialog', purpose: 'Modal overlay for focused interactions', propsCount: 14, variants: 3, states: 4, dependencies: 5, usedByCount: 34, status: 'complete' },
-  { name: 'Badge', purpose: 'Status indicator and label component', propsCount: 6, variants: 8, states: 2, dependencies: 1, usedByCount: 112, status: 'complete' },
-  { name: 'Tooltip', purpose: 'Contextual information on hover/focus', propsCount: 9, variants: 2, states: 3, dependencies: 2, usedByCount: 56, status: 'partial' },
-  { name: 'Sheet', purpose: 'Side panel for progressive disclosure', propsCount: 11, variants: 2, states: 3, dependencies: 3, usedByCount: 23, status: 'undocumented' },
-  { name: 'Tabs', purpose: 'Content organization with tab navigation', propsCount: 7, variants: 3, states: 2, dependencies: 2, usedByCount: 41, status: 'complete' },
-]
+// ─── Static Design Data (structural design system tokens) ──
 
 const colorTokens = [
   { name: 'Primary', scale: ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900'], color: 'blue' },
@@ -99,51 +56,35 @@ const animationTokens = [
 
 // ─── Helpers ─────────────────────────────────────────────
 
-function statusConfig(status: DesignComponent['status']) {
-  switch (status) {
-    case 'complete': return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/20', label: 'Complete' }
-    case 'partial': return { color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/20', label: 'Partial' }
-    case 'undocumented': return { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/20', label: 'Undocumented' }
-  }
-}
-
-function coverageColor(rate: number): string {
-  if (rate >= 95) return 'text-emerald-400'
-  if (rate >= 80) return 'text-blue-400'
-  if (rate >= 60) return 'text-amber-400'
-  return 'text-red-400'
-}
-
-function coverageBarColor(rate: number): string {
-  if (rate >= 95) return 'bg-emerald-500'
-  if (rate >= 80) return 'bg-blue-500'
-  if (rate >= 60) return 'bg-amber-500'
-  return 'bg-red-500'
-}
-
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
 // ─── Main Component ──────────────────────────────────────
 
 export default function DesignSystemDocsPage() {
-  const mounted = useHydrated()
-  const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (res.ok) {
+          const json = await res.json()
+          setData(json)
+        }
+      } catch {}
+      setLoading(false)
+    }
+    loadData()
+  }, [])
 
-  const totalComponents = designComponents.length
-  const documentedCount = designComponents.filter(c => c.status !== 'undocumented').length
-  const overallCoverage = Math.round((designCategories.reduce((sum, c) => sum + c.coverage, 0)) / designCategories.length)
-  const totalUsedBy = designComponents.reduce((sum, c) => sum + c.usedByCount, 0)
+  if (loading) {
+    return <div className="animate-pulse bg-slate-800 rounded-xl h-96" />
+  }
 
-  const filteredComponents = selectedStatus === 'all'
-    ? designComponents
-    : designComponents.filter(c => c.status === selectedStatus)
+  const factory = data?.factory || {}
+  const system = factory.system || {}
+  const counts = factory.counts || {}
+  const systemHealthy = Object.values(system).filter((s: any) => s === 'operational').length
+  const systemTotal = Object.keys(system).length
 
   return (
     <div className="space-y-6">
@@ -164,7 +105,7 @@ export default function DesignSystemDocsPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20">
             <Camera className="w-3.5 h-3.5 text-pink-400" />
-            <span className="text-xs font-medium text-pink-400">412 components captured</span>
+            <span className="text-xs font-medium text-pink-400">{systemHealthy}/{systemTotal} systems OK</span>
           </div>
           <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs">
             <RefreshCw className="w-3.5 h-3.5" />
@@ -174,152 +115,43 @@ export default function DesignSystemDocsPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          2. Stats Banner
+          2. System Status Banner
           ═══════════════════════════════════════════════════════ */}
       <div className="bg-gradient-to-br from-pink-500/5 via-slate-900 to-slate-900 border border-pink-500/15 rounded-xl p-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Layers className="w-4 h-4 text-pink-400" />
-              <span className="text-2xl font-bold text-pink-400">{totalComponents}</span>
+              <span className="text-2xl font-bold text-pink-400">{Object.keys(counts).length}</span>
             </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Core Components</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider">System Modules</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span className="text-2xl font-bold text-emerald-400">{documentedCount}</span>
+              <span className="text-2xl font-bold text-emerald-400">{systemHealthy}</span>
             </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Documented</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Operational</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Sparkles className="w-4 h-4 text-pink-400" />
-              <span className="text-2xl font-bold text-pink-400">{overallCoverage}%</span>
+              <span className="text-2xl font-bold text-pink-400">4</span>
             </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Coverage</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Token Categories</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <MousePointer className="w-4 h-4 text-pink-400" />
-              <span className="text-2xl font-bold text-pink-400">{totalUsedBy}</span>
+              <span className="text-2xl font-bold text-pink-400">Tailwind 4</span>
             </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Total Usages</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Framework</div>
           </div>
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          3. Categories
-          ═══════════════════════════════════════════════════════ */}
-      <div>
-        <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-pink-400" />
-          Design Categories
-          <span className="ml-auto text-[10px] text-slate-400">{designCategories.length} categories</span>
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {designCategories.map((cat) => {
-            const CatIcon = cat.icon
-            return (
-              <div
-                key={cat.name}
-                className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all duration-200"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg bg-pink-500/15 flex items-center justify-center">
-                    <CatIcon className="w-3.5 h-3.5 text-pink-400" />
-                  </div>
-                  <span className="text-sm font-medium text-white">{cat.name}</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2">
-                  <span>{cat.documentedCount}/{cat.componentCount} documented</span>
-                  <span className={`font-bold ${coverageColor(cat.coverage)}`}>{cat.coverage}%</span>
-                </div>
-                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${coverageBarColor(cat.coverage)}`}
-                    style={{ width: `${cat.coverage}%` }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════
-          4. Component List
-          ═══════════════════════════════════════════════════════ */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Box className="w-4 h-4 text-pink-400" />
-            Components
-            <span className="text-[10px] text-slate-400">{designComponents.length} core</span>
-          </h2>
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3 h-3 text-slate-500" />
-            {(['all', 'complete', 'partial', 'undocumented'] as const).map((status) => (
-              <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                  selectedStatus === status
-                    ? 'bg-pink-500/15 text-pink-400 border border-pink-500/20'
-                    : 'text-slate-500 hover:text-slate-300 border border-transparent'
-                }`}
-              >
-                {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          {/* Table header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-800 text-[10px] text-slate-500 uppercase tracking-wider">
-            <div className="col-span-2">Name</div>
-            <div className="col-span-3">Purpose</div>
-            <div className="col-span-1">Props</div>
-            <div className="col-span-1">Variants</div>
-            <div className="col-span-1">States</div>
-            <div className="col-span-1">Deps</div>
-            <div className="col-span-1">Used By</div>
-            <div className="col-span-2">Status</div>
-          </div>
-
-          {/* Table rows */}
-          <div className="divide-y divide-slate-800/50">
-            {filteredComponents.map((comp) => {
-              const config = statusConfig(comp.status)
-              return (
-                <div
-                  key={comp.name}
-                  className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-slate-800/30 transition-colors group"
-                >
-                  <div className="col-span-2 text-xs font-mono font-medium text-slate-200">{comp.name}</div>
-                  <div className="col-span-3 text-[11px] text-slate-400 truncate">{comp.purpose}</div>
-                  <div className="col-span-1 text-xs text-slate-300 text-center">{comp.propsCount}</div>
-                  <div className="col-span-1 text-xs text-slate-300 text-center">{comp.variants}</div>
-                  <div className="col-span-1 text-xs text-slate-300 text-center">{comp.states}</div>
-                  <div className="col-span-1 text-xs text-slate-300 text-center">{comp.dependencies}</div>
-                  <div className="col-span-1 text-xs text-pink-400 font-medium text-center">{comp.usedByCount}</div>
-                  <div className="col-span-2 flex items-center justify-between">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
-                      {config.label}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════
-          5. Color Tokens
+          3. Color Tokens
           ═══════════════════════════════════════════════════════ */}
       <div>
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -350,7 +182,7 @@ export default function DesignSystemDocsPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          6. Spacing Scale
+          4. Spacing Scale
           ═══════════════════════════════════════════════════════ */}
       <div>
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -380,7 +212,7 @@ export default function DesignSystemDocsPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          7. Typography
+          5. Typography
           ═══════════════════════════════════════════════════════ */}
       <div>
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -414,7 +246,7 @@ export default function DesignSystemDocsPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          8. Animation Tokens
+          6. Animation Tokens
           ═══════════════════════════════════════════════════════ */}
       <div>
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -440,19 +272,19 @@ export default function DesignSystemDocsPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          9. Footer
+          7. Footer
           ═══════════════════════════════════════════════════════ */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-pink-400" />
-          <span>Last captured: <span className="text-slate-300">1h ago</span></span>
+          <span>Last captured: <span className="text-slate-300">{factory.timestamp ? new Date(factory.timestamp).toLocaleTimeString() : '—'}</span></span>
         </div>
-        <span className="text-slate-700">|</span>
-        <span>Screenshots: <span className="text-pink-400">412 components</span></span>
         <span className="text-slate-700">|</span>
         <span>Framework: <span className="text-slate-300">Tailwind CSS 4</span></span>
         <span className="text-slate-700">|</span>
         <span>Components: <span className="text-slate-300">shadcn/ui (New York)</span></span>
+        <span className="text-slate-700">|</span>
+        <span>System: <span className="text-pink-400">{systemHealthy}/{systemTotal} healthy</span></span>
       </div>
 
     </div>

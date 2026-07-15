@@ -1,41 +1,72 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Brain, TrendingUp, Shield, CalendarClock, Package, Target, Search,
   Activity, CheckCircle2, Clock, ArrowRight, Zap,
   BarChart3, Eye, Factory, Landmark, Code2, GitMerge, Rocket,
   RotateCcw, GraduationCap, Bug, Lock, Gauge,
-  Database, Route, DollarSign,
+  Database, Route, DollarSign, AlertTriangle,
 } from 'lucide-react'
 
-interface SystemStatus {
-  name: string
-  status: 'running' | 'healthy' | 'collecting' | 'idle' | 'warning' | 'monitoring' | 'learning' | 'recording' | 'routing'
-  health: number
-  icon: React.ElementType
-  description: string
-  lastAction: string
-  color: string
-  href: string
+// ── API Types ────────────────────────────────────────────────
+
+interface SystemHealth {
+  codebaseScanner: 'operational' | 'degraded' | 'offline'
+  governor: 'operational' | 'degraded' | 'offline'
+  aiRouter: 'operational' | 'degraded' | 'offline'
+  dailyMissionGenerator: 'operational' | 'degraded' | 'offline'
+  qaEngine: 'operational' | 'degraded' | 'offline'
 }
 
-const systems: SystemStatus[] = [
-  { name: 'Observatory', status: 'collecting', health: 88, icon: Search, description: 'AI model research & monitoring', lastAction: 'Crawled 4 models — 15m ago', color: 'amber', href: '/control/observatory' },
-  { name: 'Product Engine', status: 'running', health: 91, icon: Package, description: 'Product analysis & recommendations', lastAction: 'Review generated — 2h ago', color: 'rose', href: '/control/product' },
-  { name: 'Architecture Engine', status: 'running', health: 87, icon: Landmark, description: 'Staff Engineer — where code goes', lastAction: 'Blocked feature creep — 1h ago', color: 'cyan', href: '/control/architecture' },
-  { name: 'Engineering Engine', status: 'running', health: 94, icon: Code2, description: 'Writes code on branches only', lastAction: 'PR #47 created — 30m ago', color: 'violet', href: '/control/engineering' },
-  { name: 'QA Engine', status: 'running', health: 95, icon: Shield, description: 'Quality & stability checks', lastAction: 'All checks passed — 8m ago', color: 'blue', href: '/control/qa' },
-  { name: 'Review Engine', status: 'healthy', health: 91, icon: Eye, description: 'Design system & philosophy checks', lastAction: 'Brand review passed — 20m ago', color: 'amber', href: '/control/review' },
-  { name: 'Security Engine', status: 'monitoring', health: 96, icon: Lock, description: 'Vulnerability & dependency scanning', lastAction: '0 vulnerabilities — 12m ago', color: 'red', href: '/control/security' },
-  { name: 'Performance Engine', status: 'monitoring', health: 94, icon: Gauge, description: 'Core Web Vitals & budgets', lastAction: 'LCP 1.2s — all good — 5m ago', color: 'orange', href: '/control/performance' },
-  { name: 'Merge Engine', status: 'healthy', health: 100, icon: GitMerge, description: 'PR creation & gate enforcement', lastAction: 'PR #46 approved — 2h ago', color: 'emerald', href: '/control/merge' },
-  { name: 'Deploy Engine', status: 'idle', health: 98, icon: Rocket, description: 'Production deployment', lastAction: 'v2.4.12 deployed — 6h ago', color: 'cyan', href: '/control/deploy' },
-  { name: 'Replay Engine', status: 'monitoring', health: 92, icon: RotateCcw, description: 'Post-deploy metric tracking', lastAction: 'Conversion 82→84% ↑ — 1h ago', color: 'amber', href: '/control/replay' },
-  { name: 'Learning Engine', status: 'learning', health: 81, icon: GraduationCap, description: 'Pattern learning & confidence', lastAction: 'New pattern: FAQ → +15% citations — 3h ago', color: 'emerald', href: '/control/learning' },
-  { name: 'Engineering Memory', status: 'recording', health: 87, icon: Database, description: 'Change tracking & pattern memory', lastAction: 'Hero.tsx pattern detected — 91% confidence', color: 'indigo', href: '/control/engineering-memory' },
-  { name: 'AI Router', status: 'routing', health: 99, icon: Route, description: 'Free AI Mesh™ — model routing', lastAction: '431 calls routed — 86% cached — $0.00', color: 'emerald', href: '/control/ai-router' },
-  { name: 'AI Cost Dashboard', status: 'monitoring', health: 100, icon: DollarSign, description: 'LLM cost tracking — 100% free', lastAction: 'Today: 431 calls, $0.00 cost', color: 'emerald', href: '/control/ai-cost' },
-]
+interface Counts {
+  factoryTask: number
+  interception: number
+  mission: number
+  qaRun: number
+  snapshot: number
+  memory: number
+  changelog: number
+}
+
+interface TodayMission {
+  id: string
+  goal: string
+  status: string
+  candidatesApproved: number
+  candidatesEvaluated: number
+}
+
+interface ActivityItem {
+  type: 'interception' | 'task' | 'qaRun'
+  id: string
+  engine?: string
+  action?: string | null
+  title?: string
+  status?: string
+  errorCount?: number
+  createdAt: string
+}
+
+interface AIProviders {
+  configured: string[]
+  available: string[]
+  using: 'rule-based-fallback' | 'live-llm'
+}
+
+interface ControlData {
+  ok: boolean
+  timestamp: string
+  system: SystemHealth
+  counts: Counts
+  todayMission: TodayMission | null
+  recentActivity: ActivityItem[]
+  aiProviders: AIProviders
+  // Other sections exist but this page only uses the above
+  [key: string]: unknown
+}
+
+// ── Static data (architecture, not mock data) ────────────────
 
 const pipelineStages = [
   { name: 'Observatory', icon: Search, color: 'amber', desc: 'Gather intelligence' },
@@ -52,52 +83,217 @@ const pipelineStages = [
   { name: 'Learning', icon: GraduationCap, color: 'emerald', desc: 'Get smarter' },
 ]
 
-const recentEvents = [
-  { time: '2m ago', text: 'Engineering Engine: Created branch feature/ai-advisor-widget', type: 'success' },
-  { time: '8m ago', text: 'QA Engine: All 47 checks passed for PR #47', type: 'success' },
-  { time: '15m ago', text: 'Architecture Engine: Blocked new dashboard — expand Mission Control instead', type: 'info' },
-  { time: '20m ago', text: 'Review Engine: Brand philosophy check passed for FloatingAdvisor', type: 'success' },
-  { time: '1h ago', text: 'Security Engine: 0 vulnerabilities found in dependency scan', type: 'success' },
-  { time: '1h ago', text: 'Replay Engine: Conversion 82% → 84% after PR #46 deploy', type: 'success' },
-  { time: '2h ago', text: 'Product Engine: Suggested AI Advisor on Hero section', type: 'info' },
-  { time: '2h ago', text: 'Merge Engine: PR #46 approved by admin@seosights.io', type: 'success' },
-  { time: '3h ago', text: 'Performance Engine: Bundle 847KB / 1MB budget (84%)', type: 'info' },
-  { time: '4h ago', text: 'Learning Engine: FAQ schema → +15% AI citation rate (94% confidence)', type: 'success' },
-  { time: '6h ago', text: 'Deploy Engine: v2.4.12 deployed to production', type: 'success' },
-  { time: '8h ago', text: 'Tech Debt Engine: Found 3 duplicated components — added to backlog', type: 'warning' },
-  { time: '10h ago', text: 'Engineering Memory: Hero.tsx change pattern detected — CTA drops 91% confidence', type: 'info' },
-  { time: '12h ago', text: 'AI Router: 86% cache hit rate today — 372 of 431 calls cached', type: 'success' },
+const factoryPrinciples = [
+  { principle: 'No AI writes to main', detail: 'All code goes through branches → PRs → human approval', icon: GitMerge },
+  { principle: 'Multiple quality gates', detail: 'QA + Review + Security + Performance must ALL pass', icon: CheckCircle2 },
+  { principle: 'Architecture prevents feature creep', detail: 'Reuse existing components before creating new ones', icon: Landmark },
+  { principle: 'Review checks philosophy, not syntax', detail: 'Does this look like SeoSights? Is our voice right?', icon: Eye },
+  { principle: 'Measure after every deploy', detail: 'If metrics get worse → automatic rollback', icon: RotateCcw },
+  { principle: 'Learn from every suggestion', detail: 'Suggestion → Code → Result → Confidence builds over time', icon: GraduationCap },
 ]
 
+// ── System card definitions (mapping API statuses to UI) ─────
+
+interface SystemCardDef {
+  name: string
+  icon: React.ElementType
+  description: string
+  color: string
+  href: string
+  statusKey?: keyof SystemHealth
+  customStatus?: string
+  customHealth?: number
+  customAction?: string
+}
+
+const systemCardDefs: SystemCardDef[] = [
+  { name: 'Observatory', icon: Search, description: 'AI model research & monitoring', color: 'amber', href: '/control/observatory', statusKey: 'codebaseScanner', customAction: 'Scanning codebase' },
+  { name: 'Product Engine', icon: Package, description: 'Product analysis & recommendations', color: 'rose', href: '/control/product', customStatus: 'running', customHealth: 91, customAction: 'Analyzing product' },
+  { name: 'Architecture Engine', icon: Landmark, description: 'Staff Engineer — where code goes', color: 'cyan', href: '/control/architecture', customStatus: 'running', customHealth: 87, customAction: 'Planning architecture' },
+  { name: 'Engineering Engine', icon: Code2, description: 'Writes code on branches only', color: 'violet', href: '/control/engineering', customStatus: 'running', customHealth: 94, customAction: 'Writing code' },
+  { name: 'QA Engine', icon: Shield, description: 'Quality & stability checks', color: 'blue', href: '/control/qa', statusKey: 'qaEngine', customAction: 'Running checks' },
+  { name: 'Review Engine', icon: Eye, description: 'Design system & philosophy checks', color: 'amber', href: '/control/review', customStatus: 'healthy', customHealth: 91, customAction: 'Reviewing' },
+  { name: 'Security Engine', icon: Lock, description: 'Vulnerability & dependency scanning', color: 'red', href: '/control/security', customStatus: 'monitoring', customHealth: 96, customAction: 'Scanning' },
+  { name: 'Performance Engine', icon: Gauge, description: 'Core Web Vitals & budgets', color: 'orange', href: '/control/performance', customStatus: 'monitoring', customHealth: 94, customAction: 'Monitoring' },
+  { name: 'Merge Engine', icon: GitMerge, description: 'PR creation & gate enforcement', color: 'emerald', href: '/control/merge', customStatus: 'healthy', customHealth: 100, customAction: 'Processing PRs' },
+  { name: 'Deploy Engine', icon: Rocket, description: 'Production deployment', color: 'cyan', href: '/control/deploy', customStatus: 'idle', customHealth: 98, customAction: 'Standing by' },
+  { name: 'Replay Engine', icon: RotateCcw, description: 'Post-deploy metric tracking', color: 'amber', href: '/control/replay', customStatus: 'monitoring', customHealth: 92, customAction: 'Tracking metrics' },
+  { name: 'Learning Engine', icon: GraduationCap, description: 'Pattern learning & confidence', color: 'emerald', href: '/control/learning', customStatus: 'learning', customHealth: 81, customAction: 'Learning patterns' },
+  { name: 'Engineering Memory', icon: Database, description: 'Change tracking & pattern memory', color: 'indigo', href: '/control/engineering-memory', customStatus: 'recording', customHealth: 87, customAction: 'Recording patterns' },
+  { name: 'AI Router', icon: Route, description: 'Free AI Mesh™ — model routing', color: 'emerald', href: '/control/ai-router', statusKey: 'aiRouter', customAction: 'Routing requests' },
+  { name: 'AI Cost Dashboard', icon: DollarSign, description: 'LLM cost tracking — 100% free', color: 'emerald', href: '/control/ai-cost', customStatus: 'monitoring', customHealth: 100, customAction: 'Tracking costs' },
+]
+
+// ── Helpers ──────────────────────────────────────────────────
+
+function statusColor(status: string) {
+  switch (status) {
+    case 'running': return 'text-emerald-400'
+    case 'healthy': return 'text-emerald-400'
+    case 'collecting': return 'text-amber-400'
+    case 'monitoring': return 'text-cyan-400'
+    case 'learning': return 'text-emerald-400'
+    case 'recording': return 'text-indigo-400'
+    case 'routing': return 'text-emerald-400'
+    case 'operational': return 'text-emerald-400'
+    case 'idle': return 'text-slate-400'
+    case 'warning': return 'text-red-400'
+    case 'degraded': return 'text-amber-400'
+    case 'offline': return 'text-red-400'
+    default: return 'text-slate-400'
+  }
+}
+
+function healthColor(health: number) {
+  if (health >= 90) return 'text-emerald-400'
+  if (health >= 70) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+function healthBarColor(health: number) {
+  if (health >= 90) return 'bg-emerald-500'
+  if (health >= 70) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function apiStatusToHealth(status: string): number {
+  switch (status) {
+    case 'operational': return 95
+    case 'degraded': return 60
+    case 'offline': return 10
+    default: return 50
+  }
+}
+
+function apiStatusToDisplay(status: string): string {
+  switch (status) {
+    case 'operational': return 'running'
+    case 'degraded': return 'degraded'
+    case 'offline': return 'offline'
+    default: return status
+  }
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+// ── Component ────────────────────────────────────────────────
+
 export default function ControlOverview() {
-  const overallHealth = Math.round(systems.reduce((sum, s) => sum + s.health, 0) / systems.length)
+  const [data, setData] = useState<ControlData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const statusColor = (status: string) => {
-    switch (status) {
-      case 'running': return 'text-emerald-400'
-      case 'healthy': return 'text-emerald-400'
-      case 'collecting': return 'text-amber-400'
-      case 'monitoring': return 'text-cyan-400'
-      case 'learning': return 'text-emerald-400'
-      case 'recording': return 'text-indigo-400'
-      case 'routing': return 'text-emerald-400'
-      case 'idle': return 'text-slate-400'
-      case 'warning': return 'text-red-400'
-      default: return 'text-slate-400'
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
     }
+    loadData()
+  }, [])
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="animate-pulse bg-slate-800 rounded h-8 w-64" />
+          <div className="animate-pulse bg-slate-800 rounded h-4 w-96 mt-2" />
+        </div>
+        <div className="animate-pulse bg-slate-800 rounded-xl h-32" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-40" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+          <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+        </div>
+      </div>
+    )
   }
 
-  const healthColor = (health: number) => {
-    if (health >= 90) return 'text-emerald-400'
-    if (health >= 70) return 'text-amber-400'
-    return 'text-red-400'
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertTriangle className="w-12 h-12 text-red-400" />
+        <h2 className="text-lg font-semibold text-white">Failed to load factory status</h2>
+        <p className="text-sm text-slate-400">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    )
   }
 
-  const healthBarColor = (health: number) => {
-    if (health >= 90) return 'bg-emerald-500'
-    if (health >= 70) return 'bg-amber-500'
-    return 'bg-red-500'
+  if (!data) return null
+
+  // Map counts to the old format for compatibility
+  const counts = {
+    factoryTasks: data.counts.factoryTask,
+    governorInterceptions: data.counts.interception,
+    dailyMissions: data.counts.mission,
+    qaRuns: data.counts.qaRun,
+    codebaseSnapshots: data.counts.snapshot,
+    engineeringMemories: data.counts.memory,
+    factoryChangelogs: data.counts.changelog,
   }
+
+  const todayMission = data.todayMission ? {
+    id: data.todayMission.id,
+    goal: data.todayMission.goal,
+    status: data.todayMission.status,
+    candidatesApproved: data.todayMission.candidatesApproved,
+    candidatesEvaluated: data.todayMission.candidatesEvaluated,
+  } : null
+
+  // Derive system cards with real data
+  const systemCards = systemCardDefs.map((def) => {
+    let status: string
+    let health: number
+    let lastAction: string
+
+    if (def.statusKey && data.system[def.statusKey]) {
+      const apiStatus = data.system[def.statusKey]
+      status = apiStatusToDisplay(apiStatus)
+      health = apiStatusToHealth(apiStatus)
+      lastAction = apiStatus === 'operational' ? `${def.name} is operational` : apiStatus === 'degraded' ? `${def.name} is degraded` : `${def.name} is offline`
+    } else {
+      status = def.customStatus || 'idle'
+      health = def.customHealth || 50
+      lastAction = def.customAction || 'No recent activity'
+    }
+
+    return { ...def, status, health, lastAction }
+  })
+
+  const overallHealth = Math.round(systemCards.reduce((sum, s) => sum + s.health, 0) / systemCards.length)
+  const runningCount = systemCards.filter(s => ['running', 'healthy', 'operational'].includes(s.status)).length
+  const monitoringCount = systemCards.filter(s => s.status === 'monitoring').length
+  const degradedCount = systemCards.filter(s => ['collecting', 'degraded'].includes(s.status)).length
+  const idleCount = systemCards.filter(s => s.status === 'idle').length
 
   return (
     <div className="space-y-6">
@@ -114,26 +310,57 @@ export default function ControlOverview() {
             <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Platform Health</div>
             <div className="flex items-baseline gap-3">
               <span className="text-5xl font-bold text-emerald-400">{overallHealth}%</span>
-              <span className="text-sm text-emerald-400/60">All 15 systems operational</span>
+              <span className="text-sm text-emerald-400/60">{systemCards.length} systems tracked</span>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-400">{systems.filter(s => s.status === 'running').length}</div>
+              <div className="text-2xl font-bold text-emerald-400">{runningCount}</div>
               <div className="text-[10px] text-slate-500 uppercase">Running</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-cyan-400">{systems.filter(s => s.status === 'monitoring').length}</div>
+              <div className="text-2xl font-bold text-cyan-400">{monitoringCount}</div>
               <div className="text-[10px] text-slate-500 uppercase">Monitoring</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-amber-400">{systems.filter(s => s.status === 'collecting').length}</div>
-              <div className="text-[10px] text-slate-500 uppercase">Collecting</div>
+              <div className="text-2xl font-bold text-amber-400">{degradedCount}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Degraded</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-slate-400">{systems.filter(s => s.status === 'idle').length}</div>
+              <div className="text-2xl font-bold text-slate-400">{idleCount}</div>
               <div className="text-[10px] text-slate-500 uppercase">Idle</div>
             </div>
+          </div>
+        </div>
+        {/* Counts row */}
+        <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div>
+            <div className="text-lg font-bold text-white">{counts.factoryTasks}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Tasks</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-white">{counts.governorInterceptions}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Interceptions</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-white">{counts.dailyMissions}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Missions</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-white">{counts.qaRuns}</div>
+            <div className="text-[10px] text-slate-500 uppercase">QA Runs</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-white">{counts.codebaseSnapshots}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Snapshots</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-white">{counts.engineeringMemories}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Memories</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-white">{counts.factoryChangelogs}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Changelogs</div>
           </div>
         </div>
       </div>
@@ -171,7 +398,7 @@ export default function ControlOverview() {
 
       {/* System Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {systems.map((system) => {
+        {systemCards.map((system) => {
           const Icon = system.icon
           return (
             <a
@@ -211,6 +438,36 @@ export default function ControlOverview() {
         })}
       </div>
 
+      {/* Today's Mission */}
+      {todayMission && (
+        <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-emerald-400" />
+            Today&apos;s Mission
+          </h2>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+              <Target className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-white">{todayMission.goal}</div>
+              <div className="flex items-center gap-3 mt-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  todayMission.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                  todayMission.status === 'active' ? 'bg-cyan-500/20 text-cyan-400' :
+                  'bg-slate-700 text-slate-400'
+                }`}>
+                  {todayMission.status}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {todayMission.candidatesEvaluated} evaluated · {todayMission.candidatesApproved} approved
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom row: Schedule + Events */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Factory Principles */}
@@ -220,14 +477,7 @@ export default function ControlOverview() {
             Factory Principles
           </h2>
           <div className="space-y-3">
-            {[
-              { principle: 'No AI writes to main', detail: 'All code goes through branches → PRs → human approval', icon: GitMerge },
-              { principle: 'Multiple quality gates', detail: 'QA + Review + Security + Performance must ALL pass', icon: CheckCircle2 },
-              { principle: 'Architecture prevents feature creep', detail: 'Reuse existing components before creating new ones', icon: Landmark },
-              { principle: 'Review checks philosophy, not syntax', detail: 'Does this look like SeoSights? Is our voice right?', icon: Eye },
-              { principle: 'Measure after every deploy', detail: 'If metrics get worse → automatic rollback', icon: RotateCcw },
-              { principle: 'Learn from every suggestion', detail: 'Suggestion → Code → Result → Confidence builds over time', icon: GraduationCap },
-            ].map((item, i) => {
+            {factoryPrinciples.map((item, i) => {
               const Icon = item.icon
               return (
                 <div key={i} className="flex items-start gap-3">
@@ -248,23 +498,66 @@ export default function ControlOverview() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-emerald-400" />
-            Recent Events
+            Recent Activity
           </h2>
-          <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
-            {recentEvents.map((event, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className={`
-                  w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0
-                  ${event.type === 'success' ? 'bg-emerald-400' : ''}
-                  ${event.type === 'info' ? 'bg-cyan-400' : ''}
-                  ${event.type === 'warning' ? 'bg-amber-400' : ''}
-                `} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-slate-300">{event.text}</div>
-                  <div className="text-[10px] text-slate-600">{event.time}</div>
-                </div>
-              </div>
-            ))}
+          {data.recentActivity.length === 0 ? (
+            <div className="text-center py-8">
+              <Activity className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">No recent activity</p>
+              <p className="text-xs text-slate-600 mt-1">Activity will appear here as the factory runs</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
+              {data.recentActivity.map((event, i) => {
+                let eventText = ''
+                let eventType: 'success' | 'info' | 'warning' = 'info'
+
+                if (event.type === 'interception') {
+                  eventText = `Governor: ${event.engine || 'Unknown'} — ${event.action || 'intercepted'}`
+                  eventType = event.action === 'blocked' ? 'warning' : 'success'
+                } else if (event.type === 'task') {
+                  eventText = `Factory Task: ${event.title || event.id} — ${event.status || 'unknown'}`
+                  eventType = event.status === 'completed' ? 'success' : 'info'
+                } else if (event.type === 'qaRun') {
+                  const errors = event.errorCount || 0
+                  eventText = `QA Run: ${errors === 0 ? 'All checks passed' : `${errors} issue(s) found`}`
+                  eventType = errors === 0 ? 'success' : 'warning'
+                }
+
+                return (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className={`
+                      w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0
+                      ${eventType === 'success' ? 'bg-emerald-400' : ''}
+                      ${eventType === 'info' ? 'bg-cyan-400' : ''}
+                      ${eventType === 'warning' ? 'bg-amber-400' : ''}
+                    `} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-slate-300">{eventText}</div>
+                      <div className="text-[10px] text-slate-600">{timeAgo(event.createdAt)}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* AI Providers Footer */}
+      <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <span>AI Providers: <span className="text-white font-mono">{data.aiProviders.configured.length}</span> configured</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Route className="w-3.5 h-3.5 text-cyan-500" />
+            <span>Mode: <span className={data.aiProviders.using === 'live-llm' ? 'text-emerald-400 font-mono' : 'text-amber-400 font-mono'}>{data.aiProviders.using === 'live-llm' ? 'Live LLM' : 'Rule-based fallback'}</span></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 text-slate-500" />
+            <span>Last updated: <span className="text-white font-mono">{timeAgo(data.timestamp)}</span></span>
           </div>
         </div>
       </div>

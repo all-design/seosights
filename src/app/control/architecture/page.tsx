@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Landmark, RefreshCw, ShieldCheck, Lightbulb, Ban, Recycle,
   FileCode, Database, Route, Puzzle, Trash2, ArrowRight,
@@ -41,108 +41,7 @@ interface DependencyRelation {
   description: string
 }
 
-// ─── Mock Data ───────────────────────────────────────────
-
-const architectureDecisions: ArchitectureDecision[] = [
-  {
-    id: 'ad-1',
-    title: 'Reuse Mission Control → Expand for new dashboard',
-    type: 'reuse',
-    path: '/components/control/MissionControl.tsx',
-    confidence: 94,
-    reasoning: 'MissionControl already has 78% overlap with proposed DashboardV2. Expanding the existing component avoids duplication and keeps the bundle lean.',
-    timestamp: '12m ago',
-  },
-  {
-    id: 'ad-2',
-    title: 'New API route needed: /api/advisor',
-    type: 'new',
-    path: '/app/api/advisor/route.ts',
-    confidence: 88,
-    reasoning: 'No existing endpoint handles advisor session management. Requires dedicated route with auth middleware and rate limiting.',
-    timestamp: '28m ago',
-  },
-  {
-    id: 'ad-3',
-    title: 'New Prisma table: AdvisorSession',
-    type: 'schema',
-    path: 'prisma/schema.prisma → model AdvisorSession',
-    confidence: 91,
-    reasoning: 'Advisor conversations need persistent storage. No existing table covers session-state with message history and token tracking.',
-    timestamp: '45m ago',
-  },
-  {
-    id: 'ad-4',
-    title: 'Component: Hero.tsx — modify existing',
-    type: 'modify',
-    path: '/components/home/Hero.tsx',
-    confidence: 82,
-    reasoning: 'Adding floating advisor CTA to existing hero. The Hero component already supports slot-based children — just needs a new slot render.',
-    timestamp: '1h ago',
-  },
-  {
-    id: 'ad-5',
-    title: 'Component: FloatingAdvisor.tsx — new',
-    type: 'new',
-    path: '/components/home/FloatingAdvisor.tsx',
-    confidence: 76,
-    reasoning: 'Novel UI pattern — floating contextual advisor widget. No existing component covers this interaction model. Must be new.',
-    timestamp: '1h ago',
-  },
-  {
-    id: 'ad-6',
-    title: 'Dead route: /api/legacy/scan — remove',
-    type: 'cleanup',
-    path: '/app/api/legacy/scan/route.ts',
-    confidence: 97,
-    reasoning: 'Zero traffic in 30 days. Referenced by no active component. Migration to /api/observatory/scan completed 3 sprints ago.',
-    timestamp: '2h ago',
-  },
-]
-
-const featureCreepAlerts: FeatureCreepAlert[] = [
-  {
-    id: 'fc-1',
-    originalSuggestion: 'Create new DashboardV2 component from scratch',
-    architectureResponse: 'MissionControl already covers 78% of the proposed functionality. Expanding it is more maintainable.',
-    recommendedAlternative: 'Extend MissionControl with new dashboard panel slots',
-    status: 'blocked',
-  },
-  {
-    id: 'fc-2',
-    originalSuggestion: 'Build standalone AnalyticsWidget library (5 components)',
-    architectureResponse: '3 of 5 widgets duplicate existing chart components in the Observatory module.',
-    recommendedAlternative: 'Extract shared chart components to /components/shared/charts/',
-    status: 'diverted',
-  },
-  {
-    id: 'fc-3',
-    originalSuggestion: 'New database table for user preferences per page',
-    architectureResponse: 'Existing UserSettings table with JSON column can store per-page preferences without schema changes.',
-    recommendedAlternative: 'Use JSON field in UserSettings.preferences',
-    status: 'blocked',
-  },
-  {
-    id: 'fc-4',
-    originalSuggestion: 'Create separate API route for each advisor action (6 routes)',
-    architectureResponse: 'Single /api/advisor route with action parameter is cleaner and follows existing patterns.',
-    recommendedAlternative: 'Consolidate to /api/advisor?action=<type>',
-    status: 'diverted',
-  },
-]
-
-const dependencyRelations: DependencyRelation[] = [
-  { from: 'MissionControl', to: 'Observatory', health: 'healthy', description: 'Reads observatory data for dashboard panels' },
-  { from: 'Hero', to: 'FloatingAdvisor', health: 'healthy', description: 'Renders advisor slot in hero section' },
-  { from: 'AdvisorSession', to: 'UserSettings', health: 'coupled', description: 'Direct DB join on userId — consider decoupling via service layer' },
-  { from: 'AnalyticsWidget', to: 'Observatory', health: 'coupled', description: 'Shares chart config — should extract to shared module' },
-  { from: 'LegacyScan', to: 'Observatory', health: 'circular', description: 'Circular import: Observatory imports types from LegacyScan which imports Observatory utils' },
-  { from: 'ProductEngine', to: 'ArchitectureEngine', health: 'healthy', description: 'Sends proposals for architecture review before implementation' },
-]
-
 // ─── Helpers ─────────────────────────────────────────────
-
-const OVERALL_SCORE = 87
 
 function decisionTypeConfig(type: DecisionType) {
   switch (type) {
@@ -177,6 +76,19 @@ function confidenceColor(score: number): string {
   return 'text-red-400'
 }
 
+function timeAgo(dateStr: string): string {
+  const now = Date.now()
+  const then = new Date(dateStr).getTime()
+  const diffMs = now - then
+  const diffMins = Math.floor(diffMs / 60000)
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays}d ago`
+}
+
 // ─── Circular Gauge ──────────────────────────────────────
 
 function CircularGauge({ score, size = 160 }: { score: number; size?: number }) {
@@ -191,7 +103,6 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        {/* Track */}
         <circle
           cx={center}
           cy={center}
@@ -200,7 +111,6 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
           stroke="#1e293b"
           strokeWidth={strokeWidth}
         />
-        {/* Progress */}
         <circle
           cx={center}
           cy={center}
@@ -214,7 +124,6 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
           className="transition-all duration-1000 ease-out"
         />
       </svg>
-      {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-4xl font-bold text-cyan-400">{score}</span>
         <span className="text-xs text-slate-500 mt-0.5">/ 100</span>
@@ -223,24 +132,141 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
   )
 }
 
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
 // ─── Main Component ──────────────────────────────────────
 
 export default function ArchitectureEnginePage() {
-  const mounted = useHydrated()
+  const [factoryData, setFactoryData] = useState<any>(null)
+  const [memData, setMemData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        setFactoryData({
+          system: json.system || {},
+          counts: json.counts || {},
+          recentActivity: json.recentActivity || [],
+          ok: json.ok ?? true,
+        })
+        setMemData({ memories: json.recentMemories || [], count: json.counts?.memory ?? 0 })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
-  const soundDecisions = architectureDecisions.filter(d => d.type === 'reuse' || d.type === 'modify').length + 30
-  const refactorSuggestions = architectureDecisions.filter(d => d.type === 'schema').length + 3
+  // ─── Loading ────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-16" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-56" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-96" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-32" />
+      </div>
+    )
+  }
+
+  // ─── Error ──────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <AlertTriangle className="w-10 h-10 text-red-400" />
+        <p className="text-slate-300 text-sm">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // ─── Derived data ───────────────────────────────────────
+  const system = factoryData?.system || {}
+  const counts = factoryData?.counts || {}
+  const memories = memData?.memories || []
+
+  // Calculate architecture score from system health
+  const systemEntries = Object.entries(system) as [string, string][]
+  const operationalCount = systemEntries.filter(([, s]) => s === 'operational').length
+  const OVERALL_SCORE = systemEntries.length > 0
+    ? Math.round((operationalCount / systemEntries.length) * 100)
+    : 0
+
+  // Build architecture decisions from engineering memories
+  const architectureDecisions: ArchitectureDecision[] = memories.map((mem: any) => {
+    // Determine type from memory data
+    let type: DecisionType = 'modify'
+    if (mem.patternLearned && mem.patternLearned.toLowerCase().includes('reuse')) type = 'reuse'
+    else if (mem.patternLearned && mem.patternLearned.toLowerCase().includes('new')) type = 'new'
+    else if (mem.outcome === 'rolled_back') type = 'cleanup'
+    else if (mem.rollbackNeeded) type = 'cleanup'
+    else if (mem.feature && mem.feature.toLowerCase().includes('schema')) type = 'schema'
+    else if (mem.outcome === 'success') type = 'reuse'
+
+    return {
+      id: mem.id,
+      title: mem.feature || 'Architecture decision',
+      type,
+      path: mem.filesChanged || '/unknown',
+      confidence: Math.round((mem.confidence || 0) * 100),
+      reasoning: mem.patternLearned || `Outcome: ${mem.outcome || 'unknown'}`,
+      timestamp: mem.createdAt,
+    }
+  })
+
+  // Build feature creep alerts from rolled-back/failed memories
+  const featureCreepAlerts: FeatureCreepAlert[] = memories
+    .filter((m: any) => m.rollbackNeeded || m.outcome === 'rolled_back' || m.outcome === 'failed')
+    .map((m: any) => ({
+      id: m.id,
+      originalSuggestion: m.feature || 'Unknown suggestion',
+      architectureResponse: m.rollbackNeeded
+        ? 'This change required a rollback due to issues detected.'
+        : m.patternLearned || 'The architecture engine identified issues with this approach.',
+      recommendedAlternative: m.patternLearned || 'Consider a more incremental approach.',
+      status: m.outcome === 'rolled_back' ? 'blocked' as const : 'diverted' as const,
+    }))
+
+  // Build dependency graph from system component relationships
+  const systemComponents = Object.keys(system)
+  const dependencyRelations: DependencyRelation[] = []
+  // Create derived relationships from system components
+  if (system.aiRouter) {
+    dependencyRelations.push({ from: 'AI Router', to: 'Engineering Engine', health: system.aiRouter === 'operational' ? 'healthy' : 'coupled', description: 'Routes AI tasks to engineering pipeline' })
+  }
+  if (system.governor) {
+    dependencyRelations.push({ from: 'Governor', to: 'Architecture Engine', health: system.governor === 'operational' ? 'healthy' : 'coupled', description: 'Intercepts proposals for architecture review' })
+  }
+  if (system.qaEngine) {
+    dependencyRelations.push({ from: 'QA Engine', to: 'Engineering Engine', health: system.qaEngine === 'operational' ? 'healthy' : 'coupled', description: 'Validates engineering outputs' })
+  }
+  if (system.codebaseScanner) {
+    dependencyRelations.push({ from: 'Codebase Scanner', to: 'Architecture Engine', health: system.codebaseScanner === 'operational' ? 'healthy' : 'coupled', description: 'Provides codebase structure data' })
+  }
+  if (system.dailyMissionGenerator) {
+    dependencyRelations.push({ from: 'Mission Generator', to: 'Engineering Engine', health: system.dailyMissionGenerator === 'operational' ? 'healthy' : 'coupled', description: 'Generates daily task missions' })
+  }
+  if (system.aiRouter && system.governor) {
+    dependencyRelations.push({ from: 'AI Router', to: 'Governor', health: 'healthy', description: 'Sends proposals through governor for approval' })
+  }
+
+  // Stats
+  const soundDecisions = architectureDecisions.filter(d => d.type === 'reuse' || d.type === 'modify').length
+  const refactorSuggestions = architectureDecisions.filter(d => d.type === 'schema').length
   const featureCreepBlocked = featureCreepAlerts.filter(a => a.status === 'blocked').length
-  const reuseOpportunities = architectureDecisions.filter(d => d.type === 'reuse').length + 6
+  const reuseOpportunities = architectureDecisions.filter(d => d.type === 'reuse').length
 
   return (
     <div className="space-y-6">
@@ -259,9 +285,13 @@ export default function ArchitectureEnginePage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-400">Running</span>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
+            operationalCount > 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-500/10 border-slate-500/20'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${operationalCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+            <span className={`text-xs font-medium ${operationalCount > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+              {operationalCount > 0 ? 'Running' : 'Idle'}
+            </span>
           </div>
           <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs">
             <RefreshCw className="w-3.5 h-3.5" />
@@ -275,7 +305,6 @@ export default function ArchitectureEnginePage() {
           ═══════════════════════════════════════════════════════ */}
       <div className="bg-gradient-to-br from-cyan-500/5 via-slate-900 to-slate-900 border border-cyan-500/15 rounded-xl p-6">
         <div className="flex flex-col md:flex-row items-center gap-8">
-          {/* Circular Gauge */}
           <div className="flex-shrink-0">
             <CircularGauge score={OVERALL_SCORE} size={160} />
             <div className="text-center mt-2">
@@ -283,7 +312,6 @@ export default function ArchitectureEnginePage() {
             </div>
           </div>
 
-          {/* 4 Stat Boxes */}
           <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
@@ -326,52 +354,55 @@ export default function ArchitectureEnginePage() {
           Recent Architecture Decisions
           <span className="ml-auto text-[10px] text-slate-400">{architectureDecisions.length} this session</span>
         </h2>
-        <div className="space-y-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
-          {architectureDecisions.map((decision) => {
-            const config = decisionTypeConfig(decision.type)
-            const TypeIcon = config.icon
-            return (
-              <div
-                key={decision.id}
-                className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all duration-200 group"
-              >
-                <div className="flex items-start gap-3">
-                  {/* Type icon */}
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
-                    <TypeIcon className={`w-4 h-4 ${config.color}`} />
+        {architectureDecisions.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center gap-3">
+            <Layers className="w-8 h-8 text-slate-600" />
+            <p className="text-sm text-slate-500">No architecture decisions recorded yet</p>
+            <p className="text-xs text-slate-600">Decisions will appear as the engineering engine processes tasks</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
+            {architectureDecisions.map((decision) => {
+              const config = decisionTypeConfig(decision.type)
+              const TypeIcon = config.icon
+              return (
+                <div
+                  key={decision.id}
+                  className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all duration-200 group"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                      <TypeIcon className={`w-4 h-4 ${config.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="text-sm font-medium text-white">{decision.title}</span>
+                        <span className={`text-sm font-bold flex-shrink-0 ${confidenceColor(decision.confidence)}`}>
+                          {decision.confidence}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Route className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                        <code className="text-[11px] text-slate-400 font-mono truncate">{decision.path}</code>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed mb-2">{decision.reasoning}</p>
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
+                          {config.label}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                          <Clock className="w-3 h-3" />
+                          {timeAgo(decision.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-600 mt-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    {/* Title row */}
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <span className="text-sm font-medium text-white">{decision.title}</span>
-                      <span className={`text-sm font-bold flex-shrink-0 ${confidenceColor(decision.confidence)}`}>
-                        {decision.confidence}%
-                      </span>
-                    </div>
-                    {/* Path */}
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Route className="w-3 h-3 text-slate-500 flex-shrink-0" />
-                      <code className="text-[11px] text-slate-400 font-mono truncate">{decision.path}</code>
-                    </div>
-                    {/* Reasoning */}
-                    <p className="text-[11px] text-slate-400 leading-relaxed mb-2">{decision.reasoning}</p>
-                    {/* Bottom row: badge + timestamp */}
-                    <div className="flex items-center justify-between">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
-                        {config.label}
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                        <Clock className="w-3 h-3" />
-                        {decision.timestamp}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-600 mt-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════
@@ -391,7 +422,7 @@ export default function ArchitectureEnginePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <span className="text-sm text-slate-300">Prevented <span className="text-white font-bold">{featureCreepBlocked}</span> unnecessary new components this week</span>
+              <span className="text-sm text-slate-300">Prevented <span className="text-white font-bold">{featureCreepBlocked}</span> unnecessary changes</span>
             </div>
             <div className="flex items-center gap-4 text-[10px] text-slate-500">
               <span className="flex items-center gap-1">
@@ -410,52 +441,59 @@ export default function ArchitectureEnginePage() {
           </div>
         </div>
 
-        {/* Feature Creep Alert cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {featureCreepAlerts.map((alert) => {
-            const config = creepStatusConfig(alert.status)
-            const StatusIcon = config.icon
-            return (
-              <div
-                key={alert.id}
-                className={`bg-slate-900 border rounded-xl p-4 hover:border-slate-700 transition-all duration-200 ${config.border}`}
-              >
-                {/* Original suggestion */}
-                <div className="mb-3">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Product Engine Suggested</div>
-                  <div className="text-xs text-slate-300">{alert.originalSuggestion}</div>
-                </div>
+        {featureCreepAlerts.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center gap-3">
+            <ShieldCheck className="w-8 h-8 text-emerald-400/30" />
+            <p className="text-sm text-slate-500">No feature creep alerts</p>
+            <p className="text-xs text-slate-600">All proposed changes have been architecturally sound</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {featureCreepAlerts.map((alert) => {
+              const config = creepStatusConfig(alert.status)
+              const StatusIcon = config.icon
+              return (
+                <div
+                  key={alert.id}
+                  className={`bg-slate-900 border rounded-xl p-4 hover:border-slate-700 transition-all duration-200 ${config.border}`}
+                >
+                  {/* Original suggestion */}
+                  <div className="mb-3">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Product Engine Suggested</div>
+                    <div className="text-xs text-slate-300">{alert.originalSuggestion}</div>
+                  </div>
 
-                {/* Arrow */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex-1 h-px bg-slate-700" />
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-                  <div className="flex-1 h-px bg-slate-700" />
-                </div>
+                  {/* Arrow */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex-1 h-px bg-slate-700" />
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                    <div className="flex-1 h-px bg-slate-700" />
+                  </div>
 
-                {/* Architecture response */}
-                <div className="mb-3">
-                  <div className="text-[10px] text-cyan-500 uppercase tracking-wider mb-1">Architecture Response</div>
-                  <div className="text-xs text-slate-300">{alert.architectureResponse}</div>
-                </div>
+                  {/* Architecture response */}
+                  <div className="mb-3">
+                    <div className="text-[10px] text-cyan-500 uppercase tracking-wider mb-1">Architecture Response</div>
+                    <div className="text-xs text-slate-300">{alert.architectureResponse}</div>
+                  </div>
 
-                {/* Recommended alternative */}
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 mb-3">
-                  <div className="text-[10px] text-emerald-500 uppercase tracking-wider mb-1">Recommended Alternative</div>
-                  <div className="text-xs text-slate-300 font-medium">{alert.recommendedAlternative}</div>
-                </div>
+                  {/* Recommended alternative */}
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 mb-3">
+                    <div className="text-[10px] text-emerald-500 uppercase tracking-wider mb-1">Recommended Alternative</div>
+                    <div className="text-xs text-slate-300 font-medium">{alert.recommendedAlternative}</div>
+                  </div>
 
-                {/* Status badge */}
-                <div className="flex items-center justify-end">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
-                    <StatusIcon className="w-3 h-3" />
-                    {config.label}
-                  </span>
+                  {/* Status badge */}
+                  <div className="flex items-center justify-end">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
+                      <StatusIcon className="w-3 h-3" />
+                      {config.label}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════
@@ -467,58 +505,66 @@ export default function ArchitectureEnginePage() {
           Dependency Graph
           <span className="ml-auto text-[10px] text-slate-500">Key architectural relationships</span>
         </h2>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          {/* Legend */}
-          <div className="flex items-center gap-5 mb-4 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-1.5 text-[10px]">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-slate-400">Healthy</span>
+        {dependencyRelations.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center gap-3">
+            <Network className="w-8 h-8 text-slate-600" />
+            <p className="text-sm text-slate-500">No dependency data available</p>
+            <p className="text-xs text-slate-600">System component relationships will appear when the factory is running</p>
+          </div>
+        ) : (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            {/* Legend */}
+            <div className="flex items-center gap-5 mb-4 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-slate-400">Healthy</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-slate-400">Coupled</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <span className="text-slate-400">Circular</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-[10px]">
-              <div className="w-2 h-2 rounded-full bg-amber-400" />
-              <span className="text-slate-400">Coupled</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px]">
-              <div className="w-2 h-2 rounded-full bg-red-400" />
-              <span className="text-slate-400">Circular</span>
+
+            {/* Relations */}
+            <div className="space-y-3">
+              {dependencyRelations.map((rel, idx) => {
+                const config = dependencyHealthConfig(rel.health)
+                return (
+                  <div key={idx} className="flex items-center gap-3 group">
+                    {/* From module */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                      <span className="text-xs font-mono text-slate-300 text-right truncate">{rel.from}</span>
+                      <Box className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                    </div>
+
+                    {/* Arrow */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <div className={`h-px w-6 ${rel.health === 'healthy' ? 'bg-emerald-500/40' : rel.health === 'coupled' ? 'bg-amber-500/40' : 'bg-red-500/40'}`} />
+                      <ArrowRight className={`w-3.5 h-3.5 ${config.line}`} />
+                      <div className={`h-px w-6 ${rel.health === 'healthy' ? 'bg-emerald-500/40' : rel.health === 'coupled' ? 'bg-amber-500/40' : 'bg-red-500/40'}`} />
+                    </div>
+
+                    {/* To module */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Box className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                      <span className="text-xs font-mono text-slate-300 truncate">{rel.to}</span>
+                    </div>
+
+                    {/* Health dot + description */}
+                    <div className="flex items-center gap-2 flex-shrink-0 w-56 hidden lg:flex">
+                      <div className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+                      <span className="text-[10px] text-slate-500 truncate">{rel.description}</span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
-
-          {/* Relations */}
-          <div className="space-y-3">
-            {dependencyRelations.map((rel, idx) => {
-              const config = dependencyHealthConfig(rel.health)
-              return (
-                <div key={idx} className="flex items-center gap-3 group">
-                  {/* From module */}
-                  <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                    <span className="text-xs font-mono text-slate-300 text-right truncate">{rel.from}</span>
-                    <Box className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                  </div>
-
-                  {/* Arrow */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <div className={`h-px w-6 ${rel.health === 'healthy' ? 'bg-emerald-500/40' : rel.health === 'coupled' ? 'bg-amber-500/40' : 'bg-red-500/40'}`} />
-                    <ArrowRight className={`w-3.5 h-3.5 ${config.line}`} />
-                    <div className={`h-px w-6 ${rel.health === 'healthy' ? 'bg-emerald-500/40' : rel.health === 'coupled' ? 'bg-amber-500/40' : 'bg-red-500/40'}`} />
-                  </div>
-
-                  {/* To module */}
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Box className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                    <span className="text-xs font-mono text-slate-300 truncate">{rel.to}</span>
-                  </div>
-
-                  {/* Health dot + description */}
-                  <div className="flex items-center gap-2 flex-shrink-0 w-56 hidden lg:flex">
-                    <div className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
-                    <span className="text-[10px] text-slate-500 truncate">{rel.description}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════
@@ -527,17 +573,17 @@ export default function ArchitectureEnginePage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Next review: <span className="text-slate-300">in 23 min</span></span>
+          <span>System components: <span className="text-slate-300">{systemEntries.length}</span></span>
         </div>
         <span className="text-slate-700">|</span>
-        <span>Last review: <span className="text-slate-300">37m ago</span></span>
+        <span>Operational: <span className="text-emerald-400">{operationalCount}</span></span>
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
           <Scan className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Modules scanned: <span className="text-slate-300">142</span></span>
+          <span>Memory records: <span className="text-slate-300">{memories.length}</span></span>
         </div>
         <span className="text-slate-700">|</span>
-        <span>Reuse rate: <span className="text-cyan-400">73%</span></span>
+        <span>Reuse rate: <span className="text-cyan-400">{architectureDecisions.length > 0 ? Math.round(reuseOpportunities / architectureDecisions.length * 100) : 0}%</span></span>
       </div>
 
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Package, RefreshCw, ChevronDown, ChevronRight, Clock, Scan,
   CheckCircle2, AlertTriangle, XCircle, FileText, Layers,
@@ -10,89 +10,6 @@ import {
 // ─── Types ───────────────────────────────────────────────
 
 type FeatureStatus = 'documented' | 'missing' | 'outdated'
-
-interface FeatureDoc {
-  id: string
-  name: string
-  userStory: string
-  flow: string[]
-  acceptanceCriteria: string[]
-  screens: string[]
-  kpis: string[]
-  status: FeatureStatus
-  lastUpdated: string
-}
-
-// ─── Mock Data ───────────────────────────────────────────
-
-const featureDocs: FeatureDoc[] = [
-  {
-    id: 'fd-1',
-    name: 'Opportunity Queue',
-    userStory: 'As a growth manager, I want to see a prioritized queue of AI citation opportunities so I can focus on the highest-impact actions first.',
-    flow: ['Navigate to /control/growth', 'View Discovery stage', 'Sort by impact score', 'Select opportunity → Generate content'],
-    acceptanceCriteria: ['Queue loads within 2s', 'Opportunities sorted by composite impact score', 'Each item shows target AI, estimated impact, priority', 'One-click transition to content generation'],
-    screens: ['/control/growth — Pipeline view', '/control/growth — Queue tab', '/control/growth — Opportunity detail modal'],
-    kpis: ['Queue refresh rate', 'Time-to-action per opportunity', 'Opportunity-to-content conversion rate'],
-    status: 'documented',
-    lastUpdated: '2h ago',
-  },
-  {
-    id: 'fd-2',
-    name: 'Mission Control',
-    userStory: 'As an operator, I want a single dashboard showing all active autonomous systems so I can monitor the health of the entire AI factory.',
-    flow: ['Navigate to /control', 'View system health scores', 'Click system card for details', 'Acknowledge alerts'],
-    acceptanceCriteria: ['All 15 systems visible', 'Health scores update every 5 min', 'Critical alerts surface immediately', 'One-click drill-down to any engine'],
-    screens: ['/control — Overview dashboard', '/control — System detail panels'],
-    kpis: ['Mean time to detect issues', 'System uptime %', 'Alert acknowledgement time'],
-    status: 'documented',
-    lastUpdated: '4h ago',
-  },
-  {
-    id: 'fd-3',
-    name: 'Growth Engine',
-    userStory: 'As a content strategist, I want the Growth Engine to autonomously generate and publish AI-optimized content so we increase citation rates.',
-    flow: ['Discovery scan runs', 'Opportunities queued', 'AI generates draft', 'QA + Review pipeline', 'Human approval', 'Publish + monitor'],
-    acceptanceCriteria: ['6-stage pipeline visible', 'Auto-generates drafts for P1 opportunities', 'All content passes QA before publishing', 'Citation tracking post-publish'],
-    screens: ['/control/growth — Pipeline', '/control/growth — Active missions', '/control/growth — Content queue', '/control/growth — Recent published'],
-    kpis: ['Content generation velocity', 'QA pass rate', 'Citation acquisition rate', 'Visibility delta per publish'],
-    status: 'documented',
-    lastUpdated: '6h ago',
-  },
-  {
-    id: 'fd-4',
-    name: 'AI Router',
-    userStory: 'As a platform engineer, I want AI requests routed to the most cost-effective model so we minimize spend while maintaining quality.',
-    flow: ['Engine makes AI request', 'Router evaluates: deterministic? → cache? → free model? → paid model?', 'Request routed to optimal provider', 'Result cached for future use'],
-    acceptanceCriteria: ['Deterministic tasks never hit LLM', 'Cache hit rate > 80%', 'Free models used when possible', 'Fallback chain handles provider outages'],
-    screens: ['/control/ai-router — Mesh architecture', '/control/ai-router — Routing rules', '/control/ai-cost — Breakdown'],
-    kpis: ['Cache hit rate', 'Cost per request', 'Free vs paid model ratio', 'Routing latency'],
-    status: 'outdated',
-    lastUpdated: '3d ago',
-  },
-  {
-    id: 'fd-5',
-    name: 'Documentation Engine',
-    userStory: 'As a developer, I want auto-generated documentation for all product features, APIs, and database schemas so the docs are always current.',
-    flow: ['Engine scans codebase', 'Extracts feature metadata', 'Generates docs from templates', 'Flags drift between code and docs', 'Auto-updates where safe'],
-    acceptanceCriteria: ['All features have doc entries', 'API docs auto-generated from route handlers', 'DB docs generated from Prisma schema', 'Drift detection runs nightly'],
-    screens: ['/control/documentation/product', '/control/documentation/technical', '/control/documentation/api', '/control/documentation/database'],
-    kpis: ['Documentation coverage %', 'Drift detection accuracy', 'Auto-update success rate', 'Time since last manual update'],
-    status: 'documented',
-    lastUpdated: '1h ago',
-  },
-  {
-    id: 'fd-6',
-    name: 'Replay Engine',
-    userStory: 'As a DevOps engineer, I want post-deploy metric monitoring with automatic rollback so bad deployments never reach users.',
-    flow: ['Deploy completes', 'Replay monitors key metrics (latency, errors, conversions)', 'If metrics degrade beyond threshold → auto-rollback', 'If stable → promote to full rollout'],
-    acceptanceCriteria: ['Metric monitoring starts within 30s of deploy', 'Rollback triggers within 2 min of degradation', 'Rollback is zero-downtime', 'Full audit trail of metric observations'],
-    screens: ['/control/replay — Monitoring dashboard', '/control/replay — Rollback history', '/control/deploy — Deployment detail'],
-    kpis: ['Mean time to detect regression', 'Rollback success rate', 'False positive rate', 'Deploy confidence score'],
-    status: 'missing',
-    lastUpdated: 'never',
-  },
-]
 
 // ─── Helpers ─────────────────────────────────────────────
 
@@ -104,25 +21,53 @@ function statusConfig(status: FeatureStatus) {
   }
 }
 
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
-}
-
 // ─── Main Component ──────────────────────────────────────
 
 export default function ProductDocsPage() {
-  const mounted = useHydrated()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (res.ok) {
+          const json = await res.json()
+          setData(json)
+        }
+      } catch {}
+      setLoading(false)
+    }
+    loadData()
+  }, [])
 
-  const documented = featureDocs.filter(f => f.status === 'documented').length
-  const outdated = featureDocs.filter(f => f.status === 'outdated').length
-  const missing = featureDocs.filter(f => f.status === 'missing').length
-  const coveragePercent = Math.round((documented / featureDocs.length) * 100)
+  if (loading) {
+    return <div className="animate-pulse bg-slate-800 rounded-xl h-96" />
+  }
+
+  const productQA = data?.productQA || null
+  const qa = productQA?.qa || {}
+  const featureAdoption = productQA?.featureAdoption || []
+  const featureValidation = productQA?.featureValidation || []
+  const recentDecisions = productQA?.recentDecisions || []
+  const topInsights = productQA?.topInsights || []
+  const summary = productQA?.summary || {}
+
+  // Derive feature doc status from feature adoption data
+  const featureDocs = featureAdoption.map((f: any) => ({
+    id: f.featureKey,
+    name: f.featureName,
+    status: f.status === 'adopted' ? 'documented' : f.status === 'at_risk' ? 'outdated' : 'missing' as FeatureStatus,
+    adoptionRate: f.adoptionRate,
+    trend: f.trend,
+    activeUsersToday: f.activeUsersToday,
+  }))
+
+  const documented = featureDocs.filter((f: any) => f.status === 'documented').length
+  const outdated = featureDocs.filter((f: any) => f.status === 'outdated').length
+  const missing = featureDocs.filter((f: any) => f.status === 'missing').length
+  const coveragePercent = featureDocs.length > 0 ? Math.round((documented / featureDocs.length) * 100) : 0
 
   return (
     <div className="space-y-6">
@@ -176,28 +121,28 @@ export default function ProductDocsPage() {
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <FileText className="w-4 h-4 text-sky-400" />
-                <span className="text-2xl font-bold text-sky-400">{documented + outdated + missing}</span>
+                <span className="text-2xl font-bold text-sky-400">{featureDocs.length}</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Features Total</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-2xl font-bold text-emerald-400">24</span>
+                <span className="text-2xl font-bold text-emerald-400">{documented}</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Documented</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
-                <span className="text-2xl font-bold text-amber-400">6</span>
+                <span className="text-2xl font-bold text-amber-400">{outdated}</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Outdated</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <XCircle className="w-4 h-4 text-red-400" />
-                <span className="text-2xl font-bold text-red-400">2</span>
+                <span className="text-2xl font-bold text-red-400">{missing}</span>
               </div>
               <div className="text-[10px] text-slate-500 uppercase tracking-wider">Missing</div>
             </div>
@@ -214,142 +159,195 @@ export default function ProductDocsPage() {
           Feature Documentation
           <span className="ml-auto text-[10px] text-slate-400">{featureDocs.length} features tracked</span>
         </h2>
-        <div className="space-y-3">
-          {featureDocs.map((feature) => {
-            const config = statusConfig(feature.status)
-            const StatusIcon = config.icon
-            const isExpanded = expandedId === feature.id
-            return (
-              <div
-                key={feature.id}
-                className="bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition-all duration-200"
-              >
-                {/* Feature header row */}
-                <button
-                  onClick={() => setExpandedId(isExpanded ? null : feature.id)}
-                  className="w-full flex items-center gap-3 p-4 text-left"
+        {featureDocs.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+            <Package className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+            <p className="text-sm text-slate-400">No feature documentation available</p>
+            <p className="text-[11px] text-slate-500 mt-1">Feature docs will appear after product data is synced</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {featureDocs.map((feature: any) => {
+              const config = statusConfig(feature.status)
+              const StatusIcon = config.icon
+              const isExpanded = expandedId === feature.id
+              return (
+                <div
+                  key={feature.id}
+                  className="bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition-all duration-200"
                 >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
-                    <StatusIcon className={`w-4 h-4 ${config.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{feature.name}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
-                        {config.label}
+                  {/* Feature header row */}
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : feature.id)}
+                    className="w-full flex items-center gap-3 p-4 text-left"
+                  >
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                      <StatusIcon className={`w-4 h-4 ${config.color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">{feature.name}</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
+                          {config.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        Adoption: {feature.adoptionRate}% · {feature.activeUsersToday} active today
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[10px] font-medium ${feature.trend === 'up' ? 'text-emerald-400' : feature.trend === 'down' ? 'text-red-400' : 'text-slate-400'}`}>
+                        {feature.trend === 'up' ? '↑' : feature.trend === 'down' ? '↓' : '→'} {feature.trend}
                       </span>
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-slate-500" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-slate-500" />
+                      )}
                     </div>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">{feature.userStory}</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                      <Clock className="w-3 h-3" />
-                      {feature.lastUpdated}
-                    </span>
-                    {isExpanded ? (
-                      <ChevronDown className="w-4 h-4 text-slate-500" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-                    )}
-                  </div>
-                </button>
+                  </button>
 
-                {/* Expanded details */}
-                {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-slate-800">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      {/* User Story */}
-                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
-                        <div className="text-[10px] text-sky-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          User Story
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 border-t border-slate-800">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        {/* Validation data */}
+                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
+                          <div className="text-[10px] text-sky-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            Validation
+                          </div>
+                          {(() => {
+                            const validation = featureValidation.find((v: any) => v.featureKey === feature.id)
+                            if (!validation) return <p className="text-xs text-slate-500">No validation data</p>
+                            return (
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400">Used count</span>
+                                  <span className="text-white">{validation.usedCount}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400">Conversion lift</span>
+                                  <span className="text-white">{validation.convLift}%</span>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400">Decision</span>
+                                  <span className={`font-medium ${validation.decision === 'KEEP' ? 'text-emerald-400' : validation.decision === 'KILL' ? 'text-red-400' : 'text-amber-400'}`}>
+                                    {validation.decision}
+                                  </span>
+                                </div>
+                              </div>
+                            )
+                          })()}
                         </div>
-                        <p className="text-xs text-slate-300 leading-relaxed">{feature.userStory}</p>
-                      </div>
 
-                      {/* Flow */}
-                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
-                        <div className="text-[10px] text-sky-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <ArrowRight className="w-3 h-3" />
-                          Flow
-                        </div>
-                        <div className="space-y-1">
-                          {feature.flow.map((step, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-[11px]">
-                              <span className="w-4 h-4 rounded-full bg-sky-500/15 text-sky-400 flex items-center justify-center text-[9px] font-bold flex-shrink-0">{idx + 1}</span>
-                              <span className="text-slate-300">{step}</span>
+                        {/* Adoption data */}
+                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
+                          <div className="text-[10px] text-emerald-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Adoption
+                          </div>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-400">Rate</span>
+                              <span className="text-white">{feature.adoptionRate}%</span>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Acceptance Criteria */}
-                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
-                        <div className="text-[10px] text-emerald-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Acceptance Criteria
-                        </div>
-                        <div className="space-y-1">
-                          {feature.acceptanceCriteria.map((ac, idx) => (
-                            <div key={idx} className="flex items-start gap-2 text-[11px]">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />
-                              <span className="text-slate-300">{ac}</span>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-400">Active today</span>
+                              <span className="text-white">{feature.activeUsersToday}</span>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Screens */}
-                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
-                        <div className="text-[10px] text-violet-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Search className="w-3 h-3" />
-                          Screens
-                        </div>
-                        <div className="space-y-1">
-                          {feature.screens.map((screen, idx) => (
-                            <div key={idx} className="text-[11px] text-slate-300 font-mono">{screen}</div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* KPIs */}
-                      <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 md:col-span-2">
-                        <div className="text-[10px] text-amber-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Layers className="w-3 h-3" />
-                          KPIs
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {feature.kpis.map((kpi, idx) => (
-                            <span key={idx} className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300">{kpi}</span>
-                          ))}
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-400">Trend</span>
+                              <span className={`font-medium ${feature.trend === 'up' ? 'text-emerald-400' : feature.trend === 'down' ? 'text-red-400' : 'text-slate-300'}`}>
+                                {feature.trend}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          4. Quick Actions Footer
+          4. AI Insights
+          ═══════════════════════════════════════════════════════ */}
+      {topInsights.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-sky-400" />
+            AI Insights
+          </h2>
+          <div className="space-y-2">
+            {topInsights.map((insight: any) => (
+              <div key={insight.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                    insight.priority === 'high' ? 'bg-red-500/15 text-red-400' :
+                    insight.priority === 'medium' ? 'bg-amber-500/15 text-amber-400' :
+                    'bg-slate-500/15 text-slate-400'
+                  }`}>{insight.priority}</span>
+                  <span className="text-xs font-medium text-white">{insight.title}</span>
+                </div>
+                <p className="text-[11px] text-slate-400">{insight.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          5. QA Score
+          ═══════════════════════════════════════════════════════ */}
+      {qa.score !== undefined && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <CheckCircle2 className="w-4 h-4 text-sky-400" />
+            <h2 className="text-sm font-semibold text-white">QA Status</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+              <span className="text-lg font-bold text-emerald-400">{qa.score}%</span>
+              <div className="text-[10px] text-slate-500">Pass Rate</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+              <span className="text-lg font-bold text-sky-400">{qa.totalTests}</span>
+              <div className="text-[10px] text-slate-500">Total Tests</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+              <span className="text-lg font-bold text-amber-400">{qa.warnings}</span>
+              <div className="text-[10px] text-slate-500">Warnings</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+              <span className="text-lg font-bold text-red-400">{qa.critical}</span>
+              <div className="text-[10px] text-slate-500">Critical</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          6. Footer
           ═══════════════════════════════════════════════════════ */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-sky-400" />
-          <span>Last scan: <span className="text-slate-300">14 min ago</span></span>
+          <span>Last QA run: <span className="text-slate-300">{qa.lastRun ? new Date(qa.lastRun).toLocaleString() : '—'}</span></span>
         </div>
-        <span className="text-slate-700">|</span>
-        <span>Next scan: <span className="text-slate-300">in 46 min</span></span>
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
           <Scan className="w-3.5 h-3.5 text-sky-400" />
-          <span>Features scanned: <span className="text-slate-300">32</span></span>
+          <span>Features scanned: <span className="text-slate-300">{featureDocs.length}</span></span>
         </div>
         <span className="text-slate-700">|</span>
         <span>Coverage: <span className="text-sky-400">{coveragePercent}%</span></span>
+        <span className="text-slate-700">|</span>
+        <span>Decisions: <span className="text-slate-300">{recentDecisions.length}</span></span>
       </div>
 
     </div>

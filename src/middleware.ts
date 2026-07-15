@@ -117,6 +117,28 @@ export function middleware(request: NextRequest) {
     return response
   }
 
+  // Skip internal control panel API routes (factory, ops, governor, engagement, growth, qa, client-zero)
+  // These are called by the admin control panel and should not be rate-limited
+  const internalPrefixes = [
+    '/api/factory/',
+    '/api/ops/',
+    '/api/governor/',
+    '/api/engagement/',
+    '/api/growth/',
+    '/api/qa/',
+    '/api/client-zero/',
+    '/api/ai-router/',
+    '/api/superadmin/',
+    '/api/live/',
+    '/api/dashboard/',
+    '/api/content-engine/',
+  ]
+  if (internalPrefixes.some(prefix => request.nextUrl.pathname.startsWith(prefix))) {
+    const response = NextResponse.next()
+    response.headers.set('x-request-id', correlationId)
+    return response
+  }
+
   // ── Client identification ──────────────────────────────────────────────────
   const ip = getClientIP(request)
   const sessionToken = request.cookies.get('seosights_session')?.value

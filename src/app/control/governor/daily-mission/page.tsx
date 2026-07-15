@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ClipboardList, Clock, Puzzle, FileText, FlaskConical, BookOpen,
   GitPullRequest, Target, Zap, CheckCircle2, AlertTriangle, XCircle,
@@ -10,100 +10,74 @@ import {
 
 // ─── Types ───────────────────────────────────────────────
 
-interface BudgetConstraint {
+interface DailyMissionData {
   id: string
-  icon: 'clock' | 'puzzle' | 'file' | 'flask' | 'book' | 'pr'
-  label: string
-  value: string
-  description: string
-}
-
-interface PipelineStep {
-  id: string
-  time: string
-  label: string
-  status: 'done' | 'in-progress' | 'pending'
-}
-
-type CandidateStatus = 'approved' | 'pending' | 'blocked'
-
-interface Candidate {
-  id: string
+  date: string
   title: string
-  impact: number
-  confidence: number
-  estimatedHours: number
-  status: CandidateStatus
-  blockReason?: string
+  description?: string
+  priority: string
+  status: string
+  source?: string
+  budgetTokens: number
+  budgetMinutes: number
+  result?: string
+  completedAt?: string
+  createdAt: string
+  tasks?: FactoryTaskInMission[]
 }
 
-type MissionOutcome = 'completed' | 'partial' | 'blocked'
-
-interface MissionHistoryItem {
+interface FactoryTaskInMission {
   id: string
-  dayLabel: string
-  goal: string
-  outcome: MissionOutcome
-  hoursUsed: string
-  kpiImproved: string
+  type: string
+  title: string
+  description?: string
+  status: string
+  priority: string
+  assignee?: string
+  confidence?: number
+  impactScore?: number
+  estimatedHours?: number
+  createdAt: string
 }
 
-interface BudgetTracker {
+interface ScheduleJob {
   id: string
-  label: string
-  used: number
-  total: number
-  unit: string
+  name: string
+  systemName: string
+  scheduledTime: string
+  dependsOn?: string
+  condition?: string
+  status: string
+  reasoning?: string
+  scheduledDate: string
+  startedAt?: string
+  completedAt?: string
+  duration?: number
+  result?: string
 }
 
-// ─── Mock Data ───────────────────────────────────────────
+interface ScheduleData {
+  jobs: ScheduleJob[]
+  date: string
+  totalJobs: number
+  completed: number
+  running: number
+  pending: number
+  failed: number
+}
 
-const budgetConstraints: BudgetConstraint[] = [
-  {
-    id: 'bc-1',
-    icon: 'clock',
-    label: 'Maximum Engineering Budget',
-    value: '4 hours',
-    description: 'Total time the Engineering Engine may spend today',
-  },
-  {
-    id: 'bc-2',
-    icon: 'puzzle',
-    label: 'Maximum New Components',
-    value: '2',
-    description: 'No more than 2 new component files created',
-  },
-  {
-    id: 'bc-3',
-    icon: 'file',
-    label: 'Maximum New Pages',
-    value: '5',
-    description: 'No more than 5 new routes added',
-  },
-  {
-    id: 'bc-4',
-    icon: 'flask',
-    label: 'Must Run: Full QA',
-    value: 'Required',
-    description: 'Full QA Engine validation before merge',
-  },
-  {
-    id: 'bc-5',
-    icon: 'book',
-    label: 'Must Update: Documentation',
-    value: 'Required',
-    description: 'Documentation Engine must rebuild docs',
-  },
-  {
-    id: 'bc-6',
-    icon: 'pr',
-    label: 'Must Prepare: PR',
-    value: 'Wait for approval',
-    description: 'Prepare PR but do NOT auto-merge — wait for human approval',
-  },
+// ─── Static Architecture Data ────────────────────────────
+
+const BUDGET_CONSTRAINTS = [
+  { id: 'bc-1', icon: 'clock' as const, label: 'Maximum Engineering Budget', value: '4 hours', description: 'Total time the Engineering Engine may spend today' },
+  { id: 'bc-2', icon: 'puzzle' as const, label: 'Maximum New Components', value: '2', description: 'No more than 2 new component files created' },
+  { id: 'bc-3', icon: 'file' as const, label: 'Maximum New Pages', value: '5', description: 'No more than 5 new routes added' },
+  { id: 'bc-4', icon: 'flask' as const, label: 'Must Run: Full QA', value: 'Required', description: 'Full QA Engine validation before merge' },
+  { id: 'bc-5', icon: 'book' as const, label: 'Must Update: Documentation', value: 'Required', description: 'Documentation Engine must rebuild docs' },
+  { id: 'bc-6', icon: 'pr' as const, label: 'Must Prepare: PR', value: 'Wait for approval', description: 'Prepare PR but do NOT auto-merge — wait for human approval' },
 ]
 
-const missionRules: string[] = [
+const MISSION_RULES = [
   'Implement only if confidence >0.8',
   'Find the highest-impact improvement',
   'No new features unless Priority 1-4 are exhausted',
@@ -111,114 +85,9 @@ const missionRules: string[] = [
   'Must pass all Quality Gates',
 ]
 
-const pipelineSteps: PipelineStep[] = [
-  { id: 'ps-1', time: '06:00', label: 'Mission Generated', status: 'done' },
-  { id: 'ps-2', time: '06:00', label: 'Observatory scan for opportunities', status: 'done' },
-  { id: 'ps-3', time: '07:00', label: 'Governor validates candidates', status: 'done' },
-  { id: 'ps-4', time: '08:00', label: 'Implementation begins', status: 'in-progress' },
-  { id: 'ps-5', time: '12:00', label: 'QA validation', status: 'pending' },
-  { id: 'ps-6', time: '13:00', label: 'Documentation update', status: 'pending' },
-  { id: 'ps-7', time: '14:00', label: 'PR prepared', status: 'pending' },
-  { id: 'ps-8', time: '14:30', label: 'Human approval gate', status: 'pending' },
-]
-
-const candidates: Candidate[] = [
-  {
-    id: 'cand-1',
-    title: 'Fix documentation drift on Button component',
-    impact: 8.2,
-    confidence: 0.92,
-    estimatedHours: 1.5,
-    status: 'approved',
-  },
-  {
-    id: 'cand-2',
-    title: 'Add missing API docs for /api/advisor',
-    impact: 7.5,
-    confidence: 0.88,
-    estimatedHours: 1,
-    status: 'approved',
-  },
-  {
-    id: 'cand-3',
-    title: 'Optimize bundle size (remove unused exports)',
-    impact: 6.8,
-    confidence: 0.85,
-    estimatedHours: 2,
-    status: 'pending',
-  },
-  {
-    id: 'cand-4',
-    title: 'Add smoke test for auth flow',
-    impact: 6.2,
-    confidence: 0.79,
-    estimatedHours: 1,
-    status: 'blocked',
-    blockReason: 'confidence <0.8',
-  },
-  {
-    id: 'cand-5',
-    title: 'Refactor Growth Engine cache',
-    impact: 5.5,
-    confidence: 0.71,
-    estimatedHours: 3,
-    status: 'blocked',
-    blockReason: 'confidence <0.8',
-  },
-]
-
-const missionHistory: MissionHistoryItem[] = [
-  {
-    id: 'mh-1',
-    dayLabel: 'Yesterday',
-    goal: 'Improve Observatory coverage',
-    outcome: 'completed',
-    hoursUsed: '3.5h',
-    kpiImproved: 'Coverage +2%',
-  },
-  {
-    id: 'mh-2',
-    dayLabel: '2 days ago',
-    goal: 'Reduce tech debt',
-    outcome: 'completed',
-    hoursUsed: '4h',
-    kpiImproved: 'Removed 12 dead exports',
-  },
-  {
-    id: 'mh-3',
-    dayLabel: '3 days ago',
-    goal: 'Increase documentation',
-    outcome: 'partial',
-    hoursUsed: '2h/4h',
-    kpiImproved: 'Docs +3%',
-  },
-  {
-    id: 'mh-4',
-    dayLabel: '4 days ago',
-    goal: 'Optimize QA pipeline',
-    outcome: 'completed',
-    hoursUsed: '3h',
-    kpiImproved: 'QA time -18%',
-  },
-  {
-    id: 'mh-5',
-    dayLabel: '5 days ago',
-    goal: 'Improve AI Router caching',
-    outcome: 'completed',
-    hoursUsed: '4h',
-    kpiImproved: 'Cache hit +12%',
-  },
-]
-
-const budgetTrackers: BudgetTracker[] = [
-  { id: 'bt-1', label: 'Hours Used', used: 2.5, total: 4, unit: 'h' },
-  { id: 'bt-2', label: 'Components Created', used: 1, total: 2, unit: '' },
-  { id: 'bt-3', label: 'Pages Created', used: 2, total: 5, unit: '' },
-]
-
 // ─── Helpers ─────────────────────────────────────────────
 
-function budgetIconConfig(icon: BudgetConstraint['icon']) {
+function budgetIconConfig(icon: 'clock' | 'puzzle' | 'file' | 'flask' | 'book' | 'pr') {
   switch (icon) {
     case 'clock': return { icon: Clock, color: 'text-emerald-400' }
     case 'puzzle': return { icon: Puzzle, color: 'text-emerald-400' }
@@ -229,37 +98,26 @@ function budgetIconConfig(icon: BudgetConstraint['icon']) {
   }
 }
 
-function candidateStatusConfig(status: CandidateStatus) {
-  switch (status) {
-    case 'approved':
-      return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/20', icon: CheckCircle2, label: 'Approved' }
-    case 'pending':
-      return { color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/20', icon: AlertTriangle, label: 'Pending' }
-    case 'blocked':
-      return { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/20', icon: XCircle, label: 'Blocked' }
-  }
+function candidateStatusConfig(status: string) {
+  const lower = status.toLowerCase()
+  if (lower.includes('approved') || lower.includes('done') || lower.includes('completed') || lower.includes('deployed'))
+    return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/20', icon: CheckCircle2, label: 'Approved' }
+  if (lower.includes('blocked') || lower.includes('rejected') || lower.includes('failed'))
+    return { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/20', icon: XCircle, label: 'Blocked' }
+  if (lower.includes('progress') || lower.includes('running') || lower.includes('implement'))
+    return { color: 'text-cyan-400', bg: 'bg-cyan-500/15', border: 'border-cyan-500/20', icon: Activity, label: 'In Progress' }
+  return { color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/20', icon: AlertTriangle, label: 'Pending' }
 }
 
-function outcomeConfig(outcome: MissionOutcome) {
-  switch (outcome) {
-    case 'completed':
-      return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/20', icon: CheckCircle2, label: 'Completed' }
-    case 'partial':
-      return { color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/20', icon: AlertTriangle, label: 'Partial' }
-    case 'blocked':
-      return { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/20', icon: XCircle, label: 'Blocked' }
-  }
-}
-
-function pipelineStatusConfig(status: PipelineStep['status']) {
-  switch (status) {
-    case 'done':
-      return { color: 'text-emerald-400', dot: 'bg-emerald-400', ring: 'border-emerald-500/40 bg-emerald-500/10' }
-    case 'in-progress':
-      return { color: 'text-cyan-400', dot: 'bg-cyan-400 animate-pulse', ring: 'border-cyan-500/40 bg-cyan-500/10' }
-    case 'pending':
-      return { color: 'text-slate-500', dot: 'bg-slate-600', ring: 'border-slate-700 bg-slate-800/30' }
-  }
+function scheduleStatusConfig(status: string) {
+  const lower = status.toLowerCase()
+  if (lower.includes('completed') || lower.includes('done'))
+    return { color: 'text-emerald-400', dot: 'bg-emerald-400', ring: 'border-emerald-500/40 bg-emerald-500/10' }
+  if (lower.includes('running') || lower.includes('progress'))
+    return { color: 'text-cyan-400', dot: 'bg-cyan-400 animate-pulse', ring: 'border-cyan-500/40 bg-cyan-500/10' }
+  if (lower.includes('failed'))
+    return { color: 'text-red-400', dot: 'bg-red-400', ring: 'border-red-500/40 bg-red-500/10' }
+  return { color: 'text-slate-500', dot: 'bg-slate-600', ring: 'border-slate-700 bg-slate-800/30' }
 }
 
 function impactColor(score: number): string {
@@ -276,25 +134,49 @@ function confidenceColor(score: number): string {
 }
 
 function budgetBarColor(used: number, total: number): string {
-  const ratio = used / total
+  const ratio = total > 0 ? used / total : 0
   if (ratio >= 0.9) return 'from-red-500/60 to-red-500'
   if (ratio >= 0.7) return 'from-amber-500/60 to-amber-500'
   return 'from-emerald-500/60 to-emerald-500'
 }
 
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
+function timeAgo(dateStr: string): string {
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const minutes = Math.floor(diff / 60000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  } catch {
+    return dateStr
+  }
 }
 
 // ─── Main Component ──────────────────────────────────────
 
 export default function DailyMissionPage() {
-  const mounted = useHydrated()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
   const todayDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -303,9 +185,79 @@ export default function DailyMissionPage() {
     day: 'numeric',
   })
 
-  const approvedCount = candidates.filter(c => c.status === 'approved').length
-  const pendingCount = candidates.filter(c => c.status === 'pending').length
-  const blockedCount = candidates.filter(c => c.status === 'blocked').length
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-20" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-64" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-slate-900 border border-red-500/30 rounded-xl p-8 text-center">
+        <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-white mb-2">Failed to load Daily Mission data</h2>
+        <p className="text-sm text-slate-400 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 transition-colors text-sm"
+        >
+          <Activity className="w-4 h-4 inline mr-2" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // Extract data from unified API response
+  const factory = data?.factory || {}
+  const mission: DailyMissionData | null = factory.todayMission || null
+  const scheduleSummary = factory.scheduleSummary || { totalJobs: 0, completed: 0, running: 0, pending: 0, failed: 0 }
+  const schedule: ScheduleData | null = {
+    jobs: factory.scheduleJobs || [],
+    date: new Date().toISOString().split('T')[0],
+    ...scheduleSummary,
+  }
+
+  // Derive pipeline steps from schedule jobs
+  const pipelineSteps = schedule?.jobs?.slice(0, 8).map((job, idx) => ({
+    id: job.id,
+    time: job.scheduledTime,
+    label: job.name,
+    status: job.status.toLowerCase().includes('completed') || job.status.toLowerCase().includes('done')
+      ? 'done' as const
+      : job.status.toLowerCase().includes('running') || job.status.toLowerCase().includes('progress')
+        ? 'in-progress' as const
+        : 'pending' as const,
+  })) ?? []
+
+  // Mission tasks as candidates
+  const candidates = mission?.tasks ?? []
+
+  // Budget trackers from mission
+  const budgetTrackers = [
+    { id: 'bt-1', label: 'Minutes Used', used: mission ? Math.min(mission.budgetMinutes, 240) : 0, total: 240, unit: 'min' },
+    { id: 'bt-2', label: 'Tokens Used', used: mission?.budgetTokens ?? 0, total: Math.max(mission?.budgetTokens ?? 0, 1000), unit: '' },
+  ]
+
+  const approvedCount = candidates.filter(c => {
+    const s = c.status.toLowerCase()
+    return s.includes('approved') || s.includes('done') || s.includes('completed')
+  }).length
+  const pendingCount = candidates.filter(c => {
+    const s = c.status.toLowerCase()
+    return s.includes('pending') || s.includes('progress') || s.includes('implement')
+  }).length
+  const blockedCount = candidates.filter(c => {
+    const s = c.status.toLowerCase()
+    return s.includes('blocked') || s.includes('rejected') || s.includes('failed')
+  }).length
 
   return (
     <div className="space-y-6">
@@ -326,63 +278,72 @@ export default function DailyMissionPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-xs">
             <Clock className="w-3.5 h-3.5 text-emerald-400" />
-            Generated at 06:00
+            {mission ? `Generated ${timeAgo(mission.createdAt)}` : 'Not generated yet'}
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-400">Active</span>
-          </div>
+          {mission && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-medium text-emerald-400">{mission.status}</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════
           2. Today's Mission Card — Hero
           ═══════════════════════════════════════════════════════ */}
-      <div className="bg-gradient-to-br from-emerald-500/10 via-slate-900 to-slate-900 border border-emerald-500/20 rounded-xl p-6 relative overflow-hidden">
-        {/* Decorative glow */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+      {mission ? (
+        <div className="bg-gradient-to-br from-emerald-500/10 via-slate-900 to-slate-900 border border-emerald-500/20 rounded-xl p-6 relative overflow-hidden">
+          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
-        <div className="relative flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-            <Target className="w-5 h-5 text-emerald-400" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">Today&apos;s Mission</span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-emerald-500/15 text-emerald-400 border-emerald-500/20">
-                <Sparkles className="w-2.5 h-2.5" />
-                Active
-              </span>
+          <div className="relative flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <Target className="w-5 h-5 text-emerald-400" />
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-              {todayDate}
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">Today&apos;s Mission</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-emerald-500/15 text-emerald-400 border-emerald-500/20">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  {mission.status}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                {todayDate}
+              </div>
+            </div>
+          </div>
+
+          <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Goal</div>
+              <div className="text-sm font-semibold text-white">{mission.title}</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Priority</div>
+              <div className="text-sm font-semibold text-emerald-400">{mission.priority}</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Source</div>
+              <div className="text-sm font-semibold text-white">{mission.source || 'Governor'}</div>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Status</div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-sm font-semibold text-emerald-400">{mission.status}</span>
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Goal</div>
-            <div className="text-sm font-semibold text-white">Increase activation</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Strategy</div>
-            <div className="text-sm font-semibold text-white">Find the highest-impact improvement</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Confidence Threshold</div>
-            <div className="text-sm font-semibold text-emerald-400">&gt; 0.8</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Status</div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-sm font-semibold text-emerald-400">Active</span>
-            </div>
-          </div>
+      ) : (
+        <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-500/5 border border-slate-800 rounded-xl p-8 text-center">
+          <ClipboardList className="w-10 h-10 text-emerald-400/30 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-white mb-2">No mission for today</h3>
+          <p className="text-sm text-slate-400">A daily mission will be generated by the scheduler each morning at 06:00.</p>
         </div>
-      </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           3. Budget Constraints
@@ -391,10 +352,10 @@ export default function DailyMissionPage() {
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
           Budget Constraints
-          <span className="ml-auto text-[10px] text-slate-500">6 hard limits</span>
+          <span className="ml-auto text-[10px] text-slate-500">{BUDGET_CONSTRAINTS.length} hard limits</span>
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {budgetConstraints.map((constraint) => {
+          {BUDGET_CONSTRAINTS.map((constraint) => {
             const iconCfg = budgetIconConfig(constraint.icon)
             const Icon = iconCfg.icon
             return (
@@ -428,7 +389,7 @@ export default function DailyMissionPage() {
         </h2>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {missionRules.map((rule, idx) => (
+            {MISSION_RULES.map((rule, idx) => (
               <div key={idx} className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-md bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
                   <span className="text-[10px] font-bold text-emerald-400">{idx + 1}</span>
@@ -441,7 +402,7 @@ export default function DailyMissionPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          5. Mission Pipeline
+          5. Mission Pipeline (from schedule)
           ═══════════════════════════════════════════════════════ */}
       <div>
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -450,46 +411,48 @@ export default function DailyMissionPage() {
           <span className="ml-auto text-[10px] text-slate-500">Today&apos;s steps</span>
         </h2>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div className="space-y-2">
-            {pipelineSteps.map((step, idx) => {
-              const config = pipelineStatusConfig(step.status)
-              const isLast = idx === pipelineSteps.length - 1
-              return (
-                <div key={step.id} className="flex items-center gap-3">
-                  {/* Time */}
-                  <div className="w-12 flex-shrink-0 text-right">
-                    <span className="text-[11px] font-mono text-slate-400">{step.time}</span>
-                  </div>
-
-                  {/* Timeline node */}
-                  <div className="relative flex-shrink-0">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${config.ring}`}>
-                      <div className={`w-2 h-2 rounded-full ${config.dot}`} />
+          {pipelineSteps.length === 0 ? (
+            <div className="text-center py-8">
+              <Activity className="w-8 h-8 text-emerald-400/30 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">No pipeline steps available</p>
+              <p className="text-[11px] text-slate-500 mt-1">Steps will appear when the daily schedule is generated</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {pipelineSteps.map((step, idx) => {
+                const config = scheduleStatusConfig(step.status === 'done' ? 'completed' : step.status === 'in-progress' ? 'running' : 'pending')
+                const isLast = idx === pipelineSteps.length - 1
+                return (
+                  <div key={step.id} className="flex items-center gap-3">
+                    <div className="w-12 flex-shrink-0 text-right">
+                      <span className="text-[11px] font-mono text-slate-400">{step.time}</span>
                     </div>
-                    {/* Vertical connector */}
-                    {!isLast && (
-                      <div className="absolute top-8 left-1/2 -translate-x-1/2 w-px h-6 bg-slate-800" />
-                    )}
+                    <div className="relative flex-shrink-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${config.ring}`}>
+                        <div className={`w-2 h-2 rounded-full ${config.dot}`} />
+                      </div>
+                      {!isLast && (
+                        <div className="absolute top-8 left-1/2 -translate-x-1/2 w-px h-6 bg-slate-800" />
+                      )}
+                    </div>
+                    <div className="flex-1 flex items-center justify-between gap-2">
+                      <span className={`text-sm ${step.status === 'pending' ? 'text-slate-400' : 'text-white font-medium'}`}>
+                        {step.label}
+                      </span>
+                      <span className={`text-[10px] uppercase tracking-wider ${config.color}`}>
+                        {step.status === 'done' ? 'Done' : step.status === 'in-progress' ? 'In Progress' : 'Pending'}
+                      </span>
+                    </div>
                   </div>
-
-                  {/* Label */}
-                  <div className="flex-1 flex items-center justify-between gap-2">
-                    <span className={`text-sm ${step.status === 'pending' ? 'text-slate-400' : 'text-white font-medium'}`}>
-                      {step.label}
-                    </span>
-                    <span className={`text-[10px] uppercase tracking-wider ${config.color}`}>
-                      {step.status === 'done' ? 'Done' : step.status === 'in-progress' ? 'In Progress' : 'Pending'}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          6. Candidate Improvements
+          6. Candidate Improvements (from mission tasks)
           ═══════════════════════════════════════════════════════ */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -520,60 +483,68 @@ export default function DailyMissionPage() {
           </div>
         </div>
 
-        {/* Candidate list */}
-        <div className="space-y-3 max-h-[480px] overflow-y-auto custom-scrollbar pr-1">
-          {candidates.map((candidate) => {
-            const config = candidateStatusConfig(candidate.status)
-            const StatusIcon = config.icon
-            return (
-              <div
-                key={candidate.id}
-                className={`bg-slate-900 border rounded-xl p-4 hover:border-slate-700 transition-all duration-200 ${config.border}`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
-                    <StatusIcon className={`w-4 h-4 ${config.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {/* Title + status badge */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-sm font-medium text-white">{candidate.title}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border flex-shrink-0 ${config.bg} ${config.color} ${config.border}`}>
-                        <StatusIcon className="w-3 h-3" />
-                        {config.label}
-                      </span>
+        {candidates.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+            <Target className="w-8 h-8 text-emerald-400/30 mx-auto mb-2" />
+            <p className="text-sm text-slate-400">No candidate improvements identified</p>
+            <p className="text-[11px] text-slate-500 mt-1">Candidates will appear when the mission evaluates opportunities</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[480px] overflow-y-auto custom-scrollbar pr-1">
+            {candidates.map((candidate) => {
+              const config = candidateStatusConfig(candidate.status)
+              const StatusIcon = config.icon
+              return (
+                <div
+                  key={candidate.id}
+                  className={`bg-slate-900 border rounded-xl p-4 hover:border-slate-700 transition-all duration-200 ${config.border}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                      <StatusIcon className={`w-4 h-4 ${config.color}`} />
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className="text-sm font-medium text-white">{candidate.title}</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border flex-shrink-0 ${config.bg} ${config.color} ${config.border}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {config.label}
+                        </span>
+                      </div>
 
-                    {/* Metrics row */}
-                    <div className="grid grid-cols-3 gap-3 mb-2">
-                      <div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wider">Impact</div>
-                        <div className={`text-sm font-bold ${impactColor(candidate.impact)}`}>{candidate.impact.toFixed(1)}</div>
+                      <div className="grid grid-cols-3 gap-3 mb-2">
+                        <div>
+                          <div className="text-[10px] text-slate-500 uppercase tracking-wider">Type</div>
+                          <div className="text-sm font-bold text-slate-300">{candidate.type}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-slate-500 uppercase tracking-wider">Priority</div>
+                          <div className="text-sm font-bold text-slate-300">{candidate.priority}</div>
+                        </div>
+                        {candidate.estimatedHours != null && (
+                          <div>
+                            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Est. Hours</div>
+                            <div className="text-sm font-bold text-slate-300">{candidate.estimatedHours}h</div>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wider">Confidence</div>
-                        <div className={`text-sm font-bold ${confidenceColor(candidate.confidence)}`}>{candidate.confidence.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wider">Est. Hours</div>
-                        <div className="text-sm font-bold text-slate-300">{candidate.estimatedHours}h</div>
-                      </div>
+
+                      {candidate.confidence != null && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-slate-500">Confidence:</span>
+                          <span className={`text-[11px] font-bold ${confidenceColor(candidate.confidence)}`}>
+                            {candidate.confidence.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-
-                    {/* Block reason (if applicable) */}
-                    {candidate.blockReason && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-red-400 mt-1">
-                        <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                        <span>Blocked: {candidate.blockReason}</span>
-                      </div>
-                    )}
+                    <ChevronRight className="w-4 h-4 text-slate-600 mt-1 flex-shrink-0" />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-600 mt-1 flex-shrink-0" />
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════
@@ -585,9 +556,9 @@ export default function DailyMissionPage() {
           Budget Tracker
           <span className="ml-auto text-[10px] text-slate-500">Current day</span>
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {budgetTrackers.map((tracker) => {
-            const ratio = tracker.used / tracker.total
+            const ratio = tracker.total > 0 ? tracker.used / tracker.total : 0
             const percent = Math.min(ratio * 100, 100)
             return (
               <div
@@ -602,7 +573,6 @@ export default function DailyMissionPage() {
                     {tracker.total}{tracker.unit}
                   </span>
                 </div>
-                {/* Progress bar */}
                 <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full bg-gradient-to-r ${budgetBarColor(tracker.used, tracker.total)} transition-all duration-700`}
@@ -614,7 +584,7 @@ export default function DailyMissionPage() {
                     {percent.toFixed(0)}% used
                   </span>
                   <span className={`text-[10px] font-medium ${ratio >= 0.9 ? 'text-red-400' : ratio >= 0.7 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {(tracker.total - tracker.used).toFixed(tracker.unit ? 1 : 0)}{tracker.unit} left
+                    {tracker.total > 0 ? (tracker.total - tracker.used) : 0}{tracker.unit} left
                   </span>
                 </div>
               </div>
@@ -624,55 +594,51 @@ export default function DailyMissionPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          8. Mission History
+          8. Schedule Overview (from ops/schedule)
           ═══════════════════════════════════════════════════════ */}
-      <div>
-        <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <History className="w-4 h-4 text-emerald-400" />
-          Mission History
-          <span className="ml-auto text-[10px] text-slate-500">Past 7 days</span>
-        </h2>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-800/50 sticky top-0">
-                <tr>
-                  <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Day</th>
-                  <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Goal</th>
-                  <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Outcome</th>
-                  <th className="text-right font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Hours</th>
-                  <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">KPI Improved</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {missionHistory.map((item) => {
-                  const config = outcomeConfig(item.outcome)
-                  const OutcomeIcon = config.icon
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{item.dayLabel}</td>
-                      <td className="px-4 py-3 text-slate-200">{item.goal}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
-                          <OutcomeIcon className="w-3 h-3" />
-                          {config.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-300">{item.hoursUsed}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <TrendingUp className="w-3 h-3 text-emerald-400 flex-shrink-0" />
-                          <span className="text-slate-300">{item.kpiImproved}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+      {schedule && schedule.jobs && schedule.jobs.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <History className="w-4 h-4 text-emerald-400" />
+            Today&apos;s Schedule
+            <span className="ml-auto text-[10px] text-slate-500">
+              {schedule.completed}/{schedule.totalJobs} completed
+            </span>
+          </h2>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-800/50 sticky top-0">
+                  <tr>
+                    <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Time</th>
+                    <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Job</th>
+                    <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Status</th>
+                    <th className="text-left font-medium text-slate-400 px-4 py-2.5 uppercase tracking-wider text-[10px]">Reasoning</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {schedule.jobs.map((job) => {
+                    const config = scheduleStatusConfig(job.status)
+                    return (
+                      <tr key={job.id} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="px-4 py-3 text-slate-400 whitespace-nowrap font-mono">{job.scheduledTime}</td>
+                        <td className="px-4 py-3 text-slate-200">{job.name}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${config.color} bg-slate-800 border-slate-700`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+                            {job.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-400 max-w-[200px] truncate">{job.reasoning || '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           9. Footer

@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ScrollText, RefreshCw, FileText, BookOpen, Users, GitBranch,
   Clock, ChevronRight, CheckCircle2, AlertTriangle, Calendar,
@@ -9,28 +9,53 @@ import {
 
 // ─── Types ───────────────────────────────────────────────
 
+interface FactoryTask {
+  id: string
+  type: string
+  title: string
+  description?: string
+  status: string
+  priority: string
+  assignee?: string
+  branch?: string
+  prUrl?: string
+  result?: string
+  parentTaskId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface FactoryStatus {
+  ok: boolean
+  timestamp: string
+  system: {
+    codebaseScanner: string
+    governor: string
+    aiRouter: string
+    dailyMissionGenerator: string
+    qaEngine: string
+  }
+  counts: {
+    factoryTasks: number
+    governorInterceptions: number
+    dailyMissions: number
+    qaRuns: number
+    codebaseSnapshots: number
+    engineeringMemories: number
+    factoryChangelogs: number
+  }
+  aiProviders: {
+    configured: string[]
+    available: string[]
+    using: string
+  }
+}
+
 interface DocSection {
   id: string
   number: string
   title: string
-  pageRange: string
-  pageCount: number
   subsections?: string[]
-}
-
-interface ChangeRecord {
-  id: string
-  version: string
-  timestamp: string
-  description: string
-  type: 'addition' | 'update' | 'revision'
-}
-
-interface Contributor {
-  id: string
-  name: string
-  role: string
-  commits: number
 }
 
 interface ValidationItem {
@@ -41,29 +66,15 @@ interface ValidationItem {
   detail: string
 }
 
-// ─── Mock Data ───────────────────────────────────────────
+// ─── Static Document Structure ───────────────────────────
 
-const docSections: DocSection[] = [
-  {
-    id: 'sec-1',
-    number: '1',
-    title: 'Platform Overview',
-    pageRange: 'pp. 1-12',
-    pageCount: 12,
-  },
-  {
-    id: 'sec-2',
-    number: '2',
-    title: 'Architecture Decisions',
-    pageRange: 'pp. 13-34',
-    pageCount: 22,
-  },
+const DOC_SECTIONS: DocSection[] = [
+  { id: 'sec-1', number: '1', title: 'Platform Overview' },
+  { id: 'sec-2', number: '2', title: 'Architecture Decisions' },
   {
     id: 'sec-3',
     number: '3',
     title: 'Engine Specifications',
-    pageRange: 'pp. 35-89',
-    pageCount: 55,
     subsections: [
       '3.1 Observatory Engine',
       '3.2 Product Engine',
@@ -81,168 +92,29 @@ const docSections: DocSection[] = [
       '3.14 AI Governor',
     ],
   },
-  {
-    id: 'sec-4',
-    number: '4',
-    title: 'Database Schema',
-    pageRange: 'pp. 90-112',
-    pageCount: 23,
-  },
-  {
-    id: 'sec-5',
-    number: '5',
-    title: 'API Specifications',
-    pageRange: 'pp. 113-156',
-    pageCount: 44,
-  },
-  {
-    id: 'sec-6',
-    number: '6',
-    title: 'Component Library',
-    pageRange: 'pp. 157-198',
-    pageCount: 42,
-  },
-  {
-    id: 'sec-7',
-    number: '7',
-    title: 'Design System',
-    pageRange: 'pp. 199-224',
-    pageCount: 26,
-  },
-  {
-    id: 'sec-8',
-    number: '8',
-    title: 'Deployment Pipeline',
-    pageRange: 'pp. 225-240',
-    pageCount: 16,
-  },
-  {
-    id: 'sec-9',
-    number: '9',
-    title: 'Quality Standards',
-    pageRange: 'pp. 241-258',
-    pageCount: 18,
-  },
-  {
-    id: 'sec-10',
-    number: '10',
-    title: 'Security Protocols',
-    pageRange: 'pp. 259-272',
-    pageCount: 14,
-  },
-  {
-    id: 'sec-11',
-    number: '11',
-    title: 'Research Methodology',
-    pageRange: 'pp. 273-289',
-    pageCount: 17,
-  },
-  {
-    id: 'sec-12',
-    number: '12',
-    title: 'Growth Strategy',
-    pageRange: 'pp. 290-310',
-    pageCount: 21,
-  },
-  {
-    id: 'sec-13',
-    number: '13',
-    title: 'Operations Manual',
-    pageRange: 'pp. 311-330',
-    pageCount: 20,
-  },
-  {
-    id: 'sec-14',
-    number: '14',
-    title: 'Compliance & Audit',
-    pageRange: 'pp. 331-347',
-    pageCount: 17,
-  },
-]
-
-const changeHistory: ChangeRecord[] = [
-  {
-    id: 'ch-1',
-    version: 'v2.14.3',
-    timestamp: '2h ago',
-    description: 'Added AI Governor specification section',
-    type: 'addition',
-  },
-  {
-    id: 'ch-2',
-    version: 'v2.14.2',
-    timestamp: '1 day ago',
-    description: 'Updated QA Engine quality gates',
-    type: 'update',
-  },
-  {
-    id: 'ch-3',
-    version: 'v2.14.1',
-    timestamp: '3 days ago',
-    description: 'Added Documentation Engine specs',
-    type: 'addition',
-  },
-  {
-    id: 'ch-4',
-    version: 'v2.14.0',
-    timestamp: '5 days ago',
-    description: 'Major revision — AI Software Factory pipeline',
-    type: 'revision',
-  },
-  {
-    id: 'ch-5',
-    version: 'v2.13.8',
-    timestamp: '1 week ago',
-    description: 'Updated database schema documentation',
-    type: 'update',
-  },
-]
-
-const contributors: Contributor[] = [
-  { id: 'c-1', name: 'AI Governor', role: 'Final authority', commits: 89 },
-  { id: 'c-2', name: 'Architecture Engine', role: 'Structural integrity', commits: 142 },
-  { id: 'c-3', name: 'Documentation Engine', role: 'Auto-extraction', commits: 268 },
-  { id: 'c-4', name: 'Human Review', role: 'Validation', commits: 47 },
-]
-
-const validationStatus: ValidationItem[] = [
-  {
-    id: 'v-1',
-    label: 'Constitution Compliance',
-    value: '100%',
-    status: 'pass',
-    detail: 'All sections compliant with Level 1 rules',
-  },
-  {
-    id: 'v-2',
-    label: 'Code-Documentation Drift',
-    value: '2 instances',
-    status: 'warn',
-    detail: 'Minor drift on Button.tsx and /api/advisor route',
-  },
-  {
-    id: 'v-3',
-    label: 'Last Full Validation',
-    value: '2 hours ago',
-    status: 'info',
-    detail: 'Scheduled validation completed at 06:00',
-  },
-  {
-    id: 'v-4',
-    label: 'Next Scheduled Validation',
-    value: '06:00 tomorrow',
-    status: 'info',
-    detail: 'Daily cron triggers full re-scan',
-  },
+  { id: 'sec-4', number: '4', title: 'Database Schema' },
+  { id: 'sec-5', number: '5', title: 'API Specifications' },
+  { id: 'sec-6', number: '6', title: 'Component Library' },
+  { id: 'sec-7', number: '7', title: 'Design System' },
+  { id: 'sec-8', number: '8', title: 'Deployment Pipeline' },
+  { id: 'sec-9', number: '9', title: 'Quality Standards' },
+  { id: 'sec-10', number: '10', title: 'Security Protocols' },
+  { id: 'sec-11', number: '11', title: 'Research Methodology' },
+  { id: 'sec-12', number: '12', title: 'Growth Strategy' },
+  { id: 'sec-13', number: '13', title: 'Operations Manual' },
+  { id: 'sec-14', number: '14', title: 'Compliance & Audit' },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────
 
-const TOTAL_PAGES = 347
-const SECTION_COUNT = 28
-const VERSION = '2.14.3'
+function changeTypeFromStatus(status: string): 'addition' | 'update' | 'revision' {
+  const lower = status.toLowerCase()
+  if (lower.includes('done') || lower.includes('completed') || lower.includes('deployed')) return 'addition'
+  if (lower.includes('implement') || lower.includes('progress') || lower.includes('qa')) return 'update'
+  return 'revision'
+}
 
-function changeTypeConfig(type: ChangeRecord['type']) {
+function changeTypeConfig(type: 'addition' | 'update' | 'revision') {
   switch (type) {
     case 'addition':
       return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/20', label: 'Addition' }
@@ -264,21 +136,131 @@ function validationStatusConfig(status: ValidationItem['status']) {
   }
 }
 
-// ─── Hydration Guard ─────────────────────────────────────
-
-const emptySubscribe = () => () => {}
-function useHydrated() {
-  return useSyncExternalStore(emptySubscribe, () => true, () => false)
+function timeAgo(dateStr: string): string {
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const minutes = Math.floor(diff / 60000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  } catch {
+    return dateStr
+  }
 }
 
 // ─── Main Component ──────────────────────────────────────
 
 export default function MasterSpecificationPage() {
-  const mounted = useHydrated()
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  if (!mounted) return null
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await fetch('/api/control/data')
+        if (!res.ok) throw new Error('Failed to fetch control data')
+        const json = await res.json()
+        setData(json)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
-  const maxSectionPages = Math.max(...docSections.map(s => s.pageCount))
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-20" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-32" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-96" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-slate-900 border border-red-500/30 rounded-xl p-8 text-center">
+        <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-white mb-2">Failed to load Master Spec data</h2>
+        <p className="text-sm text-slate-400 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25 transition-colors text-sm"
+        >
+          <RefreshCw className="w-4 h-4 inline mr-2" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // Derive data from API responses
+  const factory = data?.factory || {}
+  const counts = factory.counts || {}
+  const systemHealth = factory.system || {}
+  const tasks: FactoryTask[] = factory.recentMissions || []
+  const recentTasks = tasks.slice(0, 5)
+
+  // Derive contributors from task assignees
+  const contributorMap = new Map<string, { name: string; commits: number }>()
+  for (const task of tasks) {
+    const name = task.assignee || task.type || 'Unknown'
+    const existing = contributorMap.get(name)
+    if (existing) {
+      existing.commits++
+    } else {
+      contributorMap.set(name, { name, commits: 1 })
+    }
+  }
+  const contributors = Array.from(contributorMap.values()).sort((a, b) => b.commits - a.commits).slice(0, 6)
+
+  // Derive validation status from system health
+  const validationStatus: ValidationItem[] = [
+    {
+      id: 'v-1',
+      label: 'Constitution Compliance',
+      value: systemHealth?.governor === 'operational' ? '100%' : '—',
+      status: systemHealth?.governor === 'operational' ? 'pass' : 'warn',
+      detail: systemHealth?.governor === 'operational'
+        ? 'All sections compliant with Level 1 rules'
+        : 'Governor is not fully operational',
+    },
+    {
+      id: 'v-2',
+      label: 'Code-Documentation Drift',
+      value: counts ? `${counts.factoryChangelogs} changes` : '—',
+      status: (counts?.factoryChangelogs ?? 0) > 5 ? 'warn' : 'pass',
+      detail: counts ? `${counts.factoryChangelogs} changelogs recorded` : 'No changelog data',
+    },
+    {
+      id: 'v-3',
+      label: 'System Health',
+      value: Object.values(systemHealth).every((s: any) => s === 'operational') ? 'Operational' : 'Degraded',
+      status: Object.values(systemHealth).every((s: any) => s === 'operational') ? 'pass' : 'warn',
+      detail: `AI Router: ${systemHealth?.aiRouter ?? 'unknown'}, QA: ${systemHealth?.qaEngine ?? 'unknown'}`,
+    },
+    {
+      id: 'v-4',
+      label: 'Factory Tasks',
+      value: `${counts?.factoryTasks ?? 0} total`,
+      status: 'info',
+      detail: `${tasks.filter(t => t.status === 'completed' || t.status === 'done').length} completed`,
+    },
+  ]
+
+  const lastUpdated = recentTasks.length > 0
+    ? timeAgo(recentTasks[0].createdAt)
+    : 'Never'
 
   return (
     <div className="space-y-6">
@@ -303,7 +285,7 @@ export default function MasterSpecificationPage() {
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-xs">
             <Clock className="w-3.5 h-3.5" />
-            Last Updated: 2 hours ago
+            Last Updated: {lastUpdated}
           </div>
         </div>
       </div>
@@ -315,37 +297,37 @@ export default function MasterSpecificationPage() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <FileText className="w-4 h-4 text-cyan-400" />
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Total Pages</span>
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Total Tasks</span>
           </div>
-          <div className="text-2xl font-bold text-white">{TOTAL_PAGES}</div>
+          <div className="text-2xl font-bold text-white">{counts?.factoryTasks ?? 0}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <BookOpen className="w-4 h-4 text-cyan-400" />
             <span className="text-[10px] text-slate-500 uppercase tracking-wider">Sections</span>
           </div>
-          <div className="text-2xl font-bold text-white">{SECTION_COUNT}</div>
+          <div className="text-2xl font-bold text-white">{DOC_SECTIONS.length}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-cyan-400" />
             <span className="text-[10px] text-slate-500 uppercase tracking-wider">Last Updated</span>
           </div>
-          <div className="text-2xl font-bold text-white">2h<span className="text-sm font-normal text-slate-500 ml-1">ago</span></div>
+          <div className="text-2xl font-bold text-white">{lastUpdated.includes('ago') ? lastUpdated.split(' ')[0] : '—'}<span className="text-sm font-normal text-slate-500 ml-1">{lastUpdated.includes('ago') ? 'ago' : ''}</span></div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Users className="w-4 h-4 text-cyan-400" />
             <span className="text-[10px] text-slate-500 uppercase tracking-wider">Contributors</span>
           </div>
-          <div className="text-2xl font-bold text-white">4</div>
+          <div className="text-2xl font-bold text-white">{contributors.length || '—'}</div>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <GitBranch className="w-4 h-4 text-cyan-400" />
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Version</span>
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Interceptions</span>
           </div>
-          <div className="text-2xl font-bold text-white">{VERSION}</div>
+          <div className="text-2xl font-bold text-white">{counts?.governorInterceptions ?? 0}</div>
         </div>
       </div>
 
@@ -360,104 +342,121 @@ export default function MasterSpecificationPage() {
         </h2>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar pr-1">
-            {docSections.map((section) => (
-              <div
-                key={section.id}
-                className="group cursor-pointer hover:bg-slate-800/50 rounded-lg transition-colors"
-              >
-                <div className="flex items-center gap-3 p-3">
-                  {/* Section number */}
-                  <div className="w-8 h-8 rounded-md bg-cyan-500/15 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-cyan-400">{section.number}</span>
+            {DOC_SECTIONS.map((section) => {
+              // Count tasks related to this section by matching task type to section title
+              const relatedTasks = tasks.filter(t =>
+                t.type.toLowerCase().includes(section.title.toLowerCase().split(' ')[0]) ||
+                section.title.toLowerCase().includes(t.type.toLowerCase())
+              ).length
+
+              return (
+                <div
+                  key={section.id}
+                  className="group cursor-pointer hover:bg-slate-800/50 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-3 p-3">
+                    <div className="w-8 h-8 rounded-md bg-cyan-500/15 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-cyan-400">{section.number}</span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
+                          {section.title}
+                        </span>
+                        {relatedTasks > 0 && (
+                          <span className="text-[11px] text-cyan-400 font-mono flex-shrink-0">
+                            {relatedTasks} {relatedTasks === 1 ? 'task' : 'tasks'}
+                          </span>
+                        )}
+                      </div>
+                      {relatedTasks > 0 && (
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-cyan-500/40 to-cyan-500/80 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(relatedTasks * 10, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
                   </div>
 
-                  {/* Title + page range */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium text-white group-hover:text-cyan-300 transition-colors">
-                        {section.title}
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono flex-shrink-0">{section.pageRange}</span>
-                    </div>
-                    {/* Page count bar */}
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                  {section.subsections && (
+                    <div className="ml-11 mb-2 grid grid-cols-1 sm:grid-cols-2 gap-1 pr-3">
+                      {section.subsections.map((sub, idx) => (
                         <div
-                          className="h-full bg-gradient-to-r from-cyan-500/40 to-cyan-500/80 rounded-full transition-all duration-500"
-                          style={{ width: `${(section.pageCount / maxSectionPages) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-slate-500 flex-shrink-0 w-16 text-right">
-                        {section.pageCount} {section.pageCount === 1 ? 'page' : 'pages'}
-                      </span>
+                          key={idx}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 transition-colors cursor-pointer"
+                        >
+                          <div className="w-1 h-1 rounded-full bg-cyan-500/60 flex-shrink-0" />
+                          <span className="font-mono truncate">{sub}</span>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-
-                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
+                  )}
                 </div>
-
-                {/* Subsections (only for Section 3 — Engine Specs) */}
-                {section.subsections && (
-                  <div className="ml-11 mb-2 grid grid-cols-1 sm:grid-cols-2 gap-1 pr-3">
-                    {section.subsections.map((sub, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded text-[11px] text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 transition-colors cursor-pointer"
-                      >
-                        <div className="w-1 h-1 rounded-full bg-cyan-500/60 flex-shrink-0" />
-                        <span className="font-mono truncate">{sub}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          4. Change History
+          4. Change History (from tasks)
           ═══════════════════════════════════════════════════════ */}
       <div>
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <History className="w-4 h-4 text-cyan-400" />
           Change History
-          <span className="ml-auto text-[10px] text-slate-500">Last 5 updates</span>
+          <span className="ml-auto text-[10px] text-slate-500">Recent task activity</span>
         </h2>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          {/* Vertical timeline */}
-          <div className="relative space-y-4">
-            {/* Vertical line */}
-            <div className="absolute left-[15px] top-2 bottom-2 w-px bg-slate-800" />
+          {recentTasks.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="w-8 h-8 text-cyan-400/30 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">No task history available</p>
+              <p className="text-[11px] text-slate-500 mt-1">Changes will appear here as tasks are processed</p>
+            </div>
+          ) : (
+            <div className="relative space-y-4">
+              <div className="absolute left-[15px] top-2 bottom-2 w-px bg-slate-800" />
 
-            {changeHistory.map((record) => {
-              const config = changeTypeConfig(record.type)
-              return (
-                <div key={record.id} className="relative flex items-start gap-3 pl-0">
-                  {/* Timeline dot */}
-                  <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 ${config.bg} ${config.border}`}>
-                    <div className={`w-2 h-2 rounded-full ${config.color.replace('text-', 'bg-')}`} />
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0 pt-1">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className="text-xs font-mono font-bold text-white">{record.version}</span>
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
-                        {config.label}
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px] text-slate-500 ml-auto">
-                        <Clock className="w-3 h-3" />
-                        {record.timestamp}
-                      </span>
+              {recentTasks.map((task) => {
+                const changeType = changeTypeFromStatus(task.status)
+                const config = changeTypeConfig(changeType)
+                return (
+                  <div key={task.id} className="relative flex items-start gap-3 pl-0">
+                    <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 ${config.bg} ${config.border}`}>
+                      <div className={`w-2 h-2 rounded-full ${config.color.replace('text-', 'bg-')}`} />
                     </div>
-                    <p className="text-xs text-slate-400">{record.description}</p>
+
+                    <div className="flex-1 min-w-0 pt-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-xs font-mono font-bold text-white">{task.type}</span>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${config.bg} ${config.color} ${config.border}`}>
+                          {config.label}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] text-slate-500 ml-auto">
+                          <Clock className="w-3 h-3" />
+                          {timeAgo(task.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">{task.title}</p>
+                      {task.status && (
+                        <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                          {task.status}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -527,30 +526,37 @@ export default function MasterSpecificationPage() {
           <Users className="w-4 h-4 text-cyan-400" />
           Contributors
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {contributors.map((contributor) => (
-            <div
-              key={contributor.id}
-              className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-full bg-cyan-500/15 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-cyan-400">
-                    {contributor.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
-                  </span>
+        {contributors.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
+            <Users className="w-8 h-8 text-cyan-400/30 mx-auto mb-2" />
+            <p className="text-sm text-slate-400">No contributors recorded yet</p>
+            <p className="text-[11px] text-slate-500 mt-1">Contributors will appear as tasks are assigned to engines</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {contributors.map((contributor) => (
+              <div
+                key={contributor.name}
+                className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-full bg-cyan-500/15 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-cyan-400">
+                      {contributor.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-white truncate">{contributor.name}</div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-medium text-white truncate">{contributor.name}</div>
-                  <div className="text-[10px] text-slate-500 truncate">{contributor.role}</div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-500 uppercase tracking-wider">Tasks</span>
+                  <span className="text-cyan-400 font-bold">{contributor.commits}</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-slate-500 uppercase tracking-wider">Commits</span>
-                <span className="text-cyan-400 font-bold">{contributor.commits}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════
@@ -559,11 +565,6 @@ export default function MasterSpecificationPage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Created: <span className="text-slate-300">Jan 2024</span></span>
-        </div>
-        <span className="text-slate-700">|</span>
-        <div className="flex items-center gap-1.5">
-          <FileText className="w-3.5 h-3.5 text-cyan-400" />
           <span>Format: <span className="text-slate-300">Markdown + AST</span></span>
         </div>
         <span className="text-slate-700">|</span>

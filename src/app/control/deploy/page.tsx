@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import {
   Rocket,
   Hammer,
@@ -11,7 +12,6 @@ import {
   User,
   CheckCircle2,
   XCircle,
-  ArrowRight,
   RotateCcw,
   Shield,
   Activity,
@@ -19,132 +19,8 @@ import {
   ExternalLink,
   Zap,
   AlertTriangle,
-  ChevronRight,
+  RefreshCw,
 } from 'lucide-react'
-
-// ─── Pipeline Steps Data ─────────────────────────────────────────────
-const pipelineSteps = [
-  {
-    name: 'Build',
-    icon: Hammer,
-    status: 'completed' as const,
-    duration: '1m 23s',
-    detail: 'Compiled successfully',
-  },
-  {
-    name: 'Test',
-    icon: TestTube2,
-    status: 'completed' as const,
-    duration: '3m 47s',
-    detail: '47/47 tests passed',
-  },
-  {
-    name: 'Preview Deploy',
-    icon: Monitor,
-    status: 'completed' as const,
-    detail: 'preview-v2.4.13.seosights.vercel.app',
-    duration: '2m 05s',
-  },
-  {
-    name: 'Smoke Test',
-    icon: Flame,
-    status: 'running' as const,
-    detail: 'Checking critical paths...',
-    duration: '~1m left',
-  },
-  {
-    name: 'Production Deploy',
-    icon: Globe,
-    status: 'pending' as const,
-    detail: 'Awaiting human approval',
-    duration: '—',
-  },
-]
-
-// ─── Pending Deployments Data ────────────────────────────────────────
-const pendingDeployments = [
-  {
-    prNumber: 46,
-    title: 'Fix pricing accessibility',
-    approvedBy: 'mike@seosights.io',
-    approvedAt: '2h ago',
-    stagingStatus: 'Ready',
-    stagingColor: 'cyan',
-  },
-  {
-    prNumber: 43,
-    title: 'Add schema markup to blog posts',
-    approvedBy: 'sarah@seosights.io',
-    approvedAt: '5h ago',
-    stagingStatus: 'Deployed to Preview',
-    stagingColor: 'emerald',
-  },
-]
-
-// ─── Deploy History Data ─────────────────────────────────────────────
-const deployHistory = [
-  {
-    version: 'v2.4.12',
-    prNumber: 42,
-    title: 'Optimize Lighthouse performance',
-    result: 'success' as const,
-    duration: '6m 14s',
-    triggeredBy: 'admin@seosights.io',
-    deployedAt: '6h ago',
-  },
-  {
-    version: 'v2.4.11',
-    prNumber: 41,
-    title: 'Fix mobile nav overflow',
-    result: 'success' as const,
-    duration: '5m 52s',
-    triggeredBy: 'dave@seosights.io',
-    deployedAt: '1d ago',
-  },
-  {
-    version: 'v2.4.10',
-    prNumber: 39,
-    title: 'Update Tailwind config',
-    result: 'success' as const,
-    duration: '7m 08s',
-    triggeredBy: 'admin@seosights.io',
-    deployedAt: '2d ago',
-  },
-  {
-    version: 'v2.4.9',
-    prNumber: 38,
-    title: 'Add observatory dashboard',
-    result: 'success' as const,
-    duration: '8m 31s',
-    triggeredBy: 'sarah@seosights.io',
-    deployedAt: '3d ago',
-  },
-  {
-    version: 'v2.4.8',
-    prNumber: 37,
-    title: 'Fix SSR hydration mismatch',
-    result: 'failed' as const,
-    duration: '2m 15s',
-    triggeredBy: 'admin@seosights.io',
-    deployedAt: '4d ago',
-  },
-]
-
-// ─── Rollback Data ───────────────────────────────────────────────────
-const rollbackInfo = {
-  currentVersion: 'v2.4.12',
-  previousVersion: 'v2.4.11',
-  lastRollbackAge: 'Never',
-  rollbackAvailable: true,
-}
-
-// ─── Footer Stats ────────────────────────────────────────────────────
-const footerStats = [
-  { label: 'Deploys This Week', value: '8', icon: Rocket, color: 'cyan' },
-  { label: 'Avg Deploy Time', value: '6m 22s', icon: Clock, color: 'cyan' },
-  { label: 'Rollback Rate', value: '3%', icon: RotateCcw, color: 'amber' },
-  { label: 'Uptime', value: '99.97%', icon: Activity, color: 'emerald' },
-]
 
 // ─── Badge Component ─────────────────────────────────────────────────
 function Badge({ text, color }: { text: string; color: string }) {
@@ -185,8 +61,149 @@ function PipelineStepStatus({ status }: { status: string }) {
   )
 }
 
+// ─── Pipeline stage definitions (static architecture) ──────────────
+const PIPELINE_STAGES = [
+  { name: 'Build', icon: Hammer },
+  { name: 'Test', icon: TestTube2 },
+  { name: 'Preview', icon: Monitor },
+  { name: 'Smoke Test', icon: Flame },
+  { name: 'Production', icon: Globe },
+]
+
 // ─── Main Component ──────────────────────────────────────────────────
 export default function DeployEnginePage() {
+  const [scheduleData, setScheduleData] = useState<any>(null)
+  const [factoryData, setFactoryData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [scheduleRes, factoryRes] = await Promise.all([
+          fetch('/api/ops/schedule'),
+          fetch('/api/factory/status'),
+        ])
+        if (!scheduleRes.ok) throw new Error('Failed to fetch deployment schedule')
+        const schedule = await scheduleRes.json()
+        setScheduleData(schedule)
+
+        if (factoryRes.ok) {
+          const factory = await factoryRes.json()
+          setFactoryData(factory)
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse bg-slate-800 rounded-xl h-20" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
+        <div className="animate-pulse bg-slate-800 rounded-xl h-32" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8 text-center">
+        <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-red-400 mb-1">Failed to load deployment data</h2>
+        <p className="text-sm text-slate-400 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // ─── Derive pipeline steps from schedule ─────────────────
+  const jobs = scheduleData?.jobs || []
+  const completedJobs = jobs.filter((j: any) => j.status === 'completed')
+  const runningJobs = jobs.filter((j: any) => j.status === 'running')
+  const pendingJobs = jobs.filter((j: any) => j.status === 'pending')
+  const failedJobs = jobs.filter((j: any) => j.status === 'failed')
+
+  // Map schedule progress to pipeline stages
+  const completedCount = completedJobs.length
+  const totalJobs = jobs.length
+  const pipelineSteps = PIPELINE_STAGES.map((stage, i) => {
+    const threshold = ((i + 1) / PIPELINE_STAGES.length) * totalJobs
+    const isRunning = completedCount >= threshold - 1 && completedCount < threshold && runningJobs.length > 0
+    const isCompleted = completedCount >= threshold
+    return {
+      ...stage,
+      status: isCompleted ? 'completed' as const : isRunning ? 'running' as const : 'pending' as const,
+      duration: isCompleted ? 'Done' : isRunning ? 'In progress' : '—',
+      detail: isCompleted ? 'Stage complete' : isRunning ? 'Processing...' : 'Waiting',
+    }
+  })
+
+  // ─── Derive pending deployments from schedule running/pending jobs ──
+  const pendingDeployments = [...runningJobs, ...pendingJobs].slice(0, 4).map((job: any) => ({
+    id: job.id,
+    name: job.name || 'Unknown job',
+    systemName: job.systemName || 'unknown',
+    scheduledTime: job.scheduledTime || '—',
+    status: job.status,
+    reasoning: job.reasoning || null,
+  }))
+
+  // ─── Derive deploy history from completed/failed schedule jobs ──
+  const deployHistory = [...completedJobs, ...failedJobs].slice(0, 5).map((job: any, i: number) => ({
+    id: job.id,
+    name: job.name || 'Unknown deployment',
+    systemName: job.systemName || 'unknown',
+    result: (job.status === 'completed' ? 'success' : 'failed') as 'success' | 'failed',
+    duration: job.duration ? `${Math.round(job.duration / 1000)}s` : 'N/A',
+    scheduledTime: job.scheduledTime || '—',
+    completedAt: job.completedAt
+      ? (() => {
+          const diff = Date.now() - new Date(job.completedAt).getTime()
+          const hrs = Math.floor(diff / 3600000)
+          if (hrs < 24) return `${hrs}h ago`
+          return `${Math.floor(hrs / 24)}d ago`
+        })()
+      : 'N/A',
+  }))
+
+  // ─── Derive rollback info from factory data ──────────────
+  const rollbackAvailable = factoryData?.system?.qaEngine === 'operational'
+
+  // ─── Derive footer stats from real data ──────────────────
+  const successRate = totalJobs > 0
+    ? `${Math.round((completedJobs.length / totalJobs) * 100)}%`
+    : '—'
+  const avgDuration = completedJobs.length > 0
+    ? (() => {
+        const total = completedJobs.reduce((sum: number, j: any) => sum + (j.duration || 0), 0)
+        const avgMs = total / completedJobs.length
+        const mins = Math.floor(avgMs / 60000)
+        const secs = Math.floor((avgMs % 60000) / 1000)
+        return `${mins}m ${secs}s`
+      })()
+    : '—'
+
+  const footerStats = [
+    { label: 'Jobs Today', value: String(totalJobs), icon: Rocket, color: 'cyan' },
+    { label: 'Avg Duration', value: avgDuration, icon: Clock, color: 'cyan' },
+    { label: 'Failed', value: String(failedJobs.length), icon: RotateCcw, color: 'amber' },
+    { label: 'Success Rate', value: successRate, icon: Activity, color: 'emerald' },
+  ]
+
   return (
     <div className="space-y-6">
       {/* ═══ Section 1: Header ═══ */}
@@ -198,8 +215,10 @@ export default function DeployEnginePage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Deploy Engine™</h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-xs text-amber-400 font-medium">Idle — awaiting approval</span>
+              <div className={`w-2 h-2 rounded-full ${runningJobs.length > 0 ? 'bg-cyan-500 animate-pulse' : 'bg-amber-500'}`} />
+              <span className={`text-xs font-medium ${runningJobs.length > 0 ? 'text-cyan-400' : 'text-amber-400'}`}>
+                {runningJobs.length > 0 ? 'Deploying' : 'Idle — awaiting approval'}
+              </span>
             </div>
           </div>
         </div>
@@ -218,7 +237,8 @@ export default function DeployEnginePage() {
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
         <h2 className="text-sm font-semibold text-white mb-5 flex items-center gap-2">
           <Zap className="w-4 h-4 text-cyan-400" />
-          Deployment Pipeline — PR #46
+          Deployment Pipeline
+          <span className="ml-auto text-[10px] text-slate-500">{completedCount}/{totalJobs} jobs complete</span>
         </h2>
         <div className="flex items-center justify-between gap-0 overflow-x-auto pb-2">
           {pipelineSteps.map((step, i) => {
@@ -271,38 +291,44 @@ export default function DeployEnginePage() {
           Pending Deployments
           <span className="ml-auto text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">{pendingDeployments.length} pending</span>
         </h2>
-        <div className="space-y-3">
-          {pendingDeployments.map((dep) => (
-            <div
-              key={dep.prNumber}
-              className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-4 hover:border-slate-600/70 transition-colors"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-cyan-400 font-semibold">PR #{dep.prNumber}</span>
-                    <span className="text-sm font-medium text-white">{dep.title}</span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <User className="w-3 h-3" />
-                      Approved by {dep.approvedBy}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {dep.approvedAt}
-                    </span>
-                    <Badge text={dep.stagingStatus} color={dep.stagingColor} />
+        {pendingDeployments.length > 0 ? (
+          <div className="space-y-3">
+            {pendingDeployments.map((dep) => (
+              <div
+                key={dep.id}
+                className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-4 hover:border-slate-600/70 transition-colors"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono text-cyan-400 font-semibold">{dep.systemName}</span>
+                      <span className="text-sm font-medium text-white">{dep.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Scheduled: {dep.scheduledTime}
+                      </span>
+                      <Badge
+                        text={dep.status === 'running' ? 'Running' : 'Pending'}
+                        color={dep.status === 'running' ? 'cyan' : 'amber'}
+                      />
+                    </div>
+                    {dep.reasoning && (
+                      <div className="text-[11px] text-slate-400 mt-1">{dep.reasoning}</div>
+                    )}
                   </div>
                 </div>
-                <button className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 rounded-lg text-sm font-semibold hover:bg-cyan-500/25 transition-colors">
-                  <Rocket className="w-4 h-4" />
-                  Deploy Now
-                </button>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400/50 mx-auto mb-3" />
+            <p className="text-sm text-slate-400">No pending deployments</p>
+            <p className="text-xs text-slate-500 mt-1">All scheduled jobs have been completed</p>
+          </div>
+        )}
       </div>
 
       {/* ═══ Section 4: Current Production ═══ */}
@@ -313,27 +339,40 @@ export default function DeployEnginePage() {
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Version</div>
-            <div className="text-sm font-bold text-cyan-400 font-mono">v2.4.12</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Last Deploy</div>
-            <div className="text-sm font-bold text-white">6h ago</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Deploy By</div>
-            <div className="text-sm font-bold text-white truncate">admin@seosights.io</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Vercel</div>
-            <div className="flex items-center justify-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-bold text-emerald-400">Healthy</span>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">System</div>
+            <div className={`text-sm font-bold ${factoryData?.ok ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {factoryData?.ok ? 'Healthy' : 'Degraded'}
             </div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Uptime</div>
-            <div className="text-sm font-bold text-emerald-400">99.97%</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">QA Engine</div>
+            <div className={`text-sm font-bold ${
+              factoryData?.system?.qaEngine === 'operational' ? 'text-emerald-400' :
+              factoryData?.system?.qaEngine === 'degraded' ? 'text-amber-400' :
+              'text-red-400'
+            }`}>
+              {factoryData?.system?.qaEngine || 'Unknown'}
+            </div>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">AI Router</div>
+            <div className={`text-sm font-bold ${
+              factoryData?.system?.aiRouter === 'operational' ? 'text-emerald-400' :
+              factoryData?.system?.aiRouter === 'degraded' ? 'text-amber-400' :
+              'text-red-400'
+            }`}>
+              {factoryData?.system?.aiRouter || 'Unknown'}
+            </div>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Tasks</div>
+            <div className="text-sm font-bold text-white">{factoryData?.counts?.factoryTasks ?? 0}</div>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/40 rounded-lg p-3 text-center">
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">AI Mode</div>
+            <div className="text-sm font-bold text-cyan-400">
+              {factoryData?.aiProviders?.using === 'live-llm' ? 'Live LLM' : 'Fallback'}
+            </div>
           </div>
         </div>
       </div>
@@ -344,44 +383,48 @@ export default function DeployEnginePage() {
           <Activity className="w-4 h-4 text-cyan-400" />
           Deploy History
         </h2>
-        <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-          {deployHistory.map((deploy) => (
-            <div
-              key={deploy.version}
-              className="flex items-center gap-4 bg-slate-800/30 border border-slate-700/30 rounded-lg px-4 py-3"
-            >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                deploy.result === 'success' ? 'bg-emerald-500/10' : 'bg-red-500/10'
-              }`}>
-                {deploy.result === 'success'
-                  ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  : <XCircle className="w-4 h-4 text-red-400" />
-                }
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono text-cyan-400 font-semibold">{deploy.version}</span>
-                  <span className="text-sm text-white truncate">PR #{deploy.prNumber}: {deploy.title}</span>
+        {deployHistory.length > 0 ? (
+          <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+            {deployHistory.map((deploy) => (
+              <div
+                key={deploy.id}
+                className="flex items-center gap-4 bg-slate-800/30 border border-slate-700/30 rounded-lg px-4 py-3"
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  deploy.result === 'success' ? 'bg-emerald-500/10' : 'bg-red-500/10'
+                }`}>
+                  {deploy.result === 'success'
+                    ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    : <XCircle className="w-4 h-4 text-red-400" />
+                  }
                 </div>
-                <div className="flex items-center gap-3 mt-0.5 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <User className="w-3 h-3" />
-                    {deploy.triggeredBy}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {deploy.duration}
-                  </span>
-                  <span>{deploy.deployedAt}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono text-cyan-400 font-semibold">{deploy.systemName}</span>
+                    <span className="text-sm text-white truncate">{deploy.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {deploy.duration}
+                    </span>
+                    <span>{deploy.completedAt}</span>
+                  </div>
                 </div>
+                <Badge
+                  text={deploy.result === 'success' ? 'Success' : 'Failed'}
+                  color={deploy.result === 'success' ? 'emerald' : 'red'}
+                />
               </div>
-              <Badge
-                text={deploy.result === 'success' ? 'Success' : 'Failed'}
-                color={deploy.result === 'success' ? 'emerald' : 'red'}
-              />
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Activity className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+            <p className="text-sm text-slate-400">No deployment history</p>
+            <p className="text-xs text-slate-500 mt-1">Completed deployments will appear here</p>
+          </div>
+        )}
       </div>
 
       {/* ═══ Section 6: Rollback Status ═══ */}
@@ -398,23 +441,19 @@ export default function DeployEnginePage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-sm text-slate-300">Current: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-cyan-400">{rollbackInfo.currentVersion}</code></span>
+                  <span className="text-sm text-slate-300">System: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-cyan-400">{factoryData?.ok ? 'healthy' : 'degraded'}</code></span>
                 </div>
                 <div className="flex items-center gap-2">
                   <RotateCcw className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-sm text-slate-300">Rollback target: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-amber-400">{rollbackInfo.previousVersion}</code></span>
+                  <span className="text-sm text-slate-300">Rollback: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-amber-400">{rollbackAvailable ? 'available' : 'N/A'}</code></span>
                 </div>
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-sm text-slate-400">Last rollback: {rollbackInfo.lastRollbackAge}</span>
+                  <span className="text-sm text-slate-400">Failed jobs: {failedJobs.length}</span>
                 </div>
               </div>
             </div>
           </div>
-          <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-lg text-sm font-semibold hover:bg-amber-500/25 transition-colors flex-shrink-0">
-            <RotateCcw className="w-4 h-4" />
-            Rollback to {rollbackInfo.previousVersion}
-          </button>
         </div>
       </div>
 
