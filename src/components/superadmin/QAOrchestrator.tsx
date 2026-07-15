@@ -64,7 +64,7 @@ interface QARun {
   degraded: number
   critical: number
   passRate: number
-  durationMs: number
+  duration: number
   status: string
   startedAt: string
   completedAt?: string | null
@@ -490,7 +490,7 @@ export default function QAOrchestrator() {
                     <Clock className="w-3 h-3 text-muted-foreground" />
                     <span className="text-[11px] text-muted-foreground">
                       Last run: {formatDate(run.startedAt)}
-                      {run.durationMs > 0 && ` (${(run.durationMs / 1000).toFixed(1)}s)`}
+                      {run.duration > 0 && ` (${(run.duration / 1000).toFixed(1)}s)`}
                     </span>
                   </div>
                 )}

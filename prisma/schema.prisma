@@ -2145,23 +2145,28 @@ model QARun {
   productScore        Int       @default(0)
   uxScore             Int       @default(0)
   engineeringScore    Int       @default(0)
+  researchScore       Int       @default(0)
+  conversionScore     Int       @default(0)
+  enterpriseScore     Int       @default(0)
   securityScore       Int       @default(0)
   performanceScore    Int       @default(0)
   seoScore            Int       @default(0)
   accessibilityScore  Int       @default(0)
-  conversionScore     Int       @default(0)
   customerDelight     Int       @default(0)
   technicalDebt       Int       @default(0)
   criticalCount       Int       @default(0)
   majorCount          Int       @default(0)
   mediumCount         Int       @default(0)
   minorCount          Int       @default(0)
+  pagesTested         Int       @default(0)
+  clicksTested        Int       @default(0)
+  apisTested          Int       @default(0)
+  formsTested         Int       @default(0)
   startedAt           DateTime  @default(now())
   completedAt         DateTime?
-  durationMs          Int?
+  duration            Int?
   summary             String?
   createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
 
   reviewerResults     QAReviewerResult[]
   issues              QAIssue[]
@@ -2171,15 +2176,16 @@ model QARun {
 }
 
 model QAReviewerResult {
-  id          String    @id @default(cuid())
-  runId       String
-  reviewer    String
-  score       Int       @default(0)
-  status      String    @default("pending")
-  findings    String?
-  durationMs  Int?
-  run         QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  runId           String
+  reviewer        String
+  score           Int       @default(0)
+  issues          Int       @default(0)
+  details         String?
+  summary         String?
+  recommendations String?
+  run             QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
 }
 
 model QAIssue {

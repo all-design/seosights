@@ -36,13 +36,8 @@ export async function GET() {
   try {
     const today = todayAtMidnight()
 
-    const mission = await db.dailyMission.findUnique({
+    const mission = await db.dailyMission.findFirst({
       where: { date: today },
-      include: {
-        tasks: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
     })
 
     if (!mission) {
