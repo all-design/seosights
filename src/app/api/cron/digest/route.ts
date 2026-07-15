@@ -13,6 +13,11 @@ import { db } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
+// ── GET: Vercel Cron Jobs support (delegates to POST) ──────────
+export async function GET() {
+  return POST(new NextRequest('https://localhost/api/cron/digest'))
+}
+
 // ── POST: Generate overnight digests for all active users ───────
 export async function POST(request: NextRequest) {
   try {

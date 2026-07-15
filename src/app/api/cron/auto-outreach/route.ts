@@ -26,6 +26,15 @@ interface AutoOutreachBody {
   projectId?: string
 }
 
+// ── GET: Vercel Cron Jobs support (delegates to POST) ──────────
+export async function GET() {
+  return POST(new NextRequest('https://localhost/api/cron/auto-outreach', {
+    method: 'POST',
+    body: JSON.stringify({}),
+    headers: { 'Content-Type': 'application/json' },
+  }))
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as AutoOutreachBody

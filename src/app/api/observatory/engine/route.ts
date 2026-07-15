@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import ZAI from 'z-ai-web-dev-sdk'
+import { getZAI } from '@/lib/zai'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const zai = await ZAI.create()
+    const zai = await getZAI()
     let detectedSignals = 0
     const evaluatedChanges: Array<{
       id: string

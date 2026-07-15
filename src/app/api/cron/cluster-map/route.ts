@@ -19,6 +19,15 @@ interface ClusterMapBody {
   projectId?: string // optional: limit to specific project
 }
 
+// ── GET: Vercel Cron Jobs support (delegates to POST) ──────────
+export async function GET() {
+  return POST(new NextRequest('https://localhost/api/cron/cluster-map', {
+    method: 'POST',
+    body: JSON.stringify({}),
+    headers: { 'Content-Type': 'application/json' },
+  }))
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ClusterMapBody
