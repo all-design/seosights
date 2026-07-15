@@ -20,18 +20,61 @@ import {
   Fingerprint,
   Database,
   Activity,
+  Bug,
+  Info,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────
 
 interface ComponentStatus {
-  status: 'ok' | 'degraded' | 'down'
+  status: string
   latency: number
   details: string
-  lastCheck: string
 }
 
 type StatusMap = Record<string, ComponentStatus>
+
+interface SecurityVulnerabilities {
+  critical: number
+  high: number
+  medium: number
+  low: number
+  total: number
+}
+
+interface RecentIssue {
+  id: string
+  title: string
+  severity: string
+  page: string | null
+  status: string
+  createdAt: string
+}
+
+interface RecentFallback {
+  id: string
+  engine: string
+  action: string
+  createdAt: string
+  [key: string]: unknown
+}
+
+interface SecurityData {
+  vulnerabilities: SecurityVulnerabilities
+  securityScore: number | null
+  codeScanStatus: string
+  codeScanDate: string | null
+  dependencyAuditStatus: string
+  lastFullScan: string | null
+  recentIssues: RecentIssue[]
+}
+
+interface SystemStatusData {
+  components: StatusMap
+  overallStatus: string
+  recentFallbacks: RecentFallback[]
+  lastChecked: string
+}
 
 // ─── Helpers ─────────────────────────────────────────────
 
@@ -44,6 +87,12 @@ function componentIcon(name: string): React.ElementType {
     case 'email': return Globe
     case 'websocket': return Globe
     case 'cms': return Code
+    case 'qaEngine': return Bug
+    case 'governor': return ShieldAlert
+    case 'observatory': return FileSearch
+    case 'scheduler': return Clock
+    case 'clientZero': return Fingerprint
+    case 'factory': return Package
     default: return Shield
   }
 }
@@ -57,6 +106,12 @@ function componentLabel(name: string): string {
     case 'email': return 'Email Service'
     case 'websocket': return 'WebSocket'
     case 'cms': return 'CMS'
+    case 'qaEngine': return 'QA Engine'
+    case 'governor': return 'Governor'
+    case 'observatory': return 'Observatory'
+    case 'scheduler': return 'Scheduler'
+    case 'clientZero': return 'Client Zero'
+    case 'factory': return 'Factory'
     default: return name
   }
 }
@@ -70,16 +125,70 @@ function componentCategory(name: string): string {
     case 'email': return 'Communication'
     case 'websocket': return 'Real-time'
     case 'cms': return 'Content Security'
+    case 'qaEngine': return 'Quality Assurance'
+    case 'governor': return 'Access Control'
+    case 'observatory': return 'Monitoring'
+    case 'scheduler': return 'Task Management'
+    case 'clientZero': return 'Analytics'
+    case 'factory': return 'Build Pipeline'
     default: return 'System'
   }
 }
 
-function statusStyle(status: 'ok' | 'degraded' | 'down') {
+function statusStyle(status: string) {
   switch (status) {
-    case 'ok': return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle2, label: 'Secure' }
-    case 'degraded': return { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle, label: 'Warning' }
-    case 'down': return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: XCircle, label: 'Down' }
+    case 'operational':
+    case 'ok':
+      return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle2, label: 'Secure' }
+    case 'degraded':
+      return { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle, label: 'Warning' }
+    case 'offline':
+    case 'down':
+      return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: XCircle, label: 'Down' }
+    default:
+      return { color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: Info, label: status }
   }
+}
+
+function severityStyle(severity: string) {
+  switch (severity) {
+    case 'critical':
+      return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: XCircle }
+    case 'major':
+    case 'high':
+      return { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', icon: AlertTriangle }
+    case 'medium':
+      return { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle }
+    case 'minor':
+    case 'low':
+      return { color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Info }
+    default:
+      return { color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: Info }
+  }
+}
+
+function scanStatusLabel(status: string) {
+  switch (status) {
+    case 'completed': return { label: 'Completed', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' }
+    case 'partial': return { label: 'Partial', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' }
+    case 'pending': return { label: 'Pending', color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20' }
+    case 'running': return { label: 'Running', color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' }
+    case 'passed': return { label: 'Passed', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' }
+    case 'not_run': return { label: 'Not Run', color: 'text-slate-500', bg: 'bg-slate-500/10 border-slate-500/20' }
+    default: return { label: status, color: 'text-slate-400', bg: 'bg-slate-500/10 border-slate-500/20' }
+  }
+}
+
+function formatTimeAgo(dateStr: string | null): string {
+  if (!dateStr) return 'Never'
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
 }
 
 // ─── Circular Gauge ──────────────────────────────────────
@@ -121,7 +230,8 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
 // ─── Main Component ──────────────────────────────────────
 
 export default function SecurityEnginePage() {
-  const [data, setData] = useState<any>(null)
+  const [systemStatus, setSystemStatus] = useState<SystemStatusData | null>(null)
+  const [security, setSecurity] = useState<SecurityData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [animatingScore, setAnimatingScore] = useState(0)
@@ -133,14 +243,14 @@ export default function SecurityEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
-        // Derive security data from system status in unified response
-        const systemStatus = json.systemStatus
-        setData(systemStatus || {
-          components: {},
-          status: 'unknown',
-          responseTime: 0,
-          environment: 'unknown',
-        })
+
+        // Extract both systemStatus and security from the unified response
+        if (json.systemStatus) {
+          setSystemStatus(json.systemStatus)
+        }
+        if (json.security) {
+          setSecurity(json.security)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -152,14 +262,12 @@ export default function SecurityEnginePage() {
 
   // Animate score when data arrives
   useEffect(() => {
-    if (!data || animationStarted.current) return
+    if (animationStarted.current) return
+    const target = security?.securityScore ?? 0
+    if (target === 0 && !security) return
     animationStarted.current = true
-    const components: StatusMap = data.components || {}
-    const total = Object.keys(components).length
-    const okCount = Object.values(components).filter(c => c.status === 'ok').length
-    const target = total > 0 ? Math.round((okCount / total) * 100) : 0
     let current = 0
-    const step = Math.ceil(target / 40)
+    const step = Math.ceil(target / 40) || 1
     const timer = setInterval(() => {
       current += step
       if (current >= target) {
@@ -169,7 +277,7 @@ export default function SecurityEnginePage() {
       setAnimatingScore(current)
     }, 25)
     return () => clearInterval(timer)
-  }, [data])
+  }, [security])
 
   // ─── Loading ────────────────────────────────────────────
   if (loading) {
@@ -201,50 +309,25 @@ export default function SecurityEnginePage() {
   }
 
   // ─── Derived data ───────────────────────────────────────
-  const components: StatusMap = data?.components || {}
-  const overallStatus = data?.status || 'degraded'
+  const components: StatusMap = systemStatus?.components || {}
+  const overallStatus = systemStatus?.overallStatus || 'degraded'
   const componentEntries = Object.entries(components)
 
-  const okCount = componentEntries.filter(([, c]) => c.status === 'ok').length
+  const vulns = security?.vulnerabilities || { critical: 0, high: 0, medium: 0, low: 0, total: 0 }
+  const securityScore = security?.securityScore ?? 0
+  const codeScanStatus = security?.codeScanStatus || 'pending'
+  const codeScanDate = security?.codeScanDate ?? null
+  const dependencyAuditStatus = security?.dependencyAuditStatus || 'not_run'
+  const recentIssues = security?.recentIssues || []
+  const recentFallbacks = systemStatus?.recentFallbacks || []
+
+  // Component health counts
+  const okCount = componentEntries.filter(([, c]) => c.status === 'operational' || c.status === 'ok').length
   const degradedCount = componentEntries.filter(([, c]) => c.status === 'degraded').length
-  const downCount = componentEntries.filter(([, c]) => c.status === 'down').length
-  const securityScore = componentEntries.length > 0
-    ? Math.round((okCount / componentEntries.length) * 100)
-    : 0
-
-  // Build vulnerability-like items from degraded/down components
-  const vulnerabilities = componentEntries
-    .filter(([, c]) => c.status !== 'ok')
-    .map(([name, c]) => ({
-      id: name,
-      package: componentLabel(name),
-      severity: c.status === 'down' ? 'high' as const : 'medium' as const,
-      description: c.details,
-      status: c.status === 'down' ? 'open' as const : 'accepted' as const,
-    }))
-
-  // Build code-scan-like results from component health
-  const codeScans = componentEntries.map(([name, c]) => ({
-    id: name,
-    category: componentCategory(name),
-    check: `${componentLabel(name)} health check`,
-    result: c.status === 'ok' ? 'pass' as const : 'warning' as const,
-    details: c.details,
-    latency: c.latency,
-  }))
-
-  // Build dependency-audit-like results from component health
-  const dependencyAudit = componentEntries.map(([name, c]) => ({
-    id: name,
-    name: componentLabel(name),
-    status: c.status,
-    details: c.details,
-    latency: c.latency,
-    lastCheck: c.lastCheck,
-  }))
+  const downCount = componentEntries.filter(([, c]) => c.status === 'offline' || c.status === 'down').length
 
   // ─── Empty state ────────────────────────────────────────
-  if (componentEntries.length === 0) {
+  if (componentEntries.length === 0 && !security) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -260,35 +343,13 @@ export default function SecurityEnginePage() {
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 flex flex-col items-center gap-4">
           <ShieldAlert className="w-12 h-12 text-slate-600" />
-          <p className="text-slate-300 font-medium">No security scans recorded</p>
+          <p className="text-slate-300 font-medium">No security data available</p>
           <p className="text-xs text-slate-500 text-center max-w-md">
-            System status data will appear here once the system status API is available.
+            Security scan results and system status data will appear here once the security engine has completed its first scan.
           </p>
         </div>
       </div>
     )
-  }
-
-  function vulnSeverityStyle(severity: 'high' | 'medium') {
-    switch (severity) {
-      case 'high': return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' }
-      case 'medium': return { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' }
-    }
-  }
-
-  function vulnStatusIcon(status: 'open' | 'accepted') {
-    switch (status) {
-      case 'open': return { icon: XCircle, color: 'text-red-400', label: 'Open' }
-      case 'accepted': return { icon: AlertTriangle, color: 'text-amber-400', label: 'Accepted Risk' }
-    }
-  }
-
-  function depStatusStyle(status: 'ok' | 'degraded' | 'down') {
-    switch (status) {
-      case 'ok': return { label: 'Secure', color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' }
-      case 'degraded': return { label: 'Warning', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' }
-      case 'down': return { label: 'Down', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' }
-    }
   }
 
   return (
@@ -306,11 +367,11 @@ export default function SecurityEnginePage() {
         </div>
         <div className="flex items-center gap-3">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-            overallStatus === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20'
+            overallStatus === 'operational' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20'
           }`}>
-            <Activity className={`w-3 h-3 ${overallStatus === 'healthy' ? 'text-emerald-400' : 'text-amber-400'} animate-pulse`} />
-            <span className={`text-xs font-medium ${overallStatus === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {overallStatus === 'healthy' ? 'All Clear' : 'Issues Detected'}
+            <Activity className={`w-3 h-3 ${overallStatus === 'operational' ? 'text-emerald-400' : 'text-amber-400'} animate-pulse`} />
+            <span className={`text-xs font-medium ${overallStatus === 'operational' ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {overallStatus === 'operational' ? 'All Clear' : 'Issues Detected'}
             </span>
           </div>
           <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-red-500/30 transition-colors text-xs">
@@ -328,74 +389,262 @@ export default function SecurityEnginePage() {
           </div>
           <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-emerald-400">{okCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Secure</div>
+              <div className="text-2xl font-bold text-red-400">{vulns.critical}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Critical</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-amber-400">{degradedCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Warnings</div>
+              <div className="text-2xl font-bold text-orange-400">{vulns.high}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">High</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-red-400">{downCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Down</div>
+              <div className="text-2xl font-bold text-amber-400">{vulns.medium}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Medium</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-slate-300">{data?.responseTime || 0}ms</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Response Time</div>
+              <div className="text-2xl font-bold text-blue-400">{vulns.low}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Low</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ─── Vulnerability Scan ──────────────────────────── */}
+      {/* ─── Vulnerability Scan (real issues from DB) ────── */}
       <div>
         <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-red-400" />
           Vulnerability Scan
           <span className="ml-auto flex items-center gap-2">
-            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              {okCount} secure
-            </span>
-            {degradedCount > 0 && (
-              <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                {degradedCount} warnings
+            {vulns.total === 0 ? (
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                0 issues
               </span>
+            ) : (
+              <>
+                {vulns.critical > 0 && (
+                  <span className="text-[10px] text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
+                    {vulns.critical} critical
+                  </span>
+                )}
+                {vulns.high > 0 && (
+                  <span className="text-[10px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">
+                    {vulns.high} high
+                  </span>
+                )}
+                {vulns.medium > 0 && (
+                  <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    {vulns.medium} medium
+                  </span>
+                )}
+                {vulns.low > 0 && (
+                  <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                    {vulns.low} low
+                  </span>
+                )}
+              </>
             )}
           </span>
         </h2>
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          {vulnerabilities.length === 0 ? (
+          {recentIssues.length === 0 ? (
             <div className="flex items-center gap-3 py-4">
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span className="text-sm text-slate-300">All systems secure — no vulnerabilities found</span>
+              <span className="text-sm text-slate-300">
+                {vulns.total === 0
+                  ? 'All systems secure — no vulnerabilities found'
+                  : `${vulns.total} open vulnerabilities but no recent issues to display`}
+              </span>
             </div>
           ) : (
-            <div className="space-y-3">
-              {vulnerabilities.map((vuln) => {
-                const sev = vulnSeverityStyle(vuln.severity)
-                const stat = vulnStatusIcon(vuln.status)
-                const StatIcon = stat.icon
+            <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
+              {recentIssues.map((issue) => {
+                const sev = severityStyle(issue.severity)
+                const SevIcon = sev.icon
+                const isClosed = issue.status === 'closed' || issue.status === 'resolved'
                 return (
                   <div
-                    key={vuln.id}
+                    key={issue.id}
                     className={`rounded-lg border p-4 ${sev.bg} ${sev.border}`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2.5">
-                        <span className={`text-xs font-semibold ${sev.color}`}>{vuln.severity.toUpperCase()}</span>
-                        <span className="text-xs font-medium text-white">{vuln.package}</span>
+                        <SevIcon className={`w-3.5 h-3.5 flex-shrink-0 ${sev.color}`} />
+                        <span className={`text-xs font-semibold ${sev.color}`}>{issue.severity.toUpperCase()}</span>
+                        <span className="text-xs font-medium text-white">{issue.title}</span>
                       </div>
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${stat.color}`}>
-                        <StatIcon className="w-3 h-3" />
-                        {stat.label}
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-medium flex-shrink-0 ml-2 ${
+                        isClosed ? 'text-emerald-400' : 'text-red-400'
+                      }`}>
+                        {isClosed ? (
+                          <><CheckCircle2 className="w-3 h-3" /> Resolved</>
+                        ) : (
+                          <><XCircle className="w-3 h-3" /> Open</>
+                        )}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">{vuln.description}</p>
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                      {issue.page && (
+                        <span className="flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          {issue.page}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatTimeAgo(issue.createdAt)}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ─── Code Security ───────────────────────────────── */}
+      <div>
+        <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+          <Code className="w-4 h-4 text-red-400" />
+          Code Security
+          <span className="ml-auto flex items-center gap-2">
+            {(() => {
+              const sl = scanStatusLabel(codeScanStatus)
+              return (
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${sl.bg} ${sl.color}`}>
+                  {sl.label}
+                </span>
+              )
+            })()}
+          </span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Code scan card */}
+          <div className={`bg-slate-900 border rounded-xl p-4 transition-colors hover:border-slate-700 ${
+            codeScanStatus === 'completed' ? 'border-emerald-500/20' : codeScanStatus === 'partial' ? 'border-amber-500/20' : 'border-slate-800'
+          }`}>
+            <div className="flex items-start gap-3 mb-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                codeScanStatus === 'completed' ? 'bg-emerald-500/10' : codeScanStatus === 'partial' ? 'bg-amber-500/10' : 'bg-slate-500/10'
+              }`}>
+                {codeScanStatus === 'completed' ? (
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                ) : codeScanStatus === 'partial' ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Clock className="w-4 h-4 text-slate-400" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-white">Code Scan</div>
+                <div className="text-[10px] text-slate-500">Static analysis & vulnerability detection</div>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
+              {codeScanStatus === 'completed'
+                ? 'Full code security scan completed successfully.'
+                : codeScanStatus === 'partial'
+                ? 'Partial scan completed — some checks skipped.'
+                : 'No code security scan has been run yet.'}
+            </p>
+            <div className="flex items-center justify-between">
+              {(() => {
+                const sl = scanStatusLabel(codeScanStatus)
+                return (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${sl.bg} ${sl.color}`}>
+                    {sl.label}
+                  </span>
+                )
+              })()}
+              <span className="text-[10px] text-slate-600">
+                {formatTimeAgo(codeScanDate)}
+              </span>
+            </div>
+          </div>
+
+          {/* Dependency audit card */}
+          <div className={`bg-slate-900 border rounded-xl p-4 transition-colors hover:border-slate-700 ${
+            dependencyAuditStatus === 'passed' ? 'border-emerald-500/20' : dependencyAuditStatus === 'not_run' ? 'border-slate-800' : 'border-amber-500/20'
+          }`}>
+            <div className="flex items-start gap-3 mb-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                dependencyAuditStatus === 'passed' ? 'bg-emerald-500/10' : dependencyAuditStatus === 'not_run' ? 'bg-slate-500/10' : 'bg-amber-500/10'
+              }`}>
+                {dependencyAuditStatus === 'passed' ? (
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                ) : dependencyAuditStatus === 'not_run' ? (
+                  <Package className="w-4 h-4 text-slate-400" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-white">Dependency Audit</div>
+                <div className="text-[10px] text-slate-500">Third-party package security check</div>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
+              {dependencyAuditStatus === 'passed'
+                ? 'All dependencies passed security audit.'
+                : dependencyAuditStatus === 'not_run'
+                ? 'Dependency audit has not been run yet.'
+                : `Dependency audit status: ${dependencyAuditStatus}`}
+            </p>
+            <div className="flex items-center justify-between">
+              {(() => {
+                const sl = scanStatusLabel(dependencyAuditStatus)
+                return (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${sl.bg} ${sl.color}`}>
+                    {sl.label}
+                  </span>
+                )
+              })()}
+              <span className="text-[10px] text-slate-600">
+                {formatTimeAgo(security?.lastFullScan ?? null)}
+              </span>
+            </div>
+          </div>
+
+          {/* Security score card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 transition-colors hover:border-slate-700">
+            <div className="flex items-start gap-3 mb-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                securityScore >= 80 ? 'bg-emerald-500/10' : securityScore >= 60 ? 'bg-amber-500/10' : 'bg-red-500/10'
+              }`}>
+                <Shield className={`w-4 h-4 ${
+                  securityScore >= 80 ? 'text-emerald-400' : securityScore >= 60 ? 'text-amber-400' : 'text-red-400'
+                }`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-white">Security Score</div>
+                <div className="text-[10px] text-slate-500">Overall security posture rating</div>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
+              {securityScore >= 80
+                ? 'Security posture is strong. Keep it up!'
+                : securityScore >= 60
+                ? 'Some issues need attention to improve security.'
+                : securityScore > 0
+                ? 'Critical issues detected. Immediate action recommended.'
+                : 'No security score available yet.'}
+            </p>
+            <div className="flex items-center justify-between">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${
+                securityScore >= 80
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : securityScore >= 60
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  : securityScore > 0
+                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                  : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+              }`}>
+                {securityScore > 0 ? `${securityScore}/100` : 'N/A'}
+              </span>
+              <span className="text-[10px] text-slate-600">
+                {vulns.total} issues
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -415,87 +664,42 @@ export default function SecurityEnginePage() {
             <div className="col-span-5">Details</div>
           </div>
           {/* Rows */}
-          <div className="divide-y divide-slate-800/60">
-            {componentEntries.map(([name, check]) => {
-              const style = statusStyle(check.status)
-              const StyleIcon = style.icon
-              const Icon = componentIcon(name)
-              return (
-                <div
-                  key={name}
-                  className="grid grid-cols-12 gap-2 px-5 py-3 items-center text-sm hover:bg-slate-800/30 transition-colors"
-                >
-                  <div className="col-span-3 flex items-center gap-2">
-                    <Icon className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
-                    <span className="text-xs text-white font-medium truncate">{componentLabel(name)}</span>
+          {componentEntries.length === 0 ? (
+            <div className="px-5 py-6 text-center text-sm text-slate-500">
+              No system components found
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/60">
+              {componentEntries.map(([name, check]) => {
+                const style = statusStyle(check.status)
+                const StyleIcon = style.icon
+                const Icon = componentIcon(name)
+                return (
+                  <div
+                    key={name}
+                    className="grid grid-cols-12 gap-2 px-5 py-3 items-center text-sm hover:bg-slate-800/30 transition-colors"
+                  >
+                    <div className="col-span-3 flex items-center gap-2">
+                      <Icon className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
+                      <span className="text-xs text-white font-medium truncate">{componentLabel(name)}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${style.bg} ${style.color} ${style.border}`}>
+                        <StyleIcon className="w-3 h-3" />
+                        {style.label}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-xs text-slate-400 font-mono">{check.latency}ms</span>
+                    </div>
+                    <div className="col-span-5">
+                      <span className="text-[10px] text-slate-500 truncate block">{check.details}</span>
+                    </div>
                   </div>
-                  <div className="col-span-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${style.bg} ${style.color} ${style.border}`}>
-                      <StyleIcon className="w-3 h-3" />
-                      {style.label}
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-xs text-slate-400 font-mono">{check.latency}ms</span>
-                  </div>
-                  <div className="col-span-5">
-                    <span className="text-[10px] text-slate-500 truncate block">{check.details}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Code Security ───────────────────────────────── */}
-      <div>
-        <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <Code className="w-4 h-4 text-red-400" />
-          Code Security
-          <span className="ml-auto text-[10px] text-slate-500">System health scan</span>
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {codeScans.map((scan) => {
-            const Icon = componentIcon(scan.id)
-            return (
-              <div
-                key={scan.id}
-                className={`bg-slate-900 border rounded-xl p-4 transition-colors hover:border-slate-700 ${
-                  scan.result === 'warning' ? 'border-amber-500/20' : 'border-slate-800'
-                }`}
-              >
-                <div className="flex items-start gap-3 mb-2">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    scan.result === 'pass' ? 'bg-emerald-500/10' : 'bg-amber-500/10'
-                  }`}>
-                    {scan.result === 'pass' ? (
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-white">{scan.category}</div>
-                    <div className="text-[10px] text-slate-500">{scan.check}</div>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed mb-2">{scan.details}</p>
-                <div className="flex items-center justify-between">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${
-                    scan.result === 'pass'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                  }`}>
-                    {scan.result === 'pass' ? 'Pass' : 'Warning'}
-                  </span>
-                  <span className="text-[10px] text-slate-600">
-                    {scan.latency}ms
-                  </span>
-                </div>
-              </div>
-            )
-          })}
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -506,7 +710,7 @@ export default function SecurityEnginePage() {
           Dependency Audit
           <span className="ml-auto flex items-center gap-2">
             <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              {okCount} secure
+              {okCount} operational
             </span>
             {(degradedCount + downCount) > 0 && (
               <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
@@ -521,51 +725,97 @@ export default function SecurityEnginePage() {
             <div className="col-span-3">Component</div>
             <div className="col-span-3">Status</div>
             <div className="col-span-4">Details</div>
-            <div className="col-span-2 text-right">Checked</div>
+            <div className="col-span-2 text-right">Category</div>
           </div>
           {/* Rows */}
-          <div className="divide-y divide-slate-800/60 max-h-96 overflow-y-auto custom-scrollbar">
-            {dependencyAudit.map((dep) => {
-              const style = depStatusStyle(dep.status)
-              const Icon = componentIcon(dep.id)
-              return (
+          {componentEntries.length === 0 ? (
+            <div className="px-5 py-6 text-center text-sm text-slate-500">
+              No dependency audit data available
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/60 max-h-96 overflow-y-auto custom-scrollbar">
+              {componentEntries.map(([name, c]) => {
+                const style = statusStyle(c.status)
+                const Icon = componentIcon(name)
+                const category = componentCategory(name)
+                return (
+                  <div
+                    key={name}
+                    className="grid grid-cols-12 gap-2 px-5 py-3 items-center text-sm hover:bg-slate-800/30 transition-colors"
+                  >
+                    <div className="col-span-3 flex items-center gap-2">
+                      <Icon className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
+                      <span className="text-xs text-white font-medium truncate">{componentLabel(name)}</span>
+                    </div>
+                    <div className="col-span-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${style.bg} ${style.color} ${style.border}`}>
+                        {style.label}
+                      </span>
+                    </div>
+                    <div className="col-span-4 text-[10px] text-slate-500 truncate">{c.details}</div>
+                    <div className="col-span-2 text-[10px] text-slate-600 text-right">{category}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Recent Fallbacks / Blocked Actions ──────────── */}
+      {recentFallbacks.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-red-400" />
+            Recent Blocked Actions
+            <span className="ml-auto text-[10px] text-slate-500">{recentFallbacks.length} recent</span>
+          </h2>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="grid grid-cols-12 gap-2 px-5 py-3 border-b border-slate-800 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="col-span-3">Engine</div>
+              <div className="col-span-3">Action</div>
+              <div className="col-span-6 text-right">Time</div>
+            </div>
+            <div className="divide-y divide-slate-800/60 max-h-64 overflow-y-auto custom-scrollbar">
+              {recentFallbacks.map((fb) => (
                 <div
-                  key={dep.id}
+                  key={fb.id}
                   className="grid grid-cols-12 gap-2 px-5 py-3 items-center text-sm hover:bg-slate-800/30 transition-colors"
                 >
                   <div className="col-span-3 flex items-center gap-2">
-                    <Icon className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
-                    <span className="text-xs text-white font-medium truncate">{dep.name}</span>
+                    <XCircle className="w-3 h-3 text-red-400 flex-shrink-0" />
+                    <span className="text-xs text-white font-medium truncate">{fb.engine}</span>
                   </div>
                   <div className="col-span-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${style.bg} ${style.color}`}>
-                      {style.label}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border bg-red-500/10 text-red-400 border-red-500/20">
+                      {fb.action}
                     </span>
                   </div>
-                  <div className="col-span-4 text-[10px] text-slate-500 truncate">{dep.details}</div>
-                  <div className="col-span-2 text-[10px] text-slate-600 text-right flex items-center justify-end gap-1">
+                  <div className="col-span-6 text-[10px] text-slate-500 text-right flex items-center justify-end gap-1">
                     <Clock className="w-2.5 h-2.5" />
-                    {dep.latency}ms
+                    {formatTimeAgo(fb.createdAt)}
                   </div>
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ─── Footer ──────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Lock className="w-3.5 h-3.5 text-red-400" />
-          <span>Overall: <span className={overallStatus === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}>{overallStatus}</span></span>
+          <span>Overall: <span className={overallStatus === 'operational' ? 'text-emerald-400' : 'text-amber-400'}>{overallStatus}</span></span>
         </div>
         <span className="text-slate-700">|</span>
-        <span>Issues: <span className={downCount > 0 ? 'text-red-400' : 'text-emerald-400'}>{downCount}</span></span>
+        <span>Score: <span className={securityScore >= 80 ? 'text-emerald-400' : securityScore >= 60 ? 'text-amber-400' : securityScore > 0 ? 'text-red-400' : 'text-slate-400'}>{securityScore > 0 ? securityScore : 'N/A'}</span></span>
+        <span className="text-slate-700">|</span>
+        <span>Vulnerabilities: <span className={vulns.total > 0 ? 'text-red-400' : 'text-emerald-400'}>{vulns.total}</span></span>
         <span className="text-slate-700">|</span>
         <span>Components: <span className="text-slate-300">{componentEntries.length} scanned</span></span>
         <span className="text-slate-700">|</span>
-        <span>Environment: <span className="text-slate-300">{data?.environment || 'unknown'}</span></span>
+        <span>Code Scan: <span className={codeScanStatus === 'completed' ? 'text-emerald-400' : 'text-amber-400'}>{codeScanStatus}</span></span>
       </div>
     </div>
   )

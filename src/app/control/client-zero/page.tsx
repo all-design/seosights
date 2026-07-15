@@ -33,7 +33,7 @@ interface ClientZeroScoreDelta {
 }
 
 interface ClientZeroData {
-  kpi: ClientZeroKPI | null
+  score: ClientZeroKPI | number | null
   deltas: ClientZeroScoreDelta[]
 }
 
@@ -110,7 +110,9 @@ export default function ClientZeroPage() {
 
   if (!data) return null
 
-  const { kpi, deltas } = data.clientZero
+  const clientZero = data.clientZero || { score: null, deltas: [] }
+  const kpi = typeof clientZero.score === 'object' ? clientZero.score : null
+  const deltas = clientZero.deltas || []
 
   // Compute per-engine scores from deltas
   const engineScores: Record<string, number> = {}
@@ -120,22 +122,15 @@ export default function ClientZeroPage() {
     }
     engineScores[delta.engine] += delta.scoreDelta
   }
-  // Add base scores if we have a KPI
+  // Add base scores if we have a KPI with visibility score
   if (kpi?.aiVisibilityScore) {
     const basePerEngine = Math.round(kpi.aiVisibilityScore / Math.max(Object.keys(engineScores).length, 1))
     for (const engine of Object.keys(engineScores)) {
       engineScores[engine] = Math.max(0, Math.min(100, basePerEngine + Math.round(engineScores[engine])))
     }
-  } else if (Object.keys(engineScores).length === 0) {
-    // Default engine scores
-    engineScores.chatgpt = 72
-    engineScores.claude = 55
-    engineScores.gemini = 61
-    engineScores.perplexity = 78
-    engineScores.copilot = 48
   }
 
-  const currentScore = kpi?.aiVisibilityScore ?? 0
+  const currentScore = kpi?.aiVisibilityScore ?? (typeof clientZero.score === 'number' ? clientZero.score : 0)
   const totalDelta = deltas.reduce((sum, d) => sum + d.scoreDelta, 0)
   const canGrow = totalDelta > 0 || currentScore < 90
   const goal = 90
@@ -233,7 +228,7 @@ export default function ClientZeroPage() {
       </div>
 
       {/* Per-Engine Score Breakdown */}
-      {engineEntries.length > 0 && (
+      {engineEntries.length > 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Eye className="w-4 h-4 text-purple-400" />
@@ -257,6 +252,12 @@ export default function ClientZeroPage() {
               )
             })}
           </div>
+        </div>
+      ) : (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+          <Eye className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-sm font-semibold text-white">No engine score data</h3>
+          <p className="text-xs text-slate-500 mt-1">Per-engine AI visibility scores will appear once score deltas are tracked.</p>
         </div>
       )}
 

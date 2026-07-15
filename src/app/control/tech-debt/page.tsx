@@ -113,19 +113,23 @@ export default function TechDebtEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
-        // Derive scan data from unified response
+        const td = json.techDebt || {}
+        const snap = td.snapshot || null
+        // Derive scan data from techDebt section of unified response
         setScanData({
           stats: {
-            totalComponents: 0,
-            totalAPIRoutes: 0,
-            totalPrismaModels: 0,
-            totalPages: 0,
+            totalComponents: snap?.components ?? 0,
+            totalAPIRoutes: td.apiRoutes ?? 0,
+            totalPrismaModels: td.prismaModels ?? 0,
+            totalPages: snap?.pages ?? 0,
             totalHooks: 0,
             totalLibs: 0,
-            lintErrors: 0,
-            lintWarnings: 0,
-            typescriptErrors: 0,
+            lintErrors: td.lintErrors ?? 0,
+            lintWarnings: td.lintWarnings ?? 0,
+            typescriptErrors: td.typescriptErrors ?? 0,
           },
+          techDebt: td,
+          snapshot: snap,
           components: [],
           apiRoutes: [],
           prismaModels: [],
@@ -182,13 +186,16 @@ export default function TechDebtEnginePage() {
   const pages: any[] = scanData?.pages || []
   const scanTimestamp = scanData?.timestamp
 
-  // Calculate debt score from scan stats (lower is better)
+  // Use real debt score from API if available, otherwise calculate from scan stats
   const lintErrors = stats?.lintErrors || 0
   const lintWarnings = stats?.lintWarnings || 0
   const tsErrors = stats?.typescriptErrors || 0
-  const debtScore = Math.min(100, Math.max(0, lintErrors * 10 + lintWarnings * 2 + tsErrors * 8))
+  const apiRouteCount = scanData?.techDebt?.apiRoutes ?? 0
+  const prismaModelCount = scanData?.techDebt?.prismaModels ?? 0
+  const snapshot = scanData?.snapshot ?? null
+  const debtScore = scanData?.techDebt?.technicalDebtScore ?? Math.min(100, Math.max(0, lintErrors * 10 + lintWarnings * 2 + tsErrors * 8))
 
-  // Build findings from scan data
+  // Build findings from techDebt data
   const findings: Finding[] = []
   if (lintErrors > 0) {
     findings.push({
@@ -218,24 +225,46 @@ export default function TechDebtEnginePage() {
     })
   }
 
-  // Check for potentially dead API routes (routes with no methods or empty handlers)
-  if (apiRoutes.length > 50) {
+  // Check for duplicate code from snapshot
+  if (snapshot && snapshot.duplicates > 0) {
     findings.push({
-      title: `Large API surface: ${apiRoutes.length} routes`,
+      title: `${snapshot.duplicates} duplicate code region${snapshot.duplicates !== 1 ? 's' : ''} detected`,
+      severity: snapshot.duplicates > 10 ? 'high' : 'medium',
+      filePath: 'Project-wide',
+      description: `Codebase scan found ${snapshot.duplicates} duplicate code regions that increase maintenance burden.`,
+      suggestedAction: 'Refactor duplicated code into shared utilities or components',
+    })
+  }
+
+  // Check for dead code from snapshot
+  if (snapshot && snapshot.deadCode > 0) {
+    findings.push({
+      title: `${snapshot.deadCode} dead code region${snapshot.deadCode !== 1 ? 's' : ''} detected`,
+      severity: snapshot.deadCode > 10 ? 'medium' : 'low',
+      filePath: 'Project-wide',
+      description: `Codebase scan found ${snapshot.deadCode} regions of potentially dead or unreachable code.`,
+      suggestedAction: 'Remove unused code to reduce bundle size and improve maintainability',
+    })
+  }
+
+  // Check for potentially large API surface
+  if (apiRouteCount > 50) {
+    findings.push({
+      title: `Large API surface: ${apiRouteCount} routes`,
       severity: 'medium',
       filePath: 'src/app/api/',
-      description: `The codebase has ${apiRoutes.length} API routes. Consider auditing for unused or redundant endpoints.`,
+      description: `The codebase has ${apiRouteCount} API routes. Consider auditing for unused or redundant endpoints.`,
       suggestedAction: 'Audit API routes for unused endpoints and consolidate where possible',
     })
   }
 
-  // Check for duplicate model patterns
-  if (prismaModels.length > 30) {
+  // Check for large schema
+  if (prismaModelCount > 30) {
     findings.push({
-      title: `Large schema: ${prismaModels.length} Prisma models`,
+      title: `Large schema: ${prismaModelCount} Prisma models`,
       severity: 'low',
       filePath: 'prisma/schema.prisma',
-      description: `The database schema has ${prismaModels.length} models. Some may be unused or could be consolidated.`,
+      description: `The database schema has ${prismaModelCount} models. Some may be unused or could be consolidated.`,
       suggestedAction: 'Review Prisma schema for unused models and potential consolidation',
     })
   }
@@ -244,8 +273,8 @@ export default function TechDebtEnginePage() {
     { label: 'Lint Errors', value: lintErrors, icon: FileCode2, color: lintErrors > 0 ? 'text-red-400' : 'text-emerald-400' },
     { label: 'Lint Warnings', value: lintWarnings, icon: AlertTriangle, color: lintWarnings > 10 ? 'text-amber-400' : 'text-slate-400' },
     { label: 'TS Errors', value: tsErrors, icon: Database, color: tsErrors > 0 ? 'text-red-400' : 'text-emerald-400' },
-    { label: 'API Routes', value: apiRoutes.length, icon: ArrowRight, color: 'text-slate-400' },
-    { label: 'Components', value: components.length, icon: FileCode2, color: 'text-slate-400' },
+    { label: 'API Routes', value: apiRouteCount, icon: ArrowRight, color: 'text-slate-400' },
+    { label: 'Components', value: stats?.totalComponents ?? 0, icon: FileCode2, color: 'text-slate-400' },
   ]
 
   // Auto-fixable items
@@ -447,14 +476,30 @@ export default function TechDebtEnginePage() {
               <div className="text-[10px] text-slate-500 mt-0.5">Pages</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
-              <div className="text-xl font-bold text-white">{stats.totalHooks}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Hooks</div>
+              <div className="text-xl font-bold text-white">{snapshot?.totalFiles ?? 0}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Total Files</div>
             </div>
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
-              <div className="text-xl font-bold text-white">{stats.totalLibs}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">Libs</div>
+              <div className="text-xl font-bold text-white">{snapshot?.totalLines?.toLocaleString() ?? 0}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Total Lines</div>
             </div>
           </div>
+          {snapshot && (snapshot.duplicates > 0 || snapshot.deadCode > 0) && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+                <div className="text-xl font-bold text-white">{snapshot.duplicates}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Duplicates</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+                <div className="text-xl font-bold text-white">{snapshot.deadCode}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Dead Code</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3 text-center">
+                <div className="text-xl font-bold text-white">{snapshot.avgFileSize}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Avg File Size (loc)</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

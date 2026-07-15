@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import {
-  Brain, TrendingUp, Shield, CalendarClock, Package, Target, Search,
+  Shield, CalendarClock, Package, Target, Search,
   Activity, CheckCircle2, Clock, ArrowRight, Zap,
-  BarChart3, Eye, Factory, Landmark, Code2, GitMerge, Rocket,
-  RotateCcw, GraduationCap, Bug, Lock, Gauge,
+  Eye, Factory, Landmark, Code2, GitMerge, Rocket,
+  RotateCcw, GraduationCap, Lock, Gauge,
   Database, Route, DollarSign, AlertTriangle,
 } from 'lucide-react'
 
@@ -20,13 +20,27 @@ interface SystemHealth {
 }
 
 interface Counts {
-  factoryTask: number
-  interception: number
-  mission: number
-  qaRun: number
-  snapshot: number
-  memory: number
-  changelog: number
+  factoryTasks: number
+  interceptions: number
+  missions: number
+  qaRuns: number
+  snapshots: number
+  memories: number
+  changelogs: number
+}
+
+interface ScheduleSummary {
+  totalJobs: number
+  completed: number
+  running: number
+  pending: number
+  failed: number
+}
+
+interface LatestQA {
+  id: string
+  createdAt: string
+  [key: string]: unknown
 }
 
 interface TodayMission {
@@ -62,6 +76,9 @@ interface ControlData {
   todayMission: TodayMission | null
   recentActivity: ActivityItem[]
   aiProviders: AIProviders
+  scheduleSummary: ScheduleSummary | null
+  latestQA: LatestQA | null
+  recentMemories: { createdAt: string; [key: string]: unknown }[]
   // Other sections exist but this page only uses the above
   [key: string]: unknown
 }
@@ -101,27 +118,25 @@ interface SystemCardDef {
   color: string
   href: string
   statusKey?: keyof SystemHealth
-  customStatus?: string
-  customHealth?: number
-  customAction?: string
+  actionLabel?: string
 }
 
 const systemCardDefs: SystemCardDef[] = [
-  { name: 'Observatory', icon: Search, description: 'AI model research & monitoring', color: 'amber', href: '/control/observatory', statusKey: 'codebaseScanner', customAction: 'Scanning codebase' },
-  { name: 'Product Engine', icon: Package, description: 'Product analysis & recommendations', color: 'rose', href: '/control/product', customStatus: 'running', customHealth: 91, customAction: 'Analyzing product' },
-  { name: 'Architecture Engine', icon: Landmark, description: 'Staff Engineer — where code goes', color: 'cyan', href: '/control/architecture', customStatus: 'running', customHealth: 87, customAction: 'Planning architecture' },
-  { name: 'Engineering Engine', icon: Code2, description: 'Writes code on branches only', color: 'violet', href: '/control/engineering', customStatus: 'running', customHealth: 94, customAction: 'Writing code' },
-  { name: 'QA Engine', icon: Shield, description: 'Quality & stability checks', color: 'blue', href: '/control/qa', statusKey: 'qaEngine', customAction: 'Running checks' },
-  { name: 'Review Engine', icon: Eye, description: 'Design system & philosophy checks', color: 'amber', href: '/control/review', customStatus: 'healthy', customHealth: 91, customAction: 'Reviewing' },
-  { name: 'Security Engine', icon: Lock, description: 'Vulnerability & dependency scanning', color: 'red', href: '/control/security', customStatus: 'monitoring', customHealth: 96, customAction: 'Scanning' },
-  { name: 'Performance Engine', icon: Gauge, description: 'Core Web Vitals & budgets', color: 'orange', href: '/control/performance', customStatus: 'monitoring', customHealth: 94, customAction: 'Monitoring' },
-  { name: 'Merge Engine', icon: GitMerge, description: 'PR creation & gate enforcement', color: 'emerald', href: '/control/merge', customStatus: 'healthy', customHealth: 100, customAction: 'Processing PRs' },
-  { name: 'Deploy Engine', icon: Rocket, description: 'Production deployment', color: 'cyan', href: '/control/deploy', customStatus: 'idle', customHealth: 98, customAction: 'Standing by' },
-  { name: 'Replay Engine', icon: RotateCcw, description: 'Post-deploy metric tracking', color: 'amber', href: '/control/replay', customStatus: 'monitoring', customHealth: 92, customAction: 'Tracking metrics' },
-  { name: 'Learning Engine', icon: GraduationCap, description: 'Pattern learning & confidence', color: 'emerald', href: '/control/learning', customStatus: 'learning', customHealth: 81, customAction: 'Learning patterns' },
-  { name: 'Engineering Memory', icon: Database, description: 'Change tracking & pattern memory', color: 'indigo', href: '/control/engineering-memory', customStatus: 'recording', customHealth: 87, customAction: 'Recording patterns' },
-  { name: 'AI Router', icon: Route, description: 'Free AI Mesh™ — model routing', color: 'emerald', href: '/control/ai-router', statusKey: 'aiRouter', customAction: 'Routing requests' },
-  { name: 'AI Cost Dashboard', icon: DollarSign, description: 'LLM cost tracking — 100% free', color: 'emerald', href: '/control/ai-cost', customStatus: 'monitoring', customHealth: 100, customAction: 'Tracking costs' },
+  { name: 'Observatory', icon: Search, description: 'AI model research & monitoring', color: 'amber', href: '/control/observatory', statusKey: 'codebaseScanner', actionLabel: 'Scanning codebase' },
+  { name: 'Product Engine', icon: Package, description: 'Product analysis & recommendations', color: 'rose', href: '/control/product', actionLabel: 'Analyzing product' },
+  { name: 'Architecture Engine', icon: Landmark, description: 'Staff Engineer — where code goes', color: 'cyan', href: '/control/architecture', actionLabel: 'Planning architecture' },
+  { name: 'Engineering Engine', icon: Code2, description: 'Writes code on branches only', color: 'violet', href: '/control/engineering', actionLabel: 'Writing code' },
+  { name: 'QA Engine', icon: Shield, description: 'Quality & stability checks', color: 'blue', href: '/control/qa', statusKey: 'qaEngine', actionLabel: 'Running checks' },
+  { name: 'Review Engine', icon: Eye, description: 'Design system & philosophy checks', color: 'amber', href: '/control/review', actionLabel: 'Reviewing' },
+  { name: 'Security Engine', icon: Lock, description: 'Vulnerability & dependency scanning', color: 'red', href: '/control/security', actionLabel: 'Scanning' },
+  { name: 'Performance Engine', icon: Gauge, description: 'Core Web Vitals & budgets', color: 'orange', href: '/control/performance', actionLabel: 'Monitoring' },
+  { name: 'Merge Engine', icon: GitMerge, description: 'PR creation & gate enforcement', color: 'emerald', href: '/control/merge', actionLabel: 'Processing PRs' },
+  { name: 'Deploy Engine', icon: Rocket, description: 'Production deployment', color: 'cyan', href: '/control/deploy', actionLabel: 'Standing by' },
+  { name: 'Replay Engine', icon: RotateCcw, description: 'Post-deploy metric tracking', color: 'amber', href: '/control/replay', actionLabel: 'Tracking metrics' },
+  { name: 'Learning Engine', icon: GraduationCap, description: 'Pattern learning & confidence', color: 'emerald', href: '/control/learning', actionLabel: 'Learning patterns' },
+  { name: 'Engineering Memory', icon: Database, description: 'Change tracking & pattern memory', color: 'indigo', href: '/control/engineering-memory', actionLabel: 'Recording patterns' },
+  { name: 'AI Router', icon: Route, description: 'Free AI Mesh™ — model routing', color: 'emerald', href: '/control/ai-router', statusKey: 'aiRouter', actionLabel: 'Routing requests' },
+  { name: 'AI Cost Dashboard', icon: DollarSign, description: 'LLM cost tracking — 100% free', color: 'emerald', href: '/control/ai-cost', actionLabel: 'Tracking costs' },
 ]
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -174,6 +189,112 @@ function apiStatusToDisplay(status: string): string {
   }
 }
 
+// ── Derive real status from actual DB data ───────────────────
+
+interface DerivedStatus {
+  status: string
+  health: number
+  lastAction: string
+}
+
+function hoursSince(dateStr: string): number {
+  return (Date.now() - new Date(dateStr).getTime()) / 3600000
+}
+
+function countToStatus(count: number, activeLabel: string, idleLabel: string): DerivedStatus {
+  if (count > 10) return { status: 'running', health: 97, lastAction: activeLabel }
+  if (count > 0) return { status: 'running', health: 90, lastAction: activeLabel }
+  return { status: 'offline', health: 30, lastAction: idleLabel }
+}
+
+function deriveStatus(
+  cardName: string,
+  counts: Counts,
+  scheduleSummary: ScheduleSummary | null,
+  aiProviders: AIProviders,
+  latestQA: LatestQA | null,
+  recentMemories: { createdAt: string }[],
+): DerivedStatus {
+  switch (cardName) {
+    case 'Product Engine':
+      return countToStatus(counts.missions, 'Analyzing product', 'No product data')
+
+    case 'Architecture Engine':
+      return countToStatus(counts.snapshots, 'Planning architecture', 'No snapshots recorded')
+
+    case 'Engineering Engine':
+      return countToStatus(counts.factoryTasks, 'Writing code', 'No tasks recorded')
+
+    case 'Review Engine': {
+      if (latestQA) {
+        const h = hoursSince(latestQA.createdAt)
+        if (h < 24) return { status: 'running', health: 92, lastAction: 'Reviewing recent changes' }
+        if (h < 168) return { status: 'idle', health: 60, lastAction: 'Last review was days ago' }
+        return { status: 'idle', health: 50, lastAction: 'No recent reviews' }
+      }
+      return countToStatus(counts.qaRuns, 'Reviewing', 'No review data')
+    }
+
+    case 'Security Engine':
+      return countToStatus(counts.interceptions, 'Scanning for vulnerabilities', 'No interception data')
+
+    case 'Performance Engine': {
+      if (latestQA) {
+        const h = hoursSince(latestQA.createdAt)
+        if (h < 24) return { status: 'monitoring', health: 93, lastAction: 'Monitoring performance' }
+        if (h < 168) return { status: 'idle', health: 55, lastAction: 'Last check was days ago' }
+        return { status: 'idle', health: 45, lastAction: 'No recent performance data' }
+      }
+      return countToStatus(counts.qaRuns, 'Monitoring', 'No performance data')
+    }
+
+    case 'Merge Engine':
+      return countToStatus(counts.factoryTasks, 'Processing PRs', 'No merge activity')
+
+    case 'Deploy Engine': {
+      if (!scheduleSummary || scheduleSummary.totalJobs === 0) {
+        return { status: 'offline', health: 30, lastAction: 'No deployment data' }
+      }
+      if (scheduleSummary.running > 0) return { status: 'running', health: 95, lastAction: 'Deploying' }
+      if (scheduleSummary.failed > 0) return { status: 'warning', health: 55, lastAction: `${scheduleSummary.failed} failed deployment(s)` }
+      if (scheduleSummary.completed > 0) return { status: 'idle', health: 70, lastAction: 'Standing by' }
+      if (scheduleSummary.pending > 0) return { status: 'idle', health: 60, lastAction: 'Pending deployments' }
+      return { status: 'offline', health: 30, lastAction: 'No deployment data' }
+    }
+
+    case 'Replay Engine':
+      return countToStatus(counts.qaRuns, 'Tracking metrics', 'No replay data')
+
+    case 'Learning Engine': {
+      if (recentMemories.length > 0) {
+        const h = hoursSince(recentMemories[0].createdAt)
+        if (h < 24) return { status: 'running', health: 95, lastAction: 'Learning patterns' }
+        if (h < 168) return { status: 'idle', health: 60, lastAction: 'Last learning was days ago' }
+        return { status: 'idle', health: 50, lastAction: 'No recent learning' }
+      }
+      return countToStatus(counts.memories, 'Learning patterns', 'No learning data')
+    }
+
+    case 'Engineering Memory': {
+      if (recentMemories.length > 0) {
+        const h = hoursSince(recentMemories[0].createdAt)
+        if (h < 24) return { status: 'running', health: 95, lastAction: 'Recording patterns' }
+        if (h < 168) return { status: 'idle', health: 60, lastAction: 'Last record was days ago' }
+        return { status: 'idle', health: 50, lastAction: 'No recent records' }
+      }
+      const total = counts.memories + counts.changelogs
+      return countToStatus(total, 'Recording patterns', 'No memory data')
+    }
+
+    case 'AI Cost Dashboard':
+      if (aiProviders.configured.length > 0) return { status: 'monitoring', health: 95, lastAction: 'Tracking costs' }
+      return { status: 'offline', health: 30, lastAction: 'No AI providers configured' }
+
+    default:
+      return { status: 'idle', health: 50, lastAction: 'No data available' }
+  }
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const minutes = Math.floor(diff / 60000)
@@ -198,7 +319,12 @@ export default function ControlOverview() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
-        setData(json)
+        // API wraps data in `factory` — normalize so the rest of the page
+        // can access data.system, data.counts, etc. directly
+        const normalized: ControlData = json.factory
+          ? { ...json.factory, ok: true }
+          : { ...json, ok: json.ok ?? true }
+        setData(normalized)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -250,15 +376,15 @@ export default function ControlOverview() {
 
   if (!data) return null
 
-  // Map counts to the old format for compatibility
+  // Map counts to display-friendly names
   const counts = {
-    factoryTasks: data.counts.factoryTask,
-    governorInterceptions: data.counts.interception,
-    dailyMissions: data.counts.mission,
-    qaRuns: data.counts.qaRun,
-    codebaseSnapshots: data.counts.snapshot,
-    engineeringMemories: data.counts.memory,
-    factoryChangelogs: data.counts.changelog,
+    factoryTasks: data.counts?.factoryTasks ?? 0,
+    governorInterceptions: data.counts?.interceptions ?? 0,
+    dailyMissions: data.counts?.missions ?? 0,
+    qaRuns: data.counts?.qaRuns ?? 0,
+    codebaseSnapshots: data.counts?.snapshots ?? 0,
+    engineeringMemories: data.counts?.memories ?? 0,
+    factoryChangelogs: data.counts?.changelogs ?? 0,
   }
 
   const todayMission = data.todayMission ? {
@@ -270,20 +396,27 @@ export default function ControlOverview() {
   } : null
 
   // Derive system cards with real data
+  const apiCounts = data.counts ?? { factoryTasks: 0, interceptions: 0, missions: 0, qaRuns: 0, snapshots: 0, memories: 0, changelogs: 0 }
+  const scheduleSummary = (data.scheduleSummary ?? null) as ScheduleSummary | null
+  const latestQA = (data.latestQA ?? null) as LatestQA | null
+  const recentMemories = (data.recentMemories ?? []) as { createdAt: string }[]
+
   const systemCards = systemCardDefs.map((def) => {
     let status: string
     let health: number
     let lastAction: string
 
-    if (def.statusKey && data.system[def.statusKey]) {
+    if (def.statusKey && data.system?.[def.statusKey]) {
       const apiStatus = data.system[def.statusKey]
       status = apiStatusToDisplay(apiStatus)
       health = apiStatusToHealth(apiStatus)
       lastAction = apiStatus === 'operational' ? `${def.name} is operational` : apiStatus === 'degraded' ? `${def.name} is degraded` : `${def.name} is offline`
     } else {
-      status = def.customStatus || 'idle'
-      health = def.customHealth || 50
-      lastAction = def.customAction || 'No recent activity'
+      // Derive real status from actual DB data instead of hardcoded values
+      const derived = deriveStatus(def.name, apiCounts, scheduleSummary, data.aiProviders, latestQA, recentMemories)
+      status = derived.status
+      health = derived.health
+      lastAction = derived.lastAction
     }
 
     return { ...def, status, health, lastAction }
@@ -292,7 +425,8 @@ export default function ControlOverview() {
   const overallHealth = Math.round(systemCards.reduce((sum, s) => sum + s.health, 0) / systemCards.length)
   const runningCount = systemCards.filter(s => ['running', 'healthy', 'operational'].includes(s.status)).length
   const monitoringCount = systemCards.filter(s => s.status === 'monitoring').length
-  const degradedCount = systemCards.filter(s => ['collecting', 'degraded'].includes(s.status)).length
+  const degradedCount = systemCards.filter(s => ['collecting', 'degraded', 'warning'].includes(s.status)).length
+  const offlineCount = systemCards.filter(s => s.status === 'offline').length
   const idleCount = systemCards.filter(s => s.status === 'idle').length
 
   return (
@@ -304,13 +438,13 @@ export default function ControlOverview() {
       </div>
 
       {/* Overall Health Banner */}
-      <div className="bg-gradient-to-r from-emerald-500/10 via-slate-900 to-slate-900 border border-emerald-500/20 rounded-xl p-6">
+      <div className={`bg-gradient-to-r ${overallHealth >= 90 ? 'from-emerald-500/10 border-emerald-500/20' : overallHealth >= 70 ? 'from-amber-500/10 border-amber-500/20' : 'from-red-500/10 border-red-500/20'} via-slate-900 to-slate-900 border rounded-xl p-6`}>
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Platform Health</div>
             <div className="flex items-baseline gap-3">
-              <span className="text-5xl font-bold text-emerald-400">{overallHealth}%</span>
-              <span className="text-sm text-emerald-400/60">{systemCards.length} systems tracked</span>
+              <span className={`text-5xl font-bold ${overallHealth >= 90 ? 'text-emerald-400' : overallHealth >= 70 ? 'text-amber-400' : 'text-red-400'}`}>{overallHealth}%</span>
+              <span className={`text-sm ${overallHealth >= 90 ? 'text-emerald-400/60' : overallHealth >= 70 ? 'text-amber-400/60' : 'text-red-400/60'}`}>{systemCards.length} systems tracked</span>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-6">
@@ -329,6 +463,10 @@ export default function ControlOverview() {
             <div className="text-center">
               <div className="text-2xl font-bold text-slate-400">{idleCount}</div>
               <div className="text-[10px] text-slate-500 uppercase">Idle</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-400">{offlineCount}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Offline</div>
             </div>
           </div>
         </div>

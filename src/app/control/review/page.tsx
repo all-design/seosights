@@ -140,11 +140,11 @@ export default function ReviewEnginePage() {
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
         setFactoryData({
-          system: json.system || {},
-          counts: json.counts || {},
+          system: json.factory?.system || {},
+          counts: json.factory?.counts || {},
           ok: json.ok ?? true,
         })
-        const qaRun = json.productQA || json.latestQA
+        const qaRun = json.productQA || json.factory?.latestQA
         if (qaRun) {
           setQAData({
             hasData: true,

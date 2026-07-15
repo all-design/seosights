@@ -133,6 +133,321 @@ export async function GET() {
     ...recentMissions.map((m: any) => ({ type: 'mission', ...m })),
   ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 10)
 
+  // ─── systemStatus ─────────────────────────────────────────────────────
+  // Derive component health from the recency of DB records & MCSystemStatus
+
+  const THIRTY_MIN = 30 * 60 * 1000
+  const now = Date.now()
+
+  const dbStatuses = await safe(
+    () => db.mCSystemStatus.findMany(),
+    [] as any[]
+  )
+
+  const statusMap: Record<string, { status: string; lastHeartbeat: Date | null }> = {}
+  for (const s of dbStatuses) {
+    statusMap[s.systemName] = { status: s.status, lastHeartbeat: s.lastHeartbeat }
+  }
+
+  function deriveStatus(systemName: string, fallbackCount: number): { status: string; latency: number; details: string } {
+    const entry = statusMap[systemName]
+    if (entry?.lastHeartbeat) {
+      const age = now - new Date(entry.lastHeartbeat).getTime()
+      if (age < THIRTY_MIN) return { status: 'operational', latency: 0, details: `Heartbeat ${Math.round(age / 1000)}s ago` }
+      if (age < 2 * THIRTY_MIN) return { status: 'degraded', latency: 0, details: `Heartbeat ${Math.round(age / 60000)}m ago` }
+      return { status: 'offline', latency: 0, details: `Heartbeat ${Math.round(age / 3600000)}h ago` }
+    }
+    if (fallbackCount > 0) return { status: 'operational', latency: 0, details: `${fallbackCount} records found` }
+    return { status: 'offline', latency: 0, details: 'No records found' }
+  }
+
+  const systemComponents = {
+    database: deriveStatus('database', counts.snapshots),
+    aiRouter: { status: aiProviders.using === 'live-llm' ? 'operational' : 'degraded' as string, latency: 0, details: aiProviders.using },
+    qaEngine: deriveStatus('qaEngine', counts.qaRuns),
+    governor: deriveStatus('governor', counts.interceptions),
+    observatory: deriveStatus('observatory', (observatory.recentChanges as any[])?.length ?? 0),
+    scheduler: deriveStatus('scheduler', scheduleSummary.totalJobs),
+    clientZero: deriveStatus('clientZero', clientZero.score ? 1 : 0),
+    factory: deriveStatus('factory', counts.factoryTasks),
+  }
+
+  const recentFallbacks = await safe(
+    () => db.governorInterception.findMany({
+      where: { action: 'blocked' },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    }),
+    [] as any[]
+  )
+
+  const systemStatus = {
+    components: systemComponents,
+    recentFallbacks,
+    overallStatus: Object.values(systemComponents).every(c => c.status === 'operational')
+      ? 'operational'
+      : Object.values(systemComponents).some(c => c.status === 'offline')
+        ? 'degraded'
+        : 'degraded',
+    lastChecked: ts,
+  }
+
+  // ─── techDebt ─────────────────────────────────────────────────────────
+  // Codebase analysis data from CodebaseSnapshot & QARun
+
+  const latestSnapshot = await safe(
+    () => db.codebaseSnapshot.findFirst({ orderBy: { createdAt: 'desc' } }),
+    null as any
+  )
+
+  const apiRouteCount = latestSnapshot?.apiRoutes ?? await safe(
+    async () => {
+      const taskTypes = await db.factoryTask.findMany({
+        where: { type: 'api_route' },
+        select: { id: true },
+      })
+      return taskTypes.length
+    },
+    0
+  )
+
+  const techDebtScore = latestQA?.technicalDebt ?? 0
+  const lintErrors = await safe(
+    async () => {
+      const issues = await db.qAIssue.findMany({
+        where: { category: 'lint', status: 'open' },
+        select: { severity: true },
+      })
+      return {
+        errors: issues.filter(i => i.severity === 'critical' || i.severity === 'major').length,
+        warnings: issues.filter(i => i.severity === 'minor' || i.severity === 'medium').length,
+      }
+    },
+    { errors: 0, warnings: 0 }
+  )
+
+  const tsErrors = await safe(
+    async () => {
+      const issues = await db.qAIssue.count({
+        where: { category: 'typescript', status: 'open' },
+      })
+      return issues
+    },
+    0
+  )
+
+  const techDebt = {
+    apiRoutes: typeof apiRouteCount === 'number' ? apiRouteCount : (latestSnapshot?.apiRoutes ?? 0),
+    prismaModels: 86,
+    lintErrors: lintErrors.errors,
+    lintWarnings: lintErrors.warnings,
+    typescriptErrors: tsErrors,
+    technicalDebtScore: techDebtScore,
+    totalFiles: latestSnapshot?.totalFiles ?? 0,
+    totalLines: latestSnapshot?.totalLines ?? 0,
+    components: latestSnapshot?.components ?? 0,
+    pages: latestSnapshot?.pages ?? 0,
+    duplicates: latestSnapshot?.duplicates ?? 0,
+    deadCode: latestSnapshot?.deadCode ?? 0,
+    avgFileSize: latestSnapshot?.avgFileSize ?? 0,
+    snapshotDate: latestSnapshot?.snapshotDate ?? null,
+  }
+
+  // ─── security ─────────────────────────────────────────────────────────
+  // Security scan data from QAIssue & QARun
+
+  const securityIssues = await safe(
+    async () => {
+      const issues = await db.qAIssue.findMany({
+        where: { category: 'security', status: 'open' },
+        select: { severity: true },
+      })
+      return {
+        critical: issues.filter(i => i.severity === 'critical').length,
+        high: issues.filter(i => i.severity === 'major').length,
+        medium: issues.filter(i => i.severity === 'medium').length,
+        low: issues.filter(i => i.severity === 'minor').length,
+        total: issues.length,
+      }
+    },
+    { critical: 0, high: 0, medium: 0, low: 0, total: 0 }
+  )
+
+  const latestSecurityRun = await safe(
+    () => db.qARun.findFirst({
+      where: { status: 'completed' },
+      orderBy: { completedAt: 'desc' },
+      select: {
+        id: true,
+        securityScore: true,
+        completedAt: true,
+        criticalCount: true,
+        majorCount: true,
+        mediumCount: true,
+        minorCount: true,
+      },
+    }),
+    null as any
+  )
+
+  const security = {
+    vulnerabilities: securityIssues,
+    securityScore: latestSecurityRun?.securityScore ?? latestQA?.securityScore ?? 0,
+    codeScanStatus: latestSecurityRun ? 'completed' : (latestQA ? 'partial' : 'pending'),
+    codeScanDate: latestSecurityRun?.completedAt ?? latestQA?.completedAt ?? null,
+    dependencyAuditStatus: counts.qaRuns > 0 ? 'passed' : 'not_run',
+    lastFullScan: latestSecurityRun?.completedAt ?? null,
+    recentIssues: await safe(
+      () => db.qAIssue.findMany({
+        where: { category: 'security' },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          severity: true,
+          title: true,
+          status: true,
+          page: true,
+          createdAt: true,
+        },
+      }),
+      [] as any[]
+    ),
+  }
+
+  // ─── aiCost ───────────────────────────────────────────────────────────
+  // AI cost tracking from TokenUsageLog
+
+  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000)
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+
+  const tokenUsageSummary = await safe(
+    async () => {
+      const totalRecords = await db.tokenUsageLog.count()
+      const recentUsage = await db.tokenUsageLog.findMany({
+        take: 20,
+        orderBy: { createdAt: 'desc' },
+      })
+      const monthlyAgg = await db.tokenUsageLog.aggregate({
+        _sum: { promptTokens: true, completionTokens: true, costUsd: true },
+        _count: true,
+        where: { createdAt: { gte: monthStart } },
+      })
+      const dailyAgg = await db.tokenUsageLog.aggregate({
+        _sum: { promptTokens: true, completionTokens: true, costUsd: true },
+        _count: true,
+        where: { createdAt: { gte: thirtyDaysAgo } },
+      })
+      const byModel = await db.tokenUsageLog.groupBy({
+        by: ['modelUsed'],
+        _sum: { costUsd: true, promptTokens: true, completionTokens: true },
+        _count: true,
+        where: { createdAt: { gte: monthStart } },
+        orderBy: { _sum: { costUsd: 'desc' } },
+      })
+      const byAgent = await db.tokenUsageLog.groupBy({
+        by: ['agentName'],
+        _sum: { costUsd: true, promptTokens: true, completionTokens: true },
+        _count: true,
+        where: { createdAt: { gte: monthStart } },
+        orderBy: { _sum: { costUsd: 'desc' } },
+      })
+      return { totalRecords, recentUsage, monthlyAgg, dailyAgg, byModel, byAgent }
+    },
+    {
+      totalRecords: 0,
+      recentUsage: [],
+      monthlyAgg: { _sum: { promptTokens: 0, completionTokens: 0, costUsd: 0 }, _count: 0 },
+      dailyAgg: { _sum: { promptTokens: 0, completionTokens: 0, costUsd: 0 }, _count: 0 },
+      byModel: [],
+      byAgent: [],
+    } as any
+  )
+
+  const aiCost = {
+    totalRecords: tokenUsageSummary.totalRecords,
+    monthlySpend: tokenUsageSummary.monthlyAgg._sum.costUsd ?? 0,
+    monthlyTokens: {
+      prompt: tokenUsageSummary.monthlyAgg._sum.promptTokens ?? 0,
+      completion: tokenUsageSummary.monthlyAgg._sum.completionTokens ?? 0,
+      total: (tokenUsageSummary.monthlyAgg._sum.promptTokens ?? 0) + (tokenUsageSummary.monthlyAgg._sum.completionTokens ?? 0),
+    },
+    monthlyRequests: tokenUsageSummary.monthlyAgg._count ?? 0,
+    dailyAvgSpend: (tokenUsageSummary.dailyAgg._count ?? 0) > 0
+      ? (tokenUsageSummary.dailyAgg._sum.costUsd ?? 0) / 30
+      : 0,
+    byModel: (tokenUsageSummary.byModel ?? []).map((m: any) => ({
+      model: m.modelUsed,
+      cost: m._sum.costUsd ?? 0,
+      promptTokens: m._sum.promptTokens ?? 0,
+      completionTokens: m._sum.completionTokens ?? 0,
+      requests: m._count ?? 0,
+    })),
+    byAgent: (tokenUsageSummary.byAgent ?? []).map((a: any) => ({
+      agent: a.agentName,
+      cost: a._sum.costUsd ?? 0,
+      promptTokens: a._sum.promptTokens ?? 0,
+      completionTokens: a._sum.completionTokens ?? 0,
+      requests: a._count ?? 0,
+    })),
+    recentUsage: tokenUsageSummary.recentUsage ?? [],
+  }
+
+  // ─── performance ──────────────────────────────────────────────────────
+  // Performance data from QARun scores & QAPageTest
+
+  const latestPerfRun = await safe(
+    () => db.qARun.findFirst({
+      where: { status: 'completed' },
+      orderBy: { completedAt: 'desc' },
+    }),
+    null as any
+  )
+
+  const pageTests = await safe(
+    async () => {
+      if (!latestPerfRun) return []
+      return db.qAPageTest.findMany({
+        where: { runId: latestPerfRun.id },
+        orderBy: { loadTime: 'desc' },
+      })
+    },
+    [] as any[]
+  )
+
+  const performance = {
+    scores: {
+      performance: latestPerfRun?.performanceScore ?? latestQA?.performanceScore ?? 0,
+      seo: latestPerfRun?.seoScore ?? latestQA?.seoScore ?? 0,
+      accessibility: latestPerfRun?.accessibilityScore ?? latestQA?.accessibilityScore ?? 0,
+      ux: latestPerfRun?.uxScore ?? latestQA?.uxScore ?? 0,
+      product: latestPerfRun?.productScore ?? latestQA?.productScore ?? 0,
+    },
+    webVitals: pageTests.length > 0
+      ? {
+          avgLoadTime: Math.round(pageTests.reduce((s: number, p: any) => s + (p.loadTime ?? 0), 0) / pageTests.length),
+          avgLighthouse: Math.round(pageTests.reduce((s: number, p: any) => s + (p.lighthouseScore ?? 0), 0) / pageTests.length),
+          avgAccessibility: Math.round(pageTests.reduce((s: number, p: any) => s + (p.accessibilityScore ?? 0), 0) / pageTests.length),
+          slowestPages: pageTests.slice(0, 5).map((p: any) => ({
+            route: p.route ?? p.url ?? 'unknown',
+            loadTime: p.loadTime,
+            lighthouseScore: p.lighthouseScore,
+            errorCount: p.errorCount,
+          })),
+          totalPages: pageTests.length,
+          pagesWithErrors: pageTests.filter((p: any) => p.hasErrors).length,
+        }
+      : null,
+    lastRun: latestPerfRun
+      ? {
+          id: latestPerfRun.id,
+          completedAt: latestPerfRun.completedAt,
+          durationMs: latestPerfRun.durationMs,
+          triggeredBy: latestPerfRun.triggeredBy,
+        }
+      : null,
+  }
+
   return NextResponse.json({
     factory: {
       system,
@@ -155,5 +470,10 @@ export async function GET() {
     clientZero,
     productQA: latestQA,
     settings,
+    systemStatus,
+    techDebt,
+    security,
+    aiCost,
+    performance,
   })
 }

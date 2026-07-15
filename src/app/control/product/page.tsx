@@ -168,7 +168,7 @@ export default function ProductEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch product data')
         const json = await res.json()
-        const qaRun = json.productQA || json.latestQA || null
+        const qaRun = json.productQA || json.factory?.latestQA || null
         // Derive product data from unified response
         const derived: ProductData = {
           qa: {

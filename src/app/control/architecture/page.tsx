@@ -147,12 +147,12 @@ export default function ArchitectureEnginePage() {
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
         setFactoryData({
-          system: json.system || {},
-          counts: json.counts || {},
-          recentActivity: json.recentActivity || [],
+          system: json.factory?.system || {},
+          counts: json.factory?.counts || {},
+          recentActivity: json.factory?.recentActivity || [],
           ok: json.ok ?? true,
         })
-        setMemData({ memories: json.recentMemories || [], count: json.counts?.memory ?? 0 })
+        setMemData({ memories: json.factory?.recentMemories || [], count: json.factory?.counts?.memories ?? 0 })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {

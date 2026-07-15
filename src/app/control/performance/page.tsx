@@ -134,6 +134,7 @@ function VitalRangeBar({ vital }: { vital: { name: string; abbr: string; value: 
 
 export default function PerformanceEnginePage() {
   const [systemData, setSystemData] = useState<any>(null)
+  const [perfData, setPerfData] = useState<any>(null)
   const [qaData, setQaData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -146,7 +147,8 @@ export default function PerformanceEnginePage() {
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
         if (json.systemStatus) setSystemData(json.systemStatus)
-        const qaRun = json.productQA || json.latestQA
+        if (json.performance) setPerfData(json.performance)
+        const qaRun = json.productQA || json.factory?.latestQA
         if (qaRun) {
           setQaData({
             hasData: true,
@@ -204,19 +206,63 @@ export default function PerformanceEnginePage() {
   const components = systemData?.components || {}
   const hasQA = qaData?.hasData === true
   const qaRun = qaData?.run || null
-  const scoreTrend = qaData?.scoreTrend || []
   const healthScore = qaData?.healthScore || 0
 
-  // Performance score from QA run
-  const perfScore = hasQA ? (qaRun.performanceScore || 0) : 0
-  const overallScore = hasQA ? perfScore : (
-    Object.values(components).length > 0
-      ? Math.round(Object.values(components).filter((c: any) => c.status === 'ok').length / Object.values(components).length * 100)
-      : 0
-  )
+  // Performance scores from json.performance.scores
+  const perfScores = perfData?.scores || null
+  const webVitals = perfData?.webVitals || null
+  const lastRun = perfData?.lastRun || null
 
-  // Build core vitals from QA scores
-  const coreVitals = hasQA ? [
+  // Overall score from performance scores
+  const overallScore = perfScores
+    ? Math.round(((perfScores.performance ?? 0) + (perfScores.seo ?? 0) + (perfScores.accessibility ?? 0) + (perfScores.ux ?? 0)) / 4)
+    : hasQA
+      ? (qaRun.performanceScore || 0)
+      : (
+        Object.values(components).length > 0
+          ? Math.round(Object.values(components).filter((c: any) => c.status === 'ok').length / Object.values(components).length * 100)
+          : 0
+      )
+
+  // Build core vitals from json.performance.scores (prefer real data) then QA run
+  const coreVitals = perfScores ? [
+    {
+      name: 'Performance Score',
+      abbr: 'PERF',
+      value: `${perfScores.performance ?? 0}`,
+      numericValue: perfScores.performance ?? 0,
+      status: scoreToVitalStatus(perfScores.performance ?? 0),
+      description: 'Overall performance rating',
+      ranges: { good: 90, needsImprovement: 50, poor: 50 },
+    },
+    {
+      name: 'SEO Score',
+      abbr: 'SEO',
+      value: `${perfScores.seo ?? 0}`,
+      numericValue: perfScores.seo ?? 0,
+      status: scoreToVitalStatus(perfScores.seo ?? 0),
+      description: 'Search engine optimization score',
+      ranges: { good: 90, needsImprovement: 50, poor: 50 },
+    },
+    {
+      name: 'Accessibility Score',
+      abbr: 'A11Y',
+      value: `${perfScores.accessibility ?? 0}`,
+      numericValue: perfScores.accessibility ?? 0,
+      status: scoreToVitalStatus(perfScores.accessibility ?? 0),
+      description: 'Web accessibility compliance score',
+      ranges: { good: 90, needsImprovement: 50, poor: 50 },
+    },
+    {
+      name: 'UX Score',
+      abbr: 'UX',
+      value: `${perfScores.ux ?? 0}`,
+      numericValue: perfScores.ux ?? 0,
+      status: scoreToVitalStatus(perfScores.ux ?? 0),
+      description: 'User experience quality score',
+      ranges: { good: 90, needsImprovement: 50, poor: 50 },
+    },
+  ] : hasQA ? [
     {
       name: 'Performance Score',
       abbr: 'PERF',
@@ -258,7 +304,7 @@ export default function PerformanceEnginePage() {
   // Build budget items from system components
   const budgetItems = Object.entries(components).map(([name, c]: [string, any]) => ({
     name: name === 'aiRouter' ? 'AI Router' : name === 'database' ? 'Database' : name.charAt(0).toUpperCase() + name.slice(1),
-    current: c.latency,
+    current: c.latency ?? 0,
     budget: 500,
     unit: 'ms',
     icon: name === 'database' ? Database : name === 'aiRouter' ? Server : name === 'redis' ? Activity : Clock,
@@ -266,27 +312,40 @@ export default function PerformanceEnginePage() {
 
   // Build slow endpoints from degraded components
   const slowEndpoints = Object.entries(components)
-    .filter(([, c]: [string, any]) => c.latency > 300 || c.status === 'degraded' || c.status === 'down')
+    .filter(([, c]: [string, any]) => (c.latency ?? 0) > 300 || c.status === 'degraded' || c.status === 'down')
     .map(([name, c]: [string, any]) => ({
       route: `/api/${name === 'aiRouter' ? 'ai-router' : name}`,
-      currentMs: c.latency,
+      currentMs: c.latency ?? 0,
       targetMs: 300,
-      status: c.latency > 500 || c.status === 'down' ? 'critical' as const : 'warning' as const,
+      status: (c.latency ?? 0) > 500 || c.status === 'down' ? 'critical' as const : 'warning' as const,
       trend: 'stable' as const,
     }))
 
-  // Build optimizations from score trend
-  const recentOptimizations = scoreTrend.length >= 2
-    ? [{
-        id: 'trend-1',
-        description: `QA score trend: ${scoreTrend[0].productScore} → ${scoreTrend[scoreTrend.length - 1].productScore} over ${scoreTrend.length} runs`,
-        impact: scoreTrend[scoreTrend.length - 1].productScore > scoreTrend[0].productScore ? 'Improving' : 'Declining',
-        ago: 'Recent',
-      }]
-    : []
+  // Build optimizations from performance lastRun or webVitals
+  const recentOptimizations: Array<{ id: string; description: string; impact: string; ago: string }> = []
+  if (lastRun) {
+    const runDate = lastRun.completedAt || lastRun.createdAt || lastRun.timestamp
+    recentOptimizations.push({
+      id: 'perf-lastrun',
+      description: `Last performance audit completed with overall score ${overallScore}`,
+      impact: overallScore >= 80 ? 'Healthy' : overallScore >= 50 ? 'Needs Improvement' : 'Poor',
+      ago: runDate ? new Date(runDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Recent',
+    })
+  }
+  if (webVitals && typeof webVitals === 'object') {
+    const vitalsEntries = Object.entries(webVitals)
+    if (vitalsEntries.length > 0) {
+      recentOptimizations.push({
+        id: 'perf-webvitals',
+        description: `Web Vitals data available: ${vitalsEntries.map(([k]) => k.toUpperCase()).join(', ')}`,
+        impact: 'Measured',
+        ago: 'Latest',
+      })
+    }
+  }
 
   // ─── Empty state ────────────────────────────────────────
-  const hasNoData = !hasQA && Object.keys(components).length === 0
+  const hasNoData = !hasQA && !perfScores && Object.keys(components).length === 0
 
   const handleAudit = () => {
     setAuditing(true)
@@ -534,51 +593,31 @@ export default function PerformanceEnginePage() {
             </div>
           )}
 
-          {/* ─── 6. Score Trend ──────────────────────────────────── */}
-          {scoreTrend.length > 0 && (
+          {/* ─── 6. Web Vitals ──────────────────────────────────── */}
+          {webVitals && typeof webVitals === 'object' && Object.keys(webVitals).length > 0 && (
             <div>
               <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-orange-400" />
-                Score Trend
+                <Activity className="w-4 h-4 text-orange-400" />
+                Web Vitals
               </h2>
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                <div className="flex items-end gap-4 h-40">
-                  {scoreTrend.map((run: any, i: number) => {
-                    const barHeight = Math.max(10, (run.productScore / 100) * 140)
-                    const isLatest = i === scoreTrend.length - 1
-                    const dateStr = run.date ? new Date(run.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : `Run ${i + 1}`
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {Object.entries(webVitals).map(([key, val]: [string, any]) => {
+                    const numVal = typeof val === 'number' ? val : val?.value ?? 0
+                    const status = scoreToVitalStatus(numVal)
                     return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                        <span className={`text-xs font-bold ${isLatest ? 'text-orange-400' : 'text-slate-400'}`}>
-                          {run.productScore}
-                        </span>
-                        <div className="w-full flex flex-col justify-end" style={{ height: '120px' }}>
-                          <div
-                            className={`w-full rounded-t-md transition-all ${
-                              isLatest
-                                ? 'bg-gradient-to-t from-orange-600 to-orange-400'
-                                : run.productScore >= 80
-                                ? 'bg-gradient-to-t from-emerald-600/30 to-emerald-400/30'
-                                : 'bg-gradient-to-t from-amber-600/30 to-amber-400/30'
-                            }`}
-                            style={{ height: `${barHeight}px` }}
-                          />
+                      <div key={key} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
+                        <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-1">{key}</div>
+                        <div className={`text-xl font-bold ${
+                          status === 'good' ? 'text-emerald-400' : status === 'needs-improvement' ? 'text-amber-400' : 'text-red-400'
+                        }`}>{typeof val === 'number' ? val : val?.display ?? numVal}</div>
+                        <div className="text-[10px] text-slate-500 uppercase mt-1">
+                          {status === 'good' ? 'Good' : status === 'needs-improvement' ? 'Needs Improvement' : 'Poor'}
                         </div>
-                        <span className="text-[10px] text-slate-500">{dateStr}</span>
                       </div>
                     )
                   })}
                 </div>
-                {qaData?.scoreDelta !== undefined && (
-                  <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
-                    {qaData.scoreDelta >= 0 ? (
-                      <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                    ) : (
-                      <TrendingDown className="w-3.5 h-3.5 text-red-400" />
-                    )}
-                    Score {qaData.scoreDelta >= 0 ? 'improved' : 'decreased'} by {Math.abs(qaData.scoreDelta)} points from previous run
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -636,12 +675,12 @@ export default function PerformanceEnginePage() {
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Status: <span className={systemData?.status === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}>{systemData?.status || 'unknown'}</span></span>
+          <span>Status: <span className={systemData?.overallStatus === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}>{systemData?.overallStatus || 'unknown'}</span></span>
         </div>
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-slate-400" />
-          <span>Environment: <span className="text-slate-300">{systemData?.environment || 'unknown'}</span></span>
+          <span>Last run: <span className="text-slate-300">{lastRun?.completedAt || lastRun?.createdAt || lastRun?.timestamp ? new Date(lastRun.completedAt || lastRun.createdAt || lastRun.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'unknown'}</span></span>
         </div>
       </div>
     </div>
