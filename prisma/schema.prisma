@@ -2165,8 +2165,10 @@ model QARun {
   startedAt           DateTime  @default(now())
   completedAt         DateTime?
   duration            Int?
+  durationMs          Int?
   summary             String?
   createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   reviewerResults     QAReviewerResult[]
   issues              QAIssue[]
@@ -2184,6 +2186,9 @@ model QAReviewerResult {
   details         String?
   summary         String?
   recommendations String?
+  status          String    @default("pending")
+  findings        String?
+  durationMs      Int?
   run             QARun     @relation(fields: [runId], references: [id], onDelete: Cascade)
   createdAt       DateTime  @default(now())
 }
@@ -2335,6 +2340,14 @@ model CodebaseSnapshot {
   components          String?
   apiRoutes           String?
   prismaModels        String?
+  totalFiles          Int       @default(0)
+  totalLines          Int       @default(0)
+  duplicates          Int       @default(0)
+  deadCode            Int       @default(0)
+  avgFileSize         Float     @default(0)
+  snapshotDate        DateTime?
+  metadata            String?
+  createdAt           DateTime  @default(now())
 }
 
 model FactoryChangelog {
@@ -2367,8 +2380,16 @@ model DailyMission {
   candidatesEvaluated   Int       @default(0)
   candidatesApproved    Int       @default(0)
   candidatesRejected    Int       @default(0)
-  createdAt             DateTime  @default(now())
+  title                 String?
+  description           String?
+  priority              String    @default("medium")
+  source                String?
+  budgetTokens          Int       @default(0)
+  budgetMinutes         Int       @default(0)
+  result                String?
   completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 
 model GovernorInterception {
