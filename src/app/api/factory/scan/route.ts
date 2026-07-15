@@ -35,7 +35,7 @@ function safeParse<T>(raw: string | null | undefined, fallback: T): T {
 /** Convert a stored CodebaseSnapshot row into a public JSON shape. */
 function serializeSnapshot(row: {
   id: string
-  createdAt: Date
+  timestamp: Date
   totalComponents: number
   totalAPIRoutes: number
   totalPrismaModels: number
@@ -51,7 +51,7 @@ function serializeSnapshot(row: {
 }) {
   return {
     id: row.id,
-    timestamp: row.createdAt,
+    timestamp: row.timestamp,
     stats: {
       totalComponents: row.totalComponents,
       totalAPIRoutes: row.totalAPIRoutes,
@@ -108,7 +108,7 @@ export async function POST() {
 export async function GET() {
   try {
     let snapshot = await db.codebaseSnapshot.findFirst({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { timestamp: 'desc' },
     })
 
     // First run / empty DB → run a fresh scan so the UI has something to show.
@@ -116,7 +116,7 @@ export async function GET() {
       console.log('[api/factory/scan GET] No snapshot found — auto-scanning…')
       await scanAndSaveSnapshot()
       snapshot = await db.codebaseSnapshot.findFirst({
-        orderBy: { createdAt: 'desc' },
+        orderBy: { timestamp: 'desc' },
       })
     }
 

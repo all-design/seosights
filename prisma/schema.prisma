@@ -2321,18 +2321,20 @@ model EngineeringMemory {
 }
 
 model CodebaseSnapshot {
-  id            String    @id @default(cuid())
-  totalFiles    Int       @default(0)
-  totalLines    Int       @default(0)
-  components    Int       @default(0)
-  pages         Int       @default(0)
-  apiRoutes     Int       @default(0)
-  duplicates    Int       @default(0)
-  deadCode      Int       @default(0)
-  avgFileSize   Float     @default(0)
-  snapshotDate  DateTime  @default(now())
-  metadata      String?   // JSON
-  createdAt     DateTime  @default(now())
+  id                  String    @id @default(cuid())
+  timestamp           DateTime  @default(now())
+  totalComponents     Int       @default(0)
+  totalAPIRoutes      Int       @default(0)
+  totalPrismaModels   Int       @default(0)
+  totalPages          Int       @default(0)
+  totalHooks          Int       @default(0)
+  totalLibs           Int       @default(0)
+  lintErrors          Int       @default(0)
+  lintWarnings        Int       @default(0)
+  typescriptErrors    Int       @default(0)
+  components          String?
+  apiRoutes           String?
+  prismaModels        String?
 }
 
 model FactoryChangelog {
@@ -2348,19 +2350,25 @@ model FactoryChangelog {
 }
 
 model DailyMission {
-  id            String    @id @default(cuid())
-  date          DateTime
-  title         String
-  description   String?
-  priority      String    @default("medium")
-  status        String    @default("pending")  // pending | in_progress | completed | skipped
-  source        String?   // governor | product | observatory
-  budgetTokens  Int       @default(0)
-  budgetMinutes Int       @default(0)
-  result        String?   // JSON
-  completedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  date                  DateTime
+  goal                  String
+  strategy              String?
+  maxHours              Int       @default(0)
+  maxComponents         Int       @default(0)
+  maxPages              Int       @default(0)
+  confidenceThreshold   Float     @default(0)
+  hoursUsed             Int       @default(0)
+  componentsCreated     Int       @default(0)
+  pagesCreated          Int       @default(0)
+  status                String    @default("pending")
+  outcome               String?
+  kpiImproved           String?
+  candidatesEvaluated   Int       @default(0)
+  candidatesApproved    Int       @default(0)
+  candidatesRejected    Int       @default(0)
+  createdAt             DateTime  @default(now())
+  completedAt           DateTime?
 }
 
 model GovernorInterception {

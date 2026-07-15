@@ -249,10 +249,10 @@ export async function GET() {
     if (mission) {
       todayMission = {
         id: mission.id,
-        goal: mission.title,
+        goal: mission.goal,
         status: mission.status,
-        candidatesApproved: 0,
-        candidatesEvaluated: 0,
+        candidatesApproved: mission.candidatesApproved ?? 0,
+        candidatesEvaluated: mission.candidatesEvaluated ?? 0,
       }
     }
   } catch (err) {

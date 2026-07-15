@@ -196,11 +196,11 @@ export async function GET() {
   // Codebase analysis data from CodebaseSnapshot & QARun
 
   const latestSnapshot = await safe(
-    () => db.codebaseSnapshot.findFirst({ orderBy: { createdAt: 'desc' } }),
+    () => db.codebaseSnapshot.findFirst({ orderBy: { timestamp: 'desc' } }),
     null as any
   )
 
-  const apiRouteCount = latestSnapshot?.apiRoutes ?? await safe(
+  const apiRouteCount = latestSnapshot?.totalAPIRoutes ?? await safe(
     async () => {
       const taskTypes = await db.factoryTask.findMany({
         where: { type: 'api_route' },
@@ -237,20 +237,18 @@ export async function GET() {
   )
 
   const techDebt = {
-    apiRoutes: typeof apiRouteCount === 'number' ? apiRouteCount : (latestSnapshot?.apiRoutes ?? 0),
-    prismaModels: 86,
+    apiRoutes: typeof apiRouteCount === 'number' ? apiRouteCount : (latestSnapshot?.totalAPIRoutes ?? 0),
+    prismaModels: latestSnapshot?.totalPrismaModels ?? 86,
     lintErrors: lintErrors.errors,
     lintWarnings: lintErrors.warnings,
     typescriptErrors: tsErrors,
     technicalDebtScore: techDebtScore,
-    totalFiles: latestSnapshot?.totalFiles ?? 0,
-    totalLines: latestSnapshot?.totalLines ?? 0,
-    components: latestSnapshot?.components ?? 0,
-    pages: latestSnapshot?.pages ?? 0,
-    duplicates: latestSnapshot?.duplicates ?? 0,
-    deadCode: latestSnapshot?.deadCode ?? 0,
-    avgFileSize: latestSnapshot?.avgFileSize ?? 0,
-    snapshotDate: latestSnapshot?.snapshotDate ?? null,
+    totalComponents: latestSnapshot?.totalComponents ?? 0,
+    totalHooks: latestSnapshot?.totalHooks ?? 0,
+    totalLibs: latestSnapshot?.totalLibs ?? 0,
+    components: latestSnapshot?.totalComponents ?? 0,
+    pages: latestSnapshot?.totalPages ?? 0,
+    snapshotDate: latestSnapshot?.timestamp ?? null,
   }
 
   // ─── security ─────────────────────────────────────────────────────────
