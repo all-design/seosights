@@ -181,14 +181,14 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
     free: false,
   },
   'openrouter/glm-turbo': {
-    id: 'meta-llama/llama-3.3-70b-instruct:free',
+    id: 'z-ai/glm-4.7-flash',
     provider: 'openrouter',
-    costPer1kInput: 0,
-    costPer1kOutput: 0,
+    costPer1kInput: 0.00000006,
+    costPer1kOutput: 0.00000006,
     contextWindow: 131072,
     speed: 'ultra',
     quality: 'good',
-    free: true,
+    free: false,
   },
   'openrouter/glm-5.1': {
     id: 'z-ai/glm-4.7-flash',
