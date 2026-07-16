@@ -1142,34 +1142,30 @@ export async function POST(request: NextRequest) {
 
   const loopStart = Date.now()
 
-  // Run all tests (each wrapped in try/catch internally)
-  const [
-    database,
-    aiProviders,
-    aiRouter,
-    codebaseScanner,
-    aiGovernor,
-    dailyMission,
-    cronJobs,
-    factoryPipeline,
-    contentEngine,
-    observatory,
-    growthEngine,
-    engagement,
-  ] = await Promise.all([
-    testDatabase(),
-    testAIProviders(),
-    testAIRouter(),
-    testCodebaseScanner(),
-    testAIGovernor(),
-    testDailyMission(),
-    testCronJobs(),
-    testFactoryPipeline(),
-    testContentEngine(),
-    testObservatory(),
-    testGrowthEngine(),
-    testEngagement(),
-  ])
+  // Phase 1: Run non-AI tests in parallel (database, scanner, cron, engines)
+  const [database, codebaseScanner, cronJobs, factoryPipeline, contentEngine, observatory, growthEngine, engagement] =
+    await Promise.all([
+      testDatabase(),
+      testCodebaseScanner(),
+      testCronJobs(),
+      testFactoryPipeline(),
+      testContentEngine(),
+      testObservatory(),
+      testGrowthEngine(),
+      testEngagement(),
+    ])
+
+  // Phase 2: Test AI providers sequentially to avoid rate limiting
+  const aiProviders = await testAIProviders()
+
+  // Phase 3: Test AI Router (after providers, so it can use the working ones)
+  const aiRouter = await testAIRouter()
+
+  // Phase 4: Test Governor (uses AI Router internally)
+  const aiGovernor = await testAIGovernor()
+
+  // Phase 5: Test Daily Mission (uses Governor + AI Router)
+  const dailyMission = await testDailyMission()
 
   const result: QALoopResult = {
     timestamp: new Date().toISOString(),
