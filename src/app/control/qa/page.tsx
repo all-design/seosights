@@ -1,147 +1,214 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  Shield, Monitor, Code, MousePointer, Type, Gauge,
-  Search, Eye, Lock, RotateCcw, CheckCircle2,
-  AlertTriangle, AlertCircle, Info, Clock, Activity,
-  RefreshCw, ChevronRight, Zap,
+  Shield, Database, Brain, Scan, Target, Clock, Activity,
+  RefreshCw, CheckCircle2, AlertTriangle, AlertCircle, Info,
+  Zap, Server, Eye, Telescope, TrendingUp, Users, Cpu,
+  ChevronDown, ChevronUp, Play, Loader2, XCircle, CheckCircle,
+  BarChart3,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────
 
-type QaStatus = 'passing' | 'warning' | 'failing'
+type TestStatus = 'pass' | 'fail' | 'warn'
 
-interface QAData {
-  hasData: boolean
-  message?: string
-  run?: {
-    id: string
-    productScore: number
-    uxScore: number
-    engineeringScore: number
-    securityScore: number
-    performanceScore: number
-    seoScore: number
-    accessibilityScore: number
-    conversionScore: number
-    customerDelight: number
-    technicalDebt: number
-    criticalCount: number
-    majorCount: number
-    mediumCount: number
-    minorCount: number
-    completedAt: string
-    status: string
-    [key: string]: unknown
-  }
-  issueCounts?: {
-    critical: number
-    major: number
-    medium: number
-    minor: number
-    total: number
-  }
-  issueStatusCounts?: Array<{ status: string; count: number }>
-  issueCategoryCounts?: Array<{ category: string; count: number }>
-  recentIssues?: Array<{
-    id: string
-    title: string
-    severity: string
-    category: string
-    status: string
-    description: string | null
-    createdAt: string
-    [key: string]: unknown
-  }>
-  scoreTrend?: Array<{
-    date: string
-    productScore: number
-    totalIssues: number
-    [key: string]: unknown
-  }>
-  healthScore?: number
-  scoreDelta?: number
-  openCriticalMajor?: number
+interface BaseTestResult {
+  status: TestStatus
+  message: string
+  durationMs: number
+  details: unknown
 }
 
-// ─── Dimension mapping ───────────────────────────────────
+interface AIProviderTestResult extends BaseTestResult {
+  provider: string
+  details: {
+    model: string
+    success: boolean
+    latencyMs: number
+    responseSnippet: string
+    error: string | null
+  }
+}
 
-const DIMENSION_CONFIG = [
-  { key: 'productScore', name: 'Product', icon: Shield, description: 'Overall product health' },
-  { key: 'uxScore', name: 'UX', icon: MousePointer, description: 'User experience & flows' },
-  { key: 'engineeringScore', name: 'Engineering', icon: Code, description: 'Code quality & stability' },
-  { key: 'securityScore', name: 'Security', icon: Lock, description: 'Headers, CORS & vulnerabilities' },
-  { key: 'performanceScore', name: 'Performance', icon: Gauge, description: 'Load times & optimization' },
-  { key: 'seoScore', name: 'SEO', icon: Search, description: 'Meta tags, schema & crawlability' },
-  { key: 'accessibilityScore', name: 'Accessibility', icon: Eye, description: 'WCAG compliance & screen readers' },
-  { key: 'conversionScore', name: 'Conversion', icon: Type, description: 'Funnel & call-to-action quality' },
-  { key: 'customerDelight', name: 'Delight', icon: Activity, description: 'User satisfaction & engagement' },
-]
+interface RouterTestResult extends BaseTestResult {
+  details: {
+    model: string
+    provider: string
+    status: string
+    latencyMs: number
+    content: string
+    fallbackChain: string[]
+  }
+}
+
+interface ScannerTestResult extends BaseTestResult {
+  details: {
+    totalComponents: number
+    totalAPIRoutes: number
+    totalPrismaModels: number
+    totalPages: number
+    totalHooks: number
+    totalLibs: number
+    latencyMs: number
+  }
+}
+
+interface GovernorTestResult extends BaseTestResult {
+  details: {
+    approved: boolean
+    confidence: number
+    impactScore: number
+    ruleApplied: string | null
+    rejectionReason: string | null
+    latencyMs: number
+  }
+}
+
+interface MissionTestResult extends BaseTestResult {
+  details: {
+    missionId: string | null
+    candidatesEvaluated: number
+    candidatesApproved: number
+    candidatesRejected: number
+    latencyMs: number
+  }
+}
+
+interface CronJobTestResult extends BaseTestResult {
+  cronName: string
+  details: {
+    hasRecentData: boolean
+    recordCount: number
+    lastRun: string | null
+  }
+}
+
+interface FactoryTestResult extends BaseTestResult {
+  details: {
+    recentTasks: number
+    recentInterceptions: number
+    recentQARuns: number
+    taskStatuses: Record<string, number>
+    pipelineHealthy: boolean
+  }
+}
+
+interface ContentEngineTestResult extends BaseTestResult {
+  details: {
+    briefCount: number
+    articleCount: number
+    reviewCount: number
+    recentActivity: boolean
+  }
+}
+
+interface ObservatoryTestResult extends BaseTestResult {
+  details: {
+    crawlCount: number
+    responseCount: number
+    changeCount: number
+    reportCount: number
+    recentCrawl: boolean
+  }
+}
+
+interface GrowthEngineTestResult extends BaseTestResult {
+  details: {
+    memoryCount: number
+    evidenceCount: number
+    sprintCount: number
+    recentActivity: boolean
+  }
+}
+
+interface EngagementTestResult extends BaseTestResult {
+  details: {
+    missionCount: number
+    briefCount: number
+    streakCount: number
+    recentActivity: boolean
+  }
+}
+
+interface DatabaseTestResult extends BaseTestResult {
+  details: {
+    latencyMs: number
+    counts: Record<string, number>
+    errors: string[]
+  }
+}
+
+interface QALoopResult {
+  timestamp: string
+  overallStatus: 'operational' | 'degraded' | 'critical'
+  overallScore: number
+  totalTests: number
+  passedTests: number
+  failedTests: number
+  warningTests: number
+  durationMs: number
+  tests: {
+    database: DatabaseTestResult
+    aiProviders: AIProviderTestResult[]
+    aiRouter: RouterTestResult
+    codebaseScanner: ScannerTestResult
+    aiGovernor: GovernorTestResult
+    dailyMission: MissionTestResult
+    cronJobs: CronJobTestResult[]
+    factoryPipeline: FactoryTestResult
+    contentEngine: ContentEngineTestResult
+    observatory: ObservatoryTestResult
+    growthEngine: GrowthEngineTestResult
+    engagement: EngagementTestResult
+  }
+  summary: {
+    critical: string[]
+    warnings: string[]
+    info: string[]
+  }
+}
 
 // ─── Helpers ─────────────────────────────────────────────
 
-function getScoreForDimension(run: QAData['run'], key: string): number {
-  if (!run) return 0
-  return (run[key as keyof typeof run] as number) ?? 0
-}
-
-function scoreToStatus(score: number): QaStatus {
-  if (score >= 90) return 'passing'
-  if (score >= 75) return 'warning'
-  return 'failing'
-}
-
-function statusColor(status: QaStatus): string {
+function statusIcon(status: TestStatus) {
   switch (status) {
-    case 'passing': return 'text-emerald-400'
-    case 'warning': return 'text-amber-400'
-    case 'failing': return 'text-red-400'
+    case 'pass': return <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+    case 'fail': return <XCircle className="w-4 h-4 text-red-400" />
+    case 'warn': return <AlertTriangle className="w-4 h-4 text-amber-400" />
   }
 }
 
-function statusBg(status: QaStatus): string {
+function statusBg(status: TestStatus): string {
   switch (status) {
-    case 'passing': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
-    case 'warning': return 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-    case 'failing': return 'bg-red-500/15 text-red-400 border-red-500/20'
+    case 'pass': return 'bg-emerald-500/10 border-emerald-500/20'
+    case 'fail': return 'bg-red-500/10 border-red-500/20'
+    case 'warn': return 'bg-amber-500/10 border-amber-500/20'
   }
 }
 
-function barColor(status: QaStatus): string {
+function overallStatusConfig(status: string) {
   switch (status) {
-    case 'passing': return 'bg-emerald-500'
-    case 'warning': return 'bg-amber-500'
-    case 'failing': return 'bg-red-500'
+    case 'operational': return { color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/25', label: 'OPERATIONAL', dot: 'bg-emerald-400' }
+    case 'degraded': return { color: 'text-amber-400', bg: 'bg-amber-500/15 border-amber-500/25', label: 'DEGRADED', dot: 'bg-amber-400' }
+    default: return { color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/25', label: 'CRITICAL', dot: 'bg-red-400' }
   }
 }
 
-function severityConfig(severity: string) {
-  switch (severity) {
-    case 'critical': return { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/20', icon: AlertCircle, label: 'Critical' }
-    case 'major': return { color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/20', icon: AlertTriangle, label: 'Major' }
-    case 'medium': return { color: 'text-blue-400', bg: 'bg-blue-500/15', border: 'border-blue-500/20', icon: Info, label: 'Medium' }
-    case 'minor': return { color: 'text-slate-400', bg: 'bg-slate-500/15', border: 'border-slate-500/20', icon: Info, label: 'Minor' }
-    default: return { color: 'text-slate-400', bg: 'bg-slate-500/15', border: 'border-slate-500/20', icon: Info, label: severity }
-  }
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
 }
 
-function scoreColor(score: number): string {
-  if (score >= 90) return 'text-emerald-400'
-  if (score >= 75) return 'text-amber-400'
-  return 'text-red-400'
-}
+// ─── Circular Gauge ──────────────────────────────────────
 
-// ─── Circular Gauge Component ────────────────────────────
-
-function CircularGauge({ score, size = 180 }: { score: number; size?: number }) {
-  const strokeWidth = 10
+function CircularGauge({ score, size = 160 }: { score: number; size?: number }) {
+  const strokeWidth = 8
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (score / 100) * circumference
   const center = size / 2
-
-  const gaugeColor = score >= 90 ? '#34d399' : score >= 75 ? '#fbbf24' : '#f87171'
+  const gaugeColor = score >= 80 ? '#34d399' : score >= 50 ? '#fbbf24' : '#f87171'
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -158,9 +225,69 @@ function CircularGauge({ score, size = 180 }: { score: number; size?: number }) 
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-4xl font-bold ${scoreColor(score)}`}>{score}</span>
-        <span className="text-xs text-slate-500 mt-0.5">/ 100</span>
+        <span className={`text-3xl font-bold ${score >= 80 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+          {score}
+        </span>
+        <span className="text-[10px] text-slate-500">/ 100</span>
       </div>
+    </div>
+  )
+}
+
+// ─── Test Section Card ───────────────────────────────────
+
+function TestSection({
+  icon: Icon,
+  title,
+  status,
+  message,
+  durationMs,
+  children,
+  defaultOpen = false,
+}: {
+  icon: React.ElementType
+  title: string
+  status: TestStatus
+  message: string
+  durationMs: number
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <div className={`bg-slate-900 border rounded-xl overflow-hidden transition-colors ${statusBg(status)}`}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 p-4 hover:bg-slate-800/50 transition-colors"
+      >
+        <Icon className={`w-4.5 h-4.5 ${status === 'pass' ? 'text-emerald-400' : status === 'fail' ? 'text-red-400' : 'text-amber-400'}`} />
+        <div className="flex-1 text-left">
+          <div className="text-sm font-semibold text-white">{title}</div>
+          <div className="text-xs text-slate-400 mt-0.5">{message}</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-slate-500">{formatDuration(durationMs)}</span>
+          {statusIcon(status)}
+          {open ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+        </div>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-slate-800/50 pt-3">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Detail Row ──────────────────────────────────────────
+
+function DetailRow({ label, value, mono = false }: { label: string; value: string | number; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 px-2 rounded bg-slate-800/30">
+      <span className="text-[11px] text-slate-500">{label}</span>
+      <span className={`text-xs text-slate-200 ${mono ? 'font-mono' : 'font-medium'}`}>{value}</span>
     </div>
   )
 }
@@ -168,91 +295,76 @@ function CircularGauge({ score, size = 180 }: { score: number; size?: number }) 
 // ─── Main Component ──────────────────────────────────────
 
 export default function QAEnginePage() {
-  const [data, setData] = useState<QAData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [result, setResult] = useState<QALoopResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [animatingScore, setAnimatingScore] = useState(0)
   const animationStarted = useRef(false)
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch control data')
-        const json = await res.json()
-        // Derive QA data from unified response
-        const qaRun = json.latestQA || json.productQA || null
-        const derived: QAData = qaRun
-          ? {
-              hasData: true,
-              run: qaRun,
-              issueCounts: {
-                critical: qaRun.criticalCount ?? 0,
-                major: qaRun.majorCount ?? 0,
-                medium: qaRun.mediumCount ?? 0,
-                minor: qaRun.minorCount ?? 0,
-                total: (qaRun.criticalCount ?? 0) + (qaRun.majorCount ?? 0) + (qaRun.mediumCount ?? 0) + (qaRun.minorCount ?? 0),
-              },
-              issueCategoryCounts: [],
-              recentIssues: [],
-              healthScore: qaRun.productScore ?? 0,
-              scoreDelta: qaRun.scoreDelta ?? 0,
-              openCriticalMajor: (qaRun.criticalCount ?? 0) + (qaRun.majorCount ?? 0),
-            }
-          : { hasData: false, message: 'No completed QA runs found. Run the QA Engine to generate quality scores and issue reports.' }
-        setData(derived)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
-        setLoading(false)
+  // Load the latest QA loop result on mount
+  const loadLatestResult = useCallback(async () => {
+    try {
+      const res = await fetch('/api/qa-loop/status', {
+        headers: { Authorization: 'Bearer seosights-superadmin-2024' },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.hasRun && data.results) {
+          setResult(data.results)
+        }
       }
+    } catch {
+      // Ignore — just means no previous run
+    } finally {
+      setInitialLoading(false)
     }
-    loadData()
   }, [])
 
-  // Animate score when data loads
   useEffect(() => {
-    if (!data?.hasData || !data.healthScore || animationStarted.current) return
+    loadLatestResult()
+  }, [loadLatestResult])
+
+  // Animate score
+  useEffect(() => {
+    if (!result || animationStarted.current) return
     animationStarted.current = true
     let current = 0
-    const target = data.healthScore
-    const step = Math.ceil(target / 40)
+    const target = result.overallScore
+    const step = Math.ceil(target / 30)
     const timer = setInterval(() => {
       current += step
-      if (current >= target) {
-        current = target
-        clearInterval(timer)
-      }
+      if (current >= target) { current = target; clearInterval(timer) }
       setAnimatingScore(current)
     }, 25)
     return () => clearInterval(timer)
-  }, [data])
+  }, [result])
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">QA Engine</h1>
-              <p className="text-slate-400 text-sm">Quality analysis</p>
-            </div>
-          </div>
-        </div>
-        <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
-        <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
-          <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
-        </div>
-      </div>
-    )
+  // Run the full QA loop
+  const runQALoop = async () => {
+    setLoading(true)
+    setError(null)
+    animationStarted.current = false
+    try {
+      const res = await fetch('/api/qa-loop/run', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer seosights-superadmin-2024' },
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
+      const data: QALoopResult = await res.json()
+      setResult(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (error) {
+  // ─── Initial Loading ─────────────────────────────────
+  if (initialLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
@@ -260,69 +372,18 @@ export default function QAEnginePage() {
             <Shield className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">QA Engine</h1>
-            <p className="text-slate-400 text-sm">Quality analysis</p>
+            <h1 className="text-2xl font-bold text-white">QA Loop</h1>
+            <p className="text-slate-400 text-sm">Full system verification</p>
           </div>
         </div>
-        <div className="bg-slate-900 border border-red-500/20 rounded-xl p-8 text-center">
-          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-3" />
-          <p className="text-red-400 text-sm font-medium">Failed to load QA data</p>
-          <p className="text-slate-500 text-xs mt-1">{error}</p>
-          <button
-            onClick={() => { setLoading(true); setError(null); setData(null); }}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Retry
-          </button>
-        </div>
+        <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-64" />
+        <div className="animate-pulse bg-slate-900 border border-slate-800 rounded-xl h-48" />
       </div>
     )
   }
 
-  // No QA data yet
-  if (!data?.hasData) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">QA Engine</h1>
-              <p className="text-slate-400 text-sm">Quality across 9 dimensions</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
-          <Shield className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-slate-300 mb-2">No QA Data Yet</h2>
-          <p className="text-slate-500 text-sm max-w-md mx-auto">
-            {data?.message || 'No completed QA runs found. Run the QA Engine to generate quality scores and issue reports.'}
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  const dimensions = DIMENSION_CONFIG.map(dim => {
-    const score = getScoreForDimension(data.run, dim.key)
-    return {
-      ...dim,
-      score,
-      status: scoreToStatus(score),
-      lastChecked: new Date(data.run!.completedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-    }
-  })
-
-  const overallScore = data.healthScore ?? Math.round(dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length)
-  const displayScore = animatingScore || overallScore
-  const passingCount = dimensions.filter(d => d.status === 'passing').length
-  const warningCount = dimensions.filter(d => d.status === 'warning').length
-  const failingCount = dimensions.filter(d => d.status === 'failing').length
-  const criticalIssues = data.issueCounts?.critical ?? 0
-  const majorIssues = data.issueCounts?.major ?? 0
+  const osConfig = result ? overallStatusConfig(result.overallStatus) : null
+  const displayScore = result ? (animatingScore || result.overallScore) : 0
 
   return (
     <div className="space-y-6">
@@ -333,236 +394,363 @@ export default function QAEnginePage() {
             <Shield className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">QA Engine</h1>
-            <p className="text-slate-400 text-sm">Quality across {dimensions.length} dimensions</p>
+            <h1 className="text-2xl font-bold text-white">QA Loop</h1>
+            <p className="text-slate-400 text-sm">Full system verification — 12 engines, real data</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-400">Running</span>
-          </div>
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Re-run All
+          {osConfig && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${osConfig.bg}`}>
+              <div className={`w-2 h-2 rounded-full ${osConfig.dot} animate-pulse`} />
+              <span className={`text-xs font-bold ${osConfig.color}`}>{osConfig.label}</span>
+            </div>
+          )}
+          <button
+            onClick={runQALoop}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white text-xs font-medium transition-colors"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Running QA...
+              </>
+            ) : (
+              <>
+                <Play className="w-3.5 h-3.5" />
+                Run Full QA Loop
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {/* ─── Overall Score + Stats Banner ─────────────────── */}
-      <div className="bg-gradient-to-br from-blue-500/5 via-slate-900 to-slate-900 border border-blue-500/15 rounded-xl p-6">
-        <div className="flex flex-col md:flex-row items-center gap-8">
-          <div className="flex-shrink-0">
-            <CircularGauge score={displayScore} size={180} />
+      {/* ─── Error Banner ────────────────────────────────── */}
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-red-400 text-sm font-medium">QA Loop Failed</p>
+            <p className="text-red-300/70 text-xs mt-1">{error}</p>
           </div>
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-emerald-400">{passingCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Passing</div>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-amber-400">{warningCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Warning</div>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-red-400">{failingCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Failing</div>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-white">{dimensions.length}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Dimensions</div>
-            </div>
-          </div>
-          <div className="flex-shrink-0 space-y-2 text-right">
-            <div className="text-xs text-slate-500 uppercase tracking-wider">Open Issues</div>
-            <div className="flex items-center justify-end gap-3">
-              <span className="flex items-center gap-1.5 text-sm">
-                <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                <span className="text-red-400 font-semibold">{criticalIssues}</span>
-                <span className="text-slate-500">critical</span>
-              </span>
-              <span className="flex items-center gap-1.5 text-sm">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-amber-400 font-semibold">{majorIssues}</span>
-                <span className="text-slate-500">major</span>
-              </span>
-            </div>
+          <button onClick={() => setError(null)} className="ml-auto text-red-400/50 hover:text-red-400">
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ─── No Results Yet ─────────────────────────────── */}
+      {!result && !loading && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+          <Shield className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-slate-300 mb-2">No QA Loop Run Yet</h2>
+          <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
+            Run the full QA loop to test every engine in the system — AI providers, database, 
+            autonomous pipelines, cron jobs, and all 12 sub-systems.
+          </p>
+          <button
+            onClick={runQALoop}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+          >
+            <Play className="w-4 h-4" />
+            Start Full System QA
+          </button>
+        </div>
+      )}
+
+      {/* ─── Loading State ───────────────────────────────── */}
+      {loading && !result && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center">
+          <Loader2 className="w-12 h-12 text-blue-400 mx-auto mb-4 animate-spin" />
+          <h2 className="text-lg font-semibold text-slate-300 mb-2">Running Full System QA...</h2>
+          <p className="text-slate-500 text-sm max-w-md mx-auto">
+            Testing 12 engines with real API calls. This may take up to 2 minutes.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5"><Database className="w-3.5 h-3.5" />Database</span>
+            <span className="flex items-center gap-1.5"><Brain className="w-3.5 h-3.5" />AI Providers</span>
+            <span className="flex items-center gap-1.5"><Target className="w-3.5 h-3.5" />Governor</span>
+            <span className="flex items-center gap-1.5"><Scan className="w-3.5 h-3.5" />Scanner</span>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ─── Dimension Cards ───────────────────────────── */}
-      <div>
-        <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-400" />
-          Quality Dimensions
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {dimensions.map((dim) => {
-            const Icon = dim.icon
-            return (
-              <div
-                key={dim.name}
-                className={`bg-slate-900 border rounded-xl p-5 hover:border-slate-600 transition-all duration-200 group cursor-default ${
-                  dim.status === 'warning' ? 'border-amber-500/20' : dim.status === 'failing' ? 'border-red-500/20' : 'border-slate-800'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                      dim.status === 'passing' ? 'bg-blue-500/10' :
-                      dim.status === 'warning' ? 'bg-amber-500/10' :
-                      'bg-red-500/10'
-                    }`}>
-                      <Icon className={`w-4.5 h-4.5 ${
-                        dim.status === 'passing' ? 'text-blue-400' :
-                        dim.status === 'warning' ? 'text-amber-400' :
-                        'text-red-400'
-                      }`} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-white">{dim.name}</div>
-                      <div className="text-[11px] text-slate-500">{dim.description}</div>
-                    </div>
+      {/* ─── Results ─────────────────────────────────────── */}
+      {result && (
+        <>
+          {/* Overall Score Banner */}
+          <div className="bg-gradient-to-br from-blue-500/5 via-slate-900 to-slate-900 border border-blue-500/15 rounded-xl p-6">
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-shrink-0">
+                <CircularGauge score={displayScore} size={160} />
+              </div>
+              <div className="flex-1 w-full">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-emerald-400">{result.passedTests}</div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Passed</div>
                   </div>
-                  <div className={`text-2xl font-bold ${scoreColor(dim.score)}`}>{dim.score}</div>
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-amber-400">{result.warningTests}</div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Warnings</div>
+                  </div>
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-red-400">{result.failedTests}</div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Failed</div>
+                  </div>
+                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold text-white">{result.totalTests}</div>
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Total Tests</div>
+                  </div>
                 </div>
-                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-3">
-                  <div
-                    className={`h-full rounded-full ${barColor(dim.status)} transition-all duration-700 ease-out`}
-                    style={{ width: `${dim.score}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${statusBg(dim.status)}`}>
-                    {dim.status === 'passing' && <CheckCircle2 className="w-3 h-3" />}
-                    {dim.status === 'warning' && <AlertTriangle className="w-3 h-3" />}
-                    {dim.status === 'failing' && <AlertCircle className="w-3 h-3" />}
-                    {dim.status.charAt(0).toUpperCase() + dim.status.slice(1)}
-                  </span>
-                  <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                    <Clock className="w-3 h-3" />
-                    {dim.lastChecked}
-                  </span>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Duration: {formatDuration(result.durationMs)}</span>
+                  <span className="text-slate-700">|</span>
+                  <span>Completed: {new Date(result.timestamp).toLocaleString()}</span>
                 </div>
               </div>
-            )
-          })}
-        </div>
-      </div>
+            </div>
+          </div>
 
-      {/* ─── Bottom Row: Issue Categories + Recent Issues ──── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Issue Categories */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <RotateCcw className="w-4 h-4 text-blue-400" />
-            Issues by Category
-          </h2>
-          {data.issueCategoryCounts && data.issueCategoryCounts.length > 0 ? (
-            <div className="space-y-3">
-              {data.issueCategoryCounts.map((cat) => (
-                <div key={cat.category} className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/30">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-white capitalize">{cat.category}</div>
-                  </div>
-                  <div className="text-sm font-bold text-slate-200">{cat.count}</div>
+          {/* Summary Alerts */}
+          {(result.summary.critical.length > 0 || result.summary.warnings.length > 0) && (
+            <div className="space-y-2">
+              {result.summary.critical.map((msg, i) => (
+                <div key={`c${i}`} className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-xs text-red-300">{msg}</span>
+                </div>
+              ))}
+              {result.summary.warnings.map((msg, i) => (
+                <div key={`w${i}`} className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-xs text-amber-300">{msg}</span>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400/40 mx-auto mb-2" />
-              <p className="text-slate-500 text-xs">No issues by category</p>
+          )}
+
+          {/* Info Messages */}
+          {result.summary.info.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-2">
+                <Info className="w-3.5 h-3.5" /> System Info
+              </h3>
+              <div className="space-y-1">
+                {result.summary.info.map((msg, i) => (
+                  <p key={i} className="text-xs text-slate-500">• {msg}</p>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Severity breakdown */}
-          {data.issueCounts && (
-            <div className="mt-4 pt-3 border-t border-slate-800 grid grid-cols-4 gap-2">
-              <div className="text-center">
-                <div className="text-lg font-bold text-red-400">{data.issueCounts.critical}</div>
-                <div className="text-[10px] text-slate-500 uppercase">Critical</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-amber-400">{data.issueCounts.major}</div>
-                <div className="text-[10px] text-slate-500 uppercase">Major</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-blue-400">{data.issueCounts.medium}</div>
-                <div className="text-[10px] text-slate-500 uppercase">Medium</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-slate-400">{data.issueCounts.minor}</div>
-                <div className="text-[10px] text-slate-500 uppercase">Minor</div>
-              </div>
-            </div>
-          )}
-        </div>
+          {/* ─── Test Sections ─────────────────────────────── */}
 
-        {/* Recent Issues */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
-            Recent Issues
-            <span className="ml-auto text-[10px] text-slate-400">{data.recentIssues?.length ?? 0} found</span>
-          </h2>
-          {data.recentIssues && data.recentIssues.length > 0 ? (
-            <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-1">
-              {data.recentIssues.map((issue) => {
-                const sev = severityConfig(issue.severity)
-                const SevIcon = sev.icon
-                return (
-                  <div
-                    key={issue.id}
-                    className={`rounded-lg border p-3 ${sev.bg} ${sev.border} transition-colors hover:brightness-110`}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <SevIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${sev.color}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-medium text-white truncate">{issue.title}</span>
-                        </div>
-                        {issue.description && (
-                          <p className="text-[11px] text-slate-400 leading-relaxed mb-1.5">{issue.description}</p>
-                        )}
-                        <div className="flex items-center gap-3">
-                          <span className={`text-[10px] font-medium ${sev.color}`}>{sev.label}</span>
-                          <span className="text-[10px] text-slate-500 capitalize">{issue.category}</span>
-                          <span className="flex items-center gap-1 text-[10px] text-slate-600">
-                            <Clock className="w-2.5 h-2.5" />
-                            {new Date(issue.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-600 mt-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
+          {/* 1. Database */}
+          <TestSection icon={Database} title="Database Connectivity" status={result.tests.database.status} message={result.tests.database.message} durationMs={result.tests.database.durationMs} defaultOpen={result.tests.database.status !== 'pass'}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {Object.entries(result.tests.database.details.counts).map(([table, count]) => (
+                <DetailRow key={table} label={table} value={count as number} mono />
+              ))}
+            </div>
+            {result.tests.database.details.errors.length > 0 && (
+              <div className="mt-2">
+                <p className="text-[10px] text-red-400 font-medium mb-1">Errors:</p>
+                {result.tests.database.details.errors.map((err, i) => (
+                  <p key={i} className="text-[10px] text-red-300/70 font-mono">{err}</p>
+                ))}
+              </div>
+            )}
+          </TestSection>
+
+          {/* 2. AI Providers */}
+          <TestSection icon={Brain} title="AI Providers" status={result.tests.aiProviders.some(p => p.status === 'fail') ? 'fail' : result.tests.aiProviders.some(p => p.status === 'warn') ? 'warn' : 'pass'} message={`${result.tests.aiProviders.filter(p => p.status === 'pass').length}/${result.tests.aiProviders.length} providers operational`} durationMs={result.tests.aiProviders.reduce((s, p) => s + p.durationMs, 0)} defaultOpen={true}>
+            <div className="space-y-2">
+              {result.tests.aiProviders.map((provider) => (
+                <div key={provider.provider} className={`rounded-lg border p-3 ${statusBg(provider.status)}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {statusIcon(provider.status)}
+                    <span className="text-xs font-semibold text-white capitalize">{provider.provider}</span>
+                    <span className="text-[10px] text-slate-500 font-mono ml-auto">{provider.details.model}</span>
                   </div>
-                )
-              })}
+                  <div className="grid grid-cols-2 gap-2">
+                    <DetailRow label="Latency" value={formatDuration(provider.details.latencyMs)} />
+                    <DetailRow label="Success" value={provider.details.success ? 'Yes' : 'No'} />
+                  </div>
+                  {provider.details.responseSnippet && (
+                    <div className="mt-2 p-2 rounded bg-slate-800/50">
+                      <p className="text-[10px] text-slate-400 font-mono">Response: &quot;{provider.details.responseSnippet}&quot;</p>
+                    </div>
+                  )}
+                  {provider.details.error && (
+                    <p className="text-[10px] text-red-400 mt-1">Error: {provider.details.error}</p>
+                  )}
+                </div>
+              ))}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400/40 mx-auto mb-2" />
-              <p className="text-slate-500 text-xs">No issues found — all clear!</p>
-            </div>
-          )}
-        </div>
-      </div>
+          </TestSection>
 
-      {/* ─── Quick Actions Footer ─────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-        <div className="flex items-center gap-1.5">
-          <Zap className="w-3.5 h-3.5 text-blue-400" />
-          <span>Next full scan: <span className="text-slate-300">06:00 UTC</span></span>
-        </div>
-        <span className="text-slate-700">|</span>
-        <span>Last run: <span className="text-slate-300">{data.run?.completedAt ? new Date(data.run.completedAt).toLocaleString() : 'N/A'}</span></span>
-        <span className="text-slate-700">|</span>
-        <span>Total issues: <span className="text-slate-300">{data.issueCounts?.total ?? 0}</span></span>
-        <span className="text-slate-700">|</span>
-        <span>Pass rate: <span className="text-emerald-400">{data.run?.productScore ?? 0}%</span></span>
-      </div>
+          {/* 3. AI Router */}
+          <TestSection icon={Cpu} title="AI Router" status={result.tests.aiRouter.status} message={result.tests.aiRouter.message} durationMs={result.tests.aiRouter.durationMs}>
+            <div className="grid grid-cols-2 gap-2">
+              <DetailRow label="Model" value={result.tests.aiRouter.details.model} />
+              <DetailRow label="Provider" value={result.tests.aiRouter.details.provider} />
+              <DetailRow label="Status" value={result.tests.aiRouter.details.status} />
+              <DetailRow label="Latency" value={formatDuration(result.tests.aiRouter.details.latencyMs)} />
+            </div>
+            {result.tests.aiRouter.details.fallbackChain.length > 0 && (
+              <div className="mt-2 p-2 rounded bg-slate-800/50">
+                <p className="text-[10px] text-slate-500 mb-1">Fallback Chain:</p>
+                <p className="text-[10px] text-slate-400 font-mono">{result.tests.aiRouter.details.fallbackChain.join(' → ')}</p>
+              </div>
+            )}
+            {result.tests.aiRouter.details.content && (
+              <div className="mt-2 p-2 rounded bg-slate-800/50">
+                <p className="text-[10px] text-slate-400 font-mono">Response: &quot;{result.tests.aiRouter.details.content.slice(0, 150)}&quot;</p>
+              </div>
+            )}
+          </TestSection>
+
+          {/* 4. Codebase Scanner */}
+          <TestSection icon={Scan} title="Codebase Scanner" status={result.tests.codebaseScanner.status} message={result.tests.codebaseScanner.message} durationMs={result.tests.codebaseScanner.durationMs}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <DetailRow label="Components" value={result.tests.codebaseScanner.details.totalComponents} mono />
+              <DetailRow label="API Routes" value={result.tests.codebaseScanner.details.totalAPIRoutes} mono />
+              <DetailRow label="Prisma Models" value={result.tests.codebaseScanner.details.totalPrismaModels} mono />
+              <DetailRow label="Pages" value={result.tests.codebaseScanner.details.totalPages} mono />
+              <DetailRow label="Hooks" value={result.tests.codebaseScanner.details.totalHooks} mono />
+              <DetailRow label="Libs" value={result.tests.codebaseScanner.details.totalLibs} mono />
+            </div>
+          </TestSection>
+
+          {/* 5. AI Governor */}
+          <TestSection icon={Target} title="AI Governor" status={result.tests.aiGovernor.status} message={result.tests.aiGovernor.message} durationMs={result.tests.aiGovernor.durationMs}>
+            <div className="grid grid-cols-2 gap-2">
+              <DetailRow label="Decision" value={result.tests.aiGovernor.details.approved ? 'APPROVED' : 'REJECTED'} />
+              <DetailRow label="Confidence" value={result.tests.aiGovernor.details.confidence.toFixed(2)} />
+              <DetailRow label="Impact Score" value={`${result.tests.aiGovernor.details.impactScore}/10`} />
+              <DetailRow label="Latency" value={formatDuration(result.tests.aiGovernor.details.latencyMs)} />
+            </div>
+            {result.tests.aiGovernor.details.ruleApplied && (
+              <div className="mt-2 p-2 rounded bg-slate-800/50">
+                <p className="text-[10px] text-slate-400">Rule Applied: <span className="text-amber-400 font-mono">{result.tests.aiGovernor.details.ruleApplied}</span></p>
+              </div>
+            )}
+            {result.tests.aiGovernor.details.rejectionReason && (
+              <div className="mt-2 p-2 rounded bg-slate-800/50">
+                <p className="text-[10px] text-slate-400">Rejection Reason: <span className="text-red-300">{result.tests.aiGovernor.details.rejectionReason}</span></p>
+              </div>
+            )}
+          </TestSection>
+
+          {/* 6. Daily Mission Generator */}
+          <TestSection icon={Zap} title="Daily Mission Generator" status={result.tests.dailyMission.status} message={result.tests.dailyMission.message} durationMs={result.tests.dailyMission.durationMs}>
+            <div className="grid grid-cols-2 gap-2">
+              <DetailRow label="Mission ID" value={result.tests.dailyMission.details.missionId ? result.tests.dailyMission.details.missionId.slice(0, 12) + '...' : 'None'} mono />
+              <DetailRow label="Candidates Evaluated" value={result.tests.dailyMission.details.candidatesEvaluated} mono />
+              <DetailRow label="Candidates Approved" value={result.tests.dailyMission.details.candidatesApproved} mono />
+              <DetailRow label="Candidates Rejected" value={result.tests.dailyMission.details.candidatesRejected} mono />
+            </div>
+            <div className="mt-2 p-2 rounded bg-emerald-500/5 border border-emerald-500/10">
+              <p className="text-[10px] text-emerald-400">This test verified the full autonomous pipeline: Scan → Candidates → Governor → Persist</p>
+            </div>
+          </TestSection>
+
+          {/* 7. Cron Jobs */}
+          <TestSection icon={Clock} title="Cron Jobs" status={result.tests.cronJobs.some(c => c.status === 'fail') ? 'fail' : result.tests.cronJobs.some(c => c.status === 'warn') ? 'warn' : 'pass'} message={`${result.tests.cronJobs.filter(c => c.status === 'pass').length}/${result.tests.cronJobs.length} cron jobs with recent data`} durationMs={result.tests.cronJobs.reduce((s, c) => s + c.durationMs, 0)}>
+            <div className="space-y-2">
+              {result.tests.cronJobs.map((cron) => (
+                <div key={cron.cronName} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/30">
+                  {statusIcon(cron.status)}
+                  <span className="text-xs font-medium text-white flex-1">{cron.cronName}</span>
+                  <span className="text-[10px] text-slate-500">{cron.details.recordCount} records</span>
+                  <span className="text-[10px] text-slate-600">{cron.details.lastRun ? new Date(cron.details.lastRun).toLocaleDateString() : 'Never'}</span>
+                </div>
+              ))}
+            </div>
+          </TestSection>
+
+          {/* 8. Factory Pipeline */}
+          <TestSection icon={Server} title="Factory Pipeline" status={result.tests.factoryPipeline.status} message={result.tests.factoryPipeline.message} durationMs={result.tests.factoryPipeline.durationMs}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <DetailRow label="Recent Tasks (24h)" value={result.tests.factoryPipeline.details.recentTasks} mono />
+              <DetailRow label="Recent Interceptions" value={result.tests.factoryPipeline.details.recentInterceptions} mono />
+              <DetailRow label="Recent QA Runs" value={result.tests.factoryPipeline.details.recentQARuns} mono />
+            </div>
+            {Object.keys(result.tests.factoryPipeline.details.taskStatuses).length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-[10px] text-slate-500">Task Status Breakdown:</p>
+                {Object.entries(result.tests.factoryPipeline.details.taskStatuses).map(([status, count]) => (
+                  <div key={status} className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 capitalize">{status}:</span>
+                    <span className="text-[10px] text-white font-mono">{count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TestSection>
+
+          {/* 9-12. Engines Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Content Engine */}
+            <TestSection icon={BarChart3} title="Content Engine" status={result.tests.contentEngine.status} message={result.tests.contentEngine.message} durationMs={result.tests.contentEngine.durationMs}>
+              <div className="grid grid-cols-3 gap-2">
+                <DetailRow label="Briefs" value={result.tests.contentEngine.details.briefCount} mono />
+                <DetailRow label="Articles" value={result.tests.contentEngine.details.articleCount} mono />
+                <DetailRow label="Reviews" value={result.tests.contentEngine.details.reviewCount} mono />
+              </div>
+              {result.tests.contentEngine.details.recentActivity && (
+                <div className="mt-2 p-2 rounded bg-emerald-500/5 border border-emerald-500/10">
+                  <p className="text-[10px] text-emerald-400">Recent activity detected — engine is operational</p>
+                </div>
+              )}
+            </TestSection>
+
+            {/* Observatory */}
+            <TestSection icon={Telescope} title="Observatory" status={result.tests.observatory.status} message={result.tests.observatory.message} durationMs={result.tests.observatory.durationMs}>
+              <div className="grid grid-cols-2 gap-2">
+                <DetailRow label="Crawls" value={result.tests.observatory.details.crawlCount} mono />
+                <DetailRow label="Responses" value={result.tests.observatory.details.responseCount} mono />
+                <DetailRow label="Changes" value={result.tests.observatory.details.changeCount} mono />
+                <DetailRow label="Reports" value={result.tests.observatory.details.reportCount} mono />
+              </div>
+            </TestSection>
+
+            {/* Growth Engine */}
+            <TestSection icon={TrendingUp} title="Growth Engine" status={result.tests.growthEngine.status} message={result.tests.growthEngine.message} durationMs={result.tests.growthEngine.durationMs}>
+              <div className="grid grid-cols-3 gap-2">
+                <DetailRow label="Memories" value={result.tests.growthEngine.details.memoryCount} mono />
+                <DetailRow label="Evidence" value={result.tests.growthEngine.details.evidenceCount} mono />
+                <DetailRow label="Sprints" value={result.tests.growthEngine.details.sprintCount} mono />
+              </div>
+            </TestSection>
+
+            {/* Engagement */}
+            <TestSection icon={Users} title="Engagement" status={result.tests.engagement.status} message={result.tests.engagement.message} durationMs={result.tests.engagement.durationMs}>
+              <div className="grid grid-cols-3 gap-2">
+                <DetailRow label="Missions" value={result.tests.engagement.details.missionCount} mono />
+                <DetailRow label="Briefs" value={result.tests.engagement.details.briefCount} mono />
+                <DetailRow label="Streaks" value={result.tests.engagement.details.streakCount} mono />
+              </div>
+            </TestSection>
+          </div>
+
+          {/* Footer */}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-blue-400" />
+              <span>Score: <span className={`font-semibold ${result.overallScore >= 80 ? 'text-emerald-400' : result.overallScore >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{result.overallScore}/100</span></span>
+            </div>
+            <span className="text-slate-700">|</span>
+            <span>Status: <span className={`font-semibold ${result.overallStatus === 'operational' ? 'text-emerald-400' : result.overallStatus === 'degraded' ? 'text-amber-400' : 'text-red-400'}`}>{result.overallStatus.toUpperCase()}</span></span>
+            <span className="text-slate-700">|</span>
+            <span>Duration: <span className="text-slate-300">{formatDuration(result.durationMs)}</span></span>
+            <span className="text-slate-700">|</span>
+            <span>Timestamp: <span className="text-slate-300">{new Date(result.timestamp).toLocaleString()}</span></span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
