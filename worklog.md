@@ -75,3 +75,83 @@ Work Log:
   - Parses summary JSON to return full test results
   - Returns scores, metrics, and parsed results
 - Lint: clean (no new errors; pre-existing errors in generate-docx.js and EngagementShell.tsx remain)
+
+---
+Task ID: 3
+Agent: Main
+Task: Fix ALL broken control panel tabs
+
+Work Log:
+
+## 1. CRITICAL: Engagement tab (/control/engagement) — Client-side crash fix
+**Root Cause:** API returned `engagement` with only `momentum`, `streak`, `activeMission`, `inboxCount`. The page expected `brief`, `countdowns`, `mysteryBox`, `coach`, `season`, `weeklyMission`, `activitySummary`, and `activeMission.steps` — all undefined, causing crash at `data.countdowns.length`.
+
+**Fix:**
+- Updated `/api/control/data/route.ts` to include ALL engagement sub-data: brief, countdowns, mysteryBox, coach, season, weeklyMission, activitySummary, plus `include: { steps }` on activeMission query
+- Rewrote `/control/engagement/page.tsx` with safe optional chaining: `(data.countdowns ?? []).length`, `(data.inboxCount ?? 0)`, `data.activeMission?.steps ?? []`, etc.
+- Replaced purple color with emerald/amber/cyan consistently
+
+## 2. Engineering Memory tab (/control/engineering-memory) — Blank page fix
+**Root Cause:** Page read `json.recentMemories` but API returns `json.factory.recentMemories`. Also, the page's `MemoryRecord` interface didn't match the actual `EngineeringMemory` Prisma model (which has `patternType`, `patternName`, `description`, `filePath`, `occurrences`, `confidence`, `lastSeenAt`, `metadata` — not `taskId`, `feature`, `testsAdded`, etc.).
+
+**Fix:**
+- Rewrote page to read from `json.factory?.recentMemories ?? json.recentMemories ?? []`
+- Adapted all types to match real EngineeringMemory schema
+- Added pattern type breakdown, confidence bars, file path references, filter by type
+
+## 3. QA Docs tab (/control/documentation/qa) — Blank page fix
+**Root Cause:** Page checked `productQA?.hasData` which doesn't exist on QARun objects. The API returns `productQA: latestQA` (a QARun or null), not an object with `hasData` boolean.
+
+**Fix:**
+- Changed data check to `run !== null` (checks if QARun exists)
+- When no QA run: shows QA process overview, 9 quality dimensions, how to run QA loops
+- When QA run exists: shows dimension scores, test coverage, recent issues, health score
+- Replaced blue colors with emerald/cyan/amber
+
+## 4. Analytics tab (/control/analytics) — "No analytics data yet" fix
+**Root Cause:** Page only showed data if `growth.snapshot !== null || growth.opportunities.length > 0`. When no growth data existed, it showed empty state despite having rich system data available.
+
+**Fix:**
+- Rewrote to show real system metrics from the control data API regardless of growth data
+- Added system health banner, component status grid, database record counts
+- Added AI cost by model breakdown, tech debt summary, cron schedule overview
+- Added entityCounts (users, projects, analyses) to API response
+- Growth metrics shown as optional section when available
+
+## 5. Client Zero tab (/control/client-zero) — "No Client Zero data" fix
+**Root Cause:** `typeof null === 'object'` in JavaScript, so `typeof clientZero.score === 'object'` was true even when score was null, but then `kpi` would be `null` (falsy) and KPI sections wouldn't render.
+
+**Fix:**
+- Changed check to `clientZero.score != null && typeof clientZero.score === 'object'` (truthiness check first)
+- Replaced purple colors with emerald consistently
+- Added more helpful empty state message explaining Client Zero concept
+
+## 6. Settings tab (/control/settings) — "No Settings Found" fix
+**Root Cause:** When `db.systemSetting.findMany()` returns empty array (no records in DB), the page showed "No Settings Found" with no useful information.
+
+**Fix:**
+- Updated `/api/control/data/route.ts` to derive settings from environment variables when DB is empty
+- Added 10 env-derived settings (GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, Z_AI_CONFIG, DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, VERCEL_URL, VERCEL_ENV)
+- Settings are merged: DB settings take priority, env settings fill in gaps
+- Secret values are masked (show first 4 + •••• + last 4 chars)
+- Added configuration summary card and system information section
+
+## 7. Changelog tab (/control/documentation/changelog) — Empty changelog fix
+**Root Cause:** Page expected `release.added[]`, `release.fixed[]`, `release.breaking[]` arrays (grouped by version with sub-arrays). But the real FactoryChangelog model has individual entries with `version`, `title`, `type` (feature|fix|improvement|breaking|security), not grouped arrays.
+
+**Fix:**
+- Rewrote to group FactoryChangelog entries by version dynamically
+- Each entry displays with type-specific icon/color (feature=emerald, fix=cyan, improvement=amber, breaking=red, security=purple)
+- Added proper type filter bar
+- Shows per-version badges (Breaking, Security, Safe Update)
+- Displays engine source, deploy time, PR links when available
+
+## API Changes Summary (`/api/control/data/route.ts`):
+1. Engagement section expanded from 4 fields to 11 (added brief, countdowns, mysteryBox, coach, season, weeklyMission, activitySummary, activeMission with steps)
+2. Settings section now merges DB settings with env-derived config (10 env keys)
+3. Added `entityCounts` (users, projects, analyses) to response
+
+## Lint Results:
+- Only pre-existing errors remain: generate-docx.js (2 require-import errors), EngagementShell.tsx (1 unused eslint-disable warning)
+- No new errors from any of the 8 modified files
+- TypeScript compilation: no errors in any control page or API route

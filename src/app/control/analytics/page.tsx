@@ -4,59 +4,92 @@ import { useEffect, useState } from 'react'
 import {
   BarChart3, TrendingUp, Eye, DollarSign,
   ArrowUpRight, ArrowDownRight, AlertTriangle, Activity,
-  Package, Target, Zap, Clock,
+  Package, Target, Zap, Clock, Shield, Database,
+  Users, FileCode2, Cpu, Globe, CheckCircle2,
 } from 'lucide-react'
 
-// ── API Types ────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────
 
-interface GrowthDailySnapshot {
-  id: string
-  date: string
-  assetsPublished: number
-  assetsRejected: number
-  assetsMerged: number
-  avgQualityScore: number
-  avgConfidence: number
-  aiVisibilityGain: number
-  citationGain: number
-  entityGrowth: number
-  organicGrowth: number
-  knowledgeCoverage: number
-  platformValueAdded: number
-  predictionAccuracy: number
-  successfulRate: number
-  byTypeBreakdown: string
-  createdAt: string
-}
-
-interface GrowthOpportunity {
-  id: string
-  title: string
-  description: string | null
-  type: string
+interface SystemComponent {
   status: string
-  priority: string
-  estimatedImpact: number
-  confidence: number
-  source: string | null
-  createdAt: string
+  latency: number
+  details: string
 }
 
-interface GrowthData {
-  snapshot: GrowthDailySnapshot | null
-  opportunities: GrowthOpportunity[]
+interface SystemStatus {
+  components: Record<string, SystemComponent>
+  overallStatus: string
+  lastChecked: string
 }
 
-interface AnalyticsPageData {
-  growth: GrowthData
-  // Other sections available but not used by this page
-  [key: string]: unknown
+interface ControlData {
+  factory: {
+    counts: {
+      factoryTasks: number
+      interceptions: number
+      missions: number
+      qaRuns: number
+      snapshots: number
+      memories: number
+      changelogs: number
+    }
+    aiProviders: {
+      configured: string[]
+      available: string[]
+      using: string
+    }
+    scheduleSummary: {
+      totalJobs: number
+      completed: number
+      running: number
+      pending: number
+      failed: number
+    }
+    timestamp: string
+  }
+  growth: {
+    snapshot: any | null
+    opportunities: any[]
+  }
+  systemStatus: SystemStatus
+  aiCost: {
+    totalRecords: number
+    monthlySpend: number
+    monthlyTokens: { prompt: number; completion: number; total: number }
+    monthlyRequests: number
+    byModel: any[]
+    byAgent: any[]
+  }
+  entityCounts: {
+    users: number
+    projects: number
+    analyses: number
+  }
+  techDebt: {
+    apiRoutes: number
+    prismaModels: number
+    lintErrors: number
+    typescriptErrors: number
+    technicalDebtScore: number
+  }
+  performance: {
+    scores: {
+      performance: number
+      seo: number
+      accessibility: number
+    }
+    lastRun: { completedAt: string; durationMs: number } | null
+  }
+  security: {
+    securityScore: number
+    vulnerabilities: { critical: number; high: number; medium: number; low: number; total: number }
+  }
 }
 
-// ── Component ────────────────────────────────────────────────
+// ── Component ────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<AnalyticsPageData | null>(null)
+  const [data, setData] = useState<ControlData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -82,11 +115,10 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         <div className="animate-pulse bg-slate-800 rounded h-8 w-48" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-24" />
           ))}
         </div>
-        <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
         <div className="animate-pulse bg-slate-800 rounded-xl h-48" />
       </div>
     )
@@ -111,88 +143,97 @@ export default function AnalyticsPage() {
 
   if (!data) return null
 
-  const { snapshot, opportunities } = data.growth
+  const { factory, growth, systemStatus, aiCost, entityCounts, techDebt, performance, security } = data
+  const { snapshot, opportunities } = growth
 
-  // KPIs derived from growth snapshot
+  // ── System Health KPIs ─────────────────────────────────
+  const operationalCount = Object.values(systemStatus.components).filter(c => c.status === 'operational').length
+  const totalComponents = Object.keys(systemStatus.components).length
+  const healthPct = totalComponents > 0 ? Math.round((operationalCount / totalComponents) * 100) : 0
+
   const kpis = [
-    {
-      label: 'Assets Published',
-      value: snapshot?.assetsPublished?.toString() ?? '0',
-      delta: 'published',
-      trend: (snapshot?.assetsPublished ?? 0) > 0 ? 'up' as const : 'down' as const,
-      icon: Package,
-    },
-    {
-      label: 'AI Visibility Gain',
-      value: snapshot?.aiVisibilityGain != null ? `${Math.round(snapshot.aiVisibilityGain)}` : '0',
-      delta: 'points gained',
-      trend: (snapshot?.aiVisibilityGain ?? 0) > 0 ? 'up' as const : 'down' as const,
-      icon: TrendingUp,
-    },
-    {
-      label: 'Citation Gain',
-      value: snapshot?.citationGain != null ? `${Math.round(snapshot.citationGain)}` : '0',
-      delta: 'new citations',
-      trend: (snapshot?.citationGain ?? 0) > 0 ? 'up' as const : 'down' as const,
-      icon: Eye,
-    },
-    {
-      label: 'Success Rate',
-      value: snapshot?.successfulRate != null ? `${Math.round(snapshot.successfulRate)}%` : '0%',
-      delta: 'asset success',
-      trend: (snapshot?.successfulRate ?? 0) >= 50 ? 'up' as const : 'down' as const,
-      icon: BarChart3,
-    },
+    { label: 'System Health', value: `${healthPct}%`, trend: healthPct >= 80 ? 'up' as const : 'down' as const, delta: `${operationalCount}/${totalComponents} operational`, icon: Shield },
+    { label: 'AI Requests', value: aiCost.monthlyRequests > 0 ? aiCost.monthlyRequests.toLocaleString() : '0', trend: aiCost.monthlyRequests > 0 ? 'up' as const : 'down' as const, delta: 'this month', icon: Cpu },
+    { label: 'Monthly Spend', value: aiCost.monthlySpend > 0 ? `$${aiCost.monthlySpend.toFixed(2)}` : '$0', trend: aiCost.monthlySpend > 0 ? 'up' as const : 'down' as const, delta: 'AI costs', icon: DollarSign },
+    { label: 'Security Score', value: security.securityScore > 0 ? security.securityScore.toString() : '—', trend: security.securityScore >= 80 ? 'up' as const : 'down' as const, delta: 'vulnerability scan', icon: Shield },
+    { label: 'Users', value: entityCounts.users.toLocaleString(), trend: entityCounts.users > 0 ? 'up' as const : 'down' as const, delta: 'registered', icon: Users },
+    { label: 'Projects', value: entityCounts.projects.toLocaleString(), trend: entityCounts.projects > 0 ? 'up' as const : 'down' as const, delta: 'active', icon: Package },
+    { label: 'Analyses', value: entityCounts.analyses.toLocaleString(), trend: entityCounts.analyses > 0 ? 'up' as const : 'down' as const, delta: 'completed', icon: Eye },
+    { label: 'AI Providers', value: factory.aiProviders.configured.length.toString(), trend: factory.aiProviders.using === 'live-llm' ? 'up' as const : 'down' as const, delta: factory.aiProviders.using, icon: Globe },
   ]
 
-  // Growth metrics from snapshot
-  const growthMetrics = snapshot
-    ? [
-        { label: 'Avg Quality Score', value: Math.round(snapshot.avgQualityScore), color: 'emerald' },
-        { label: 'Avg Confidence', value: Math.round(snapshot.avgConfidence), color: 'cyan' },
-        { label: 'Entity Growth', value: Math.round(snapshot.entityGrowth), color: 'amber' },
-        { label: 'Organic Growth', value: Math.round(snapshot.organicGrowth), color: 'purple' },
-        { label: 'Knowledge Coverage', value: Math.round(snapshot.knowledgeCoverage), color: 'blue' },
-        { label: 'Platform Value', value: Math.round(snapshot.platformValueAdded), color: 'emerald' },
-        { label: 'Prediction Accuracy', value: Math.round(snapshot.predictionAccuracy), color: 'cyan' },
-      ]
-    : []
+  // ── Component Status ───────────────────────────────────
+  const componentEntries = Object.entries(systemStatus.components)
 
-  const maxMetricValue = Math.max(...growthMetrics.map(m => m.value), 1)
+  // ── Growth KPIs (if available) ─────────────────────────
+  const growthMetrics = snapshot ? [
+    { label: 'Assets Published', value: snapshot.assetsPublished ?? 0, color: 'emerald' },
+    { label: 'AI Visibility Gain', value: Math.round(snapshot.aiVisibilityGain ?? 0), color: 'cyan' },
+    { label: 'Citation Gain', value: Math.round(snapshot.citationGain ?? 0), color: 'amber' },
+    { label: 'Success Rate', value: Math.round(snapshot.successfulRate ?? 0), color: 'emerald' },
+    { label: 'Avg Quality', value: Math.round(snapshot.avgQualityScore ?? 0), color: 'cyan' },
+    { label: 'Knowledge Coverage', value: Math.round(snapshot.knowledgeCoverage ?? 0), color: 'amber' },
+  ] : []
 
-  // Parse by-type breakdown
-  let typeBreakdown: Record<string, number> = {}
-  if (snapshot?.byTypeBreakdown) {
-    try {
-      typeBreakdown = JSON.parse(snapshot.byTypeBreakdown)
-    } catch {
-      typeBreakdown = {}
-    }
-  }
+  const maxGrowthMetric = Math.max(...growthMetrics.map(m => m.value), 1)
 
-  const typeEntries = Object.entries(typeBreakdown).sort((a, b) => b[1] - a[1])
+  // ── AI Cost by Model ───────────────────────────────────
+  const byModel = aiCost.byModel ?? []
 
-  // Check if there's any data
-  const hasData = snapshot !== null || opportunities.length > 0
+  // ── Uptime calculation ─────────────────────────────────
+  const uptimeSeconds = factory.timestamp
+    ? Math.round((Date.now() - new Date(factory.timestamp).getTime()) / 1000)
+    : 0
+  const uptimeStr = uptimeSeconds < 60 ? `${uptimeSeconds}s`
+    : uptimeSeconds < 3600 ? `${Math.floor(uptimeSeconds / 60)}m`
+    : uptimeSeconds < 86400 ? `${Math.floor(uptimeSeconds / 3600)}h`
+    : `${Math.floor(uptimeSeconds / 86400)}d`
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <BarChart3 className="w-6 h-6 text-purple-400" />
+          <BarChart3 className="w-6 h-6 text-emerald-400" />
           Analytics
         </h1>
-        <p className="text-slate-400 text-sm mt-1">Platform-wide growth metrics and insights</p>
+        <p className="text-slate-400 text-sm mt-1">Platform-wide metrics, system health, and insights</p>
       </div>
 
-      {/* KPIs */}
+      {/* System Health Banner */}
+      <div className={`rounded-xl p-5 border ${
+        healthPct >= 80
+          ? 'bg-gradient-to-r from-emerald-500/10 via-slate-900 to-slate-900 border-emerald-500/20'
+          : healthPct >= 50
+            ? 'bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/20'
+            : 'bg-gradient-to-r from-red-500/10 via-slate-900 to-slate-900 border-red-500/20'
+      }`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">System Status</div>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-2xl font-bold ${
+                healthPct >= 80 ? 'text-emerald-400' : healthPct >= 50 ? 'text-amber-400' : 'text-red-400'
+              }`}>
+                {systemStatus.overallStatus === 'operational' ? 'Operational' : 'Degraded'}
+              </span>
+              <span className="text-xs text-slate-500">{healthPct}% healthy</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-slate-500 uppercase">Last Checked</div>
+            <div className="text-sm text-slate-300">{new Date(systemStatus.lastChecked).toLocaleTimeString()}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {kpis.map((k) => {
           const Icon = k.icon
           return (
             <div key={k.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Icon className="w-4 h-4 text-purple-400" />
+                <Icon className="w-4 h-4 text-emerald-400" />
                 <span className="text-[10px] text-slate-500 uppercase">{k.label}</span>
               </div>
               <div className="flex items-baseline gap-2">
@@ -207,146 +248,179 @@ export default function AnalyticsPage() {
         })}
       </div>
 
-      {!hasData ? (
-        /* Empty state */
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-          <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-white">No analytics data yet</h3>
-          <p className="text-xs text-slate-500 mt-1">Growth metrics will appear here as the platform generates assets and tracks AI visibility.</p>
+      {/* Component Status */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-emerald-400" />
+          Component Status
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {componentEntries.map(([name, comp]) => (
+            <div key={name} className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/50">
+              <div className="flex items-center gap-2 mb-1">
+                <div className={`w-2 h-2 rounded-full ${
+                  comp.status === 'operational' ? 'bg-emerald-400' :
+                  comp.status === 'degraded' ? 'bg-amber-400' : 'bg-red-400'
+                }`} />
+                <span className="text-xs font-medium text-white capitalize">{name}</span>
+              </div>
+              <div className="text-[10px] text-slate-500">{comp.details}</div>
+            </div>
+          ))}
         </div>
-      ) : (
-        <>
-          {/* Growth Metrics Bar Chart */}
-          {growthMetrics.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-white mb-4">Growth Metrics</h2>
-              <div className="space-y-2">
-                {growthMetrics.map((m) => {
-                  const pct = maxMetricValue > 0 ? (m.value / maxMetricValue) * 100 : 0
-                  return (
-                    <div key={m.label} className="flex items-center gap-4">
-                      <span className="text-xs text-slate-400 w-36 flex-shrink-0 truncate">{m.label}</span>
-                      <div className="flex-1 h-6 bg-slate-800 rounded overflow-hidden">
-                        <div
-                          className={`h-full rounded flex items-center px-2 bg-${m.color}-500/40`}
-                          style={{ width: `${Math.max(pct, 4)}%` }}
-                        >
-                          <span className="text-[10px] text-white font-medium">{m.value}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+      </div>
 
-          {/* Asset Breakdown by Type */}
-          {typeEntries.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-white mb-4">Asset Breakdown by Type</h2>
-              <div className="space-y-2">
-                {typeEntries.map(([type, count]) => {
-                  const maxCount = typeEntries[0]?.[1] || 1
-                  const pct = (count / maxCount) * 100
-                  return (
-                    <div key={type} className="flex items-center gap-4">
-                      <span className="text-xs text-slate-400 w-32 flex-shrink-0 truncate font-mono capitalize">{type}</span>
-                      <div className="flex-1 h-6 bg-slate-800 rounded overflow-hidden">
-                        <div
-                          className="h-full bg-purple-500/40 rounded flex items-center px-2"
-                          style={{ width: `${pct}%` }}
-                        >
-                          <span className="text-[10px] text-white font-medium">{count}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+      {/* Factory Counts */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <Database className="w-4 h-4 text-emerald-400" />
+          Database Records
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {[
+            { label: 'Factory Tasks', value: factory.counts.factoryTasks },
+            { label: 'Interceptions', value: factory.counts.interceptions },
+            { label: 'Missions', value: factory.counts.missions },
+            { label: 'QA Runs', value: factory.counts.qaRuns },
+            { label: 'Snapshots', value: factory.counts.snapshots },
+            { label: 'Memories', value: factory.counts.memories },
+            { label: 'Changelogs', value: factory.counts.changelogs },
+          ].map((item) => (
+            <div key={item.label} className="text-center p-3 rounded-lg bg-slate-800/30">
+              <div className="text-lg font-bold text-white">{item.value}</div>
+              <div className="text-[10px] text-slate-500 uppercase">{item.label}</div>
             </div>
-          )}
+          ))}
+        </div>
+      </div>
 
-          {/* Opportunities */}
-          {opportunities.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                <Target className="w-4 h-4 text-purple-400" />
-                Growth Opportunities
-              </h2>
-              <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
-                {opportunities.map((opp) => (
-                  <div key={opp.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/30">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                      opp.status === 'discovered' ? 'bg-amber-400' :
-                      opp.status === 'in_progress' ? 'bg-cyan-400' :
-                      opp.status === 'completed' ? 'bg-emerald-400' :
-                      'bg-slate-500'
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-slate-300">{opp.title}</div>
-                      {opp.description && (
-                        <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{opp.description}</div>
-                      )}
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400 capitalize">{opp.type}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
-                          opp.priority === 'high' || opp.priority === 'critical' ? 'bg-amber-500/20 text-amber-400' :
-                          opp.priority === 'medium' ? 'bg-cyan-500/20 text-cyan-400' :
-                          'bg-slate-700 text-slate-400'
-                        }`}>
-                          {opp.priority}
-                        </span>
-                        {opp.estimatedImpact > 0 && (
-                          <span className="text-[10px] text-emerald-400 flex items-center gap-0.5">
-                            <Zap className="w-3 h-3" />
-                            +{Math.round(opp.estimatedImpact)} impact
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-[10px] text-slate-600 flex-shrink-0 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {new Date(opp.createdAt).toLocaleDateString()}
+      {/* AI Cost Breakdown */}
+      {byModel.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+            AI Cost by Model
+          </h2>
+          <div className="space-y-2">
+            {byModel.map((m: any) => {
+              const maxCost = byModel[0]?.cost ?? 1
+              const pct = (m.cost / maxCost) * 100
+              return (
+                <div key={m.model} className="flex items-center gap-3">
+                  <span className="text-xs text-slate-400 w-40 flex-shrink-0 truncate font-mono">{m.model}</span>
+                  <div className="flex-1 h-6 bg-slate-800 rounded overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500/40 rounded flex items-center px-2"
+                      style={{ width: `${Math.max(pct, 4)}%` }}
+                    >
+                      <span className="text-[10px] text-white font-medium">${m.cost?.toFixed(4)}</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Snapshot Detail Card */}
-          {snapshot && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-purple-400" />
-                Latest Snapshot Details
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-white">{snapshot.assetsPublished}</div>
-                  <div className="text-[10px] text-slate-500 uppercase">Published</div>
+                  <span className="text-[10px] text-slate-500 w-16 text-right">{m.requests} reqs</span>
                 </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-amber-400">{snapshot.assetsRejected}</div>
-                  <div className="text-[10px] text-slate-500 uppercase">Rejected</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-400">{snapshot.assetsMerged}</div>
-                  <div className="text-[10px] text-slate-500 uppercase">Merged</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-cyan-400">{Math.round(snapshot.avgQualityScore)}%</div>
-                  <div className="text-[10px] text-slate-500 uppercase">Avg Quality</div>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-slate-800 text-[10px] text-slate-500">
-                Snapshot date: {new Date(snapshot.date).toLocaleDateString()}
-              </div>
-            </div>
-          )}
-        </>
+              )
+            })}
+          </div>
+        </div>
       )}
+
+      {/* Growth Metrics (if available) */}
+      {growthMetrics.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            Growth Metrics
+          </h2>
+          <div className="space-y-2">
+            {growthMetrics.map((m) => {
+              const pct = maxGrowthMetric > 0 ? (m.value / maxGrowthMetric) * 100 : 0
+              return (
+                <div key={m.label} className="flex items-center gap-4">
+                  <span className="text-xs text-slate-400 w-36 flex-shrink-0 truncate">{m.label}</span>
+                  <div className="flex-1 h-6 bg-slate-800 rounded overflow-hidden">
+                    <div
+                      className={`h-full rounded flex items-center px-2 bg-${m.color}-500/40`}
+                      style={{ width: `${Math.max(pct, 4)}%` }}
+                    >
+                      <span className="text-[10px] text-white font-medium">{m.value}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tech Debt Summary */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <FileCode2 className="w-4 h-4 text-emerald-400" />
+          Codebase & Tech Debt
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="text-center p-3 rounded-lg bg-slate-800/30">
+            <div className="text-lg font-bold text-white">{techDebt.apiRoutes}</div>
+            <div className="text-[10px] text-slate-500 uppercase">API Routes</div>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-slate-800/30">
+            <div className="text-lg font-bold text-cyan-400">{techDebt.prismaModels}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Prisma Models</div>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-slate-800/30">
+            <div className="text-lg font-bold text-amber-400">{techDebt.lintErrors}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Lint Errors</div>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-slate-800/30">
+            <div className="text-lg font-bold text-red-400">{techDebt.typescriptErrors}</div>
+            <div className="text-[10px] text-slate-500 uppercase">TS Errors</div>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-slate-800/30">
+            <div className="text-lg font-bold text-emerald-400">{techDebt.technicalDebtScore}</div>
+            <div className="text-[10px] text-slate-500 uppercase">Debt Score</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Schedule Summary */}
+      {factory.scheduleSummary.totalJobs > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-emerald-400" />
+            Cron Schedule
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="text-center p-3 rounded-lg bg-slate-800/30">
+              <div className="text-lg font-bold text-white">{factory.scheduleSummary.totalJobs}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Total Jobs</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/30">
+              <div className="text-lg font-bold text-emerald-400">{factory.scheduleSummary.completed}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Completed</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/30">
+              <div className="text-lg font-bold text-cyan-400">{factory.scheduleSummary.running}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Running</div>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-slate-800/30">
+              <div className="text-lg font-bold text-amber-400">{factory.scheduleSummary.pending}</div>
+              <div className="text-[10px] text-slate-500 uppercase">Pending</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Data as of: <span className="text-slate-300">{new Date(factory.timestamp).toLocaleString()}</span></span>
+        </div>
+        <span className="text-slate-700">|</span>
+        <span>AI Mode: <span className="text-emerald-400">{factory.aiProviders.using}</span></span>
+        <span className="text-slate-700">|</span>
+        <span>Providers: <span className="text-slate-300">{factory.aiProviders.configured.join(', ') || 'none'}</span></span>
+      </div>
     </div>
   )
 }

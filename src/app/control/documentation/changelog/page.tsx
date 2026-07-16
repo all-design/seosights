@@ -4,23 +4,49 @@ import { useEffect, useState } from 'react'
 import {
   FileClock, RefreshCw, Plus, Wrench, AlertTriangle,
   ArrowRight, Clock, GitBranch, Filter, CheckCircle2,
-  XCircle, Database, Code, Zap, Tag, ChevronDown,
+  XCircle, Database, Code, Zap, Tag, Eye, Shield,
+  Layers, Flame, Rocket,
 } from 'lucide-react'
 
-// ─── Types ───────────────────────────────────────────────
+// ─── Types (matching FactoryChangelog Prisma model) ─────────
 
-type ChangeCategory = 'added' | 'fixed' | 'breaking' | 'migration'
-type FilterType = 'all' | 'added' | 'fixed' | 'breaking'
+interface ChangelogEntry {
+  id: string
+  version: string
+  title: string
+  description: string | null
+  type: string  // feature | fix | improvement | breaking | security
+  engine: string | null
+  prUrl: string | null
+  deployedAt: string | null
+  createdAt: string
+}
 
 // ─── Helpers ─────────────────────────────────────────────
 
-function categoryConfig(category: ChangeCategory) {
-  switch (category) {
-    case 'added': return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/20', icon: Plus, label: 'Added' }
-    case 'fixed': return { color: 'text-cyan-400', bg: 'bg-cyan-500/15', border: 'border-cyan-500/20', icon: Wrench, label: 'Fixed' }
+type ChangeType = 'feature' | 'fix' | 'improvement' | 'breaking' | 'security'
+type FilterType = 'all' | ChangeType
+
+function typeConfig(type: string) {
+  switch (type) {
+    case 'feature': return { color: 'text-emerald-400', bg: 'bg-emerald-500/15', border: 'border-emerald-500/20', icon: Plus, label: 'Feature' }
+    case 'fix': return { color: 'text-cyan-400', bg: 'bg-cyan-500/15', border: 'border-cyan-500/20', icon: Wrench, label: 'Fix' }
+    case 'improvement': return { color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/20', icon: Zap, label: 'Improvement' }
     case 'breaking': return { color: 'text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/20', icon: AlertTriangle, label: 'Breaking' }
-    case 'migration': return { color: 'text-amber-400', bg: 'bg-amber-500/15', border: 'border-amber-500/20', icon: Database, label: 'Migration' }
+    case 'security': return { color: 'text-purple-400', bg: 'bg-purple-500/15', border: 'border-purple-500/20', icon: Shield, label: 'Security' }
+    default: return { color: 'text-slate-400', bg: 'bg-slate-500/15', border: 'border-slate-500/20', icon: Code, label: type }
   }
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
 }
 
 // ─── Main Component ──────────────────────────────────────
@@ -48,20 +74,34 @@ export default function ChangelogEnginePage() {
     return <div className="animate-pulse bg-slate-800 rounded-xl h-96" />
   }
 
-  const changelog = data?.factory?.recentChangelogs || []
+  // Changelog entries from API
+  const changelog: ChangelogEntry[] = data?.factory?.recentChangelogs ?? data?.factory?.changelogs ?? []
 
   // Derive stats from real data
-  const totalReleases = changelog.length
-  const totalAdded = changelog.reduce((sum: number, r: any) => sum + (r.added?.length || 0), 0)
-  const totalBreaking = changelog.reduce((sum: number, r: any) => sum + (r.breaking?.length || 0), 0)
-  const firstVersion = changelog.length > 0 ? changelog[changelog.length - 1].version : '—'
-  const latestVersion = changelog.length > 0 ? changelog[0].version : '—'
+  const totalEntries = changelog.length
+  const features = changelog.filter(e => e.type === 'feature').length
+  const fixes = changelog.filter(e => e.type === 'fix').length
+  const breaking = changelog.filter(e => e.type === 'breaking').length
 
+  // Group by version
+  const byVersion: Record<string, ChangelogEntry[]> = {}
+  for (const entry of changelog) {
+    const ver = entry.version || 'unversioned'
+    if (!byVersion[ver]) byVersion[ver] = []
+    byVersion[ver].push(entry)
+  }
+  const versionEntries = Object.entries(byVersion)
+  const latestVersion = versionEntries.length > 0 ? versionEntries[0][0] : '—'
+  const firstVersion = versionEntries.length > 0 ? versionEntries[versionEntries.length - 1][0] : '—'
+
+  // Filter
   const filterOptions: { key: FilterType; label: string }[] = [
     { key: 'all', label: 'All' },
-    { key: 'added', label: 'Added' },
-    { key: 'fixed', label: 'Fixed' },
+    { key: 'feature', label: 'Features' },
+    { key: 'fix', label: 'Fixes' },
+    { key: 'improvement', label: 'Improvements' },
     { key: 'breaking', label: 'Breaking' },
+    { key: 'security', label: 'Security' },
   ]
 
   return (
@@ -85,10 +125,6 @@ export default function ChangelogEnginePage() {
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs font-medium text-emerald-400">Auto-tracking</span>
           </div>
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors text-xs">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Sync Commits
-          </button>
         </div>
       </div>
 
@@ -100,28 +136,28 @@ export default function ChangelogEnginePage() {
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <GitBranch className="w-4 h-4 text-amber-400" />
-              <span className="text-2xl font-bold text-amber-400">{totalReleases}</span>
+              <span className="text-2xl font-bold text-amber-400">{totalEntries}</span>
             </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Releases Tracked</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Entries Tracked</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Tag className="w-4 h-4 text-amber-400" />
-              <span className="text-2xl font-bold text-amber-400">{firstVersion}</span>
+              <span className="text-2xl font-bold text-amber-400">{Object.keys(byVersion).length}</span>
             </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">First Release</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Versions</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Plus className="w-4 h-4 text-emerald-400" />
-              <span className="text-2xl font-bold text-emerald-400">{totalAdded}</span>
+              <span className="text-2xl font-bold text-emerald-400">{features}</span>
             </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Features Added</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider">Features</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <AlertTriangle className="w-4 h-4 text-red-400" />
-              <span className="text-2xl font-bold text-red-400">{totalBreaking}</span>
+              <span className="text-2xl font-bold text-red-400">{breaking}</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">Breaking Changes</div>
           </div>
@@ -137,6 +173,7 @@ export default function ChangelogEnginePage() {
         {filterOptions.map((opt) => (
           <button
             key={opt.key}
+            onClick={() => setActiveFilter(opt.key)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               activeFilter === opt.key
                 ? 'bg-amber-500/15 border border-amber-500/20 text-amber-400'
@@ -146,68 +183,64 @@ export default function ChangelogEnginePage() {
             {opt.label}
           </button>
         ))}
-        <span className="ml-auto text-[10px] text-slate-500">Auto-generated from: Deploy Engine + Git commits</span>
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          4. Release List
+          4. Version Groups / Entry List
           ═══════════════════════════════════════════════════════ */}
       {changelog.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
           <FileClock className="w-8 h-8 text-slate-600 mx-auto mb-3" />
           <p className="text-sm text-slate-400">No changelog entries yet</p>
-          <p className="text-[11px] text-slate-500 mt-1">Changelog entries will appear after deployments</p>
+          <p className="text-[11px] text-slate-500 mt-1">Changelog entries will appear after deployments. The factory pipeline automatically records each change.</p>
         </div>
-      ) : (
+      ) : versionEntries.length > 0 ? (
         <div className="space-y-4 max-h-[640px] overflow-y-auto custom-scrollbar pr-1">
-          {changelog.map((release: any) => {
-            const categories: { key: ChangeCategory; entries: string[] }[] = [
-              { key: 'added', entries: release.added || [] },
-              { key: 'fixed', entries: release.fixed || [] },
-              { key: 'breaking', entries: release.breaking || [] },
-              { key: 'migration', entries: release.migration || [] },
-            ]
+          {versionEntries.map(([version, entries]) => {
+            const filteredEntries = activeFilter === 'all'
+              ? entries
+              : entries.filter(e => e.type === activeFilter)
 
-            const filteredCategories = activeFilter === 'all'
-              ? categories
-              : categories.filter(c => c.key === activeFilter)
+            if (filteredEntries.length === 0) return null
 
-            // Skip releases with no matching entries
-            const hasEntries = filteredCategories.some(c => c.entries.length > 0)
-            if (!hasEntries && activeFilter !== 'all') return null
+            const versionHasBreaking = entries.some(e => e.type === 'breaking')
+            const versionHasSecurity = entries.some(e => e.type === 'security')
+            const latestDeploy = entries.find(e => e.deployedAt)?.deployedAt ?? entries[0]?.createdAt
 
             return (
               <div
-                key={release.id}
+                key={version}
                 className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all duration-200"
               >
-                {/* Release header */}
+                {/* Version header */}
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center">
                       <GitBranch className="w-4 h-4 text-amber-400" />
                     </div>
                     <div>
-                      <span className="text-lg font-bold text-white">{release.version}</span>
-                      <span className="ml-2 text-xs text-slate-500">
-                        {release.releaseDate ? new Date(release.releaseDate).toLocaleDateString() : '—'}
-                      </span>
+                      <span className="text-lg font-bold text-white">{version}</span>
+                      {latestDeploy && (
+                        <span className="ml-2 text-xs text-slate-500">
+                          {new Date(latestDeploy).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {(release.breaking || []).length > 0 && (
+                    {versionHasBreaking && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-red-500/15 text-red-400 border-red-500/20">
                         <AlertTriangle className="w-2.5 h-2.5" />
                         Breaking
                       </span>
                     )}
-                    {(release.migration || []).length > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-amber-500/15 text-amber-400 border-amber-500/20">
-                        <Database className="w-2.5 h-2.5" />
-                        Migration
+                    {versionHasSecurity && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-purple-500/15 text-purple-400 border-purple-500/20">
+                        <Shield className="w-2.5 h-2.5" />
+                        Security
                       </span>
                     )}
-                    {(!release.breaking || release.breaking.length === 0) && (!release.migration || release.migration.length === 0) && (
+                    {!versionHasBreaking && !versionHasSecurity && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-emerald-500/15 text-emerald-400 border-emerald-500/20">
                         <CheckCircle2 className="w-2.5 h-2.5" />
                         Safe Update
@@ -216,33 +249,40 @@ export default function ChangelogEnginePage() {
                   </div>
                 </div>
 
-                {/* Change sections */}
-                <div className="space-y-4">
-                  {filteredCategories.map(({ key, entries }) => {
-                    if (entries.length === 0) return null
-                    const config = categoryConfig(key)
-                    const CatIcon = config.icon
+                {/* Entry list */}
+                <div className="space-y-2">
+                  {filteredEntries.map((entry) => {
+                    const config = typeConfig(entry.type)
+                    const TypeIcon = config.icon
                     return (
-                      <div key={key}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <CatIcon className={`w-3.5 h-3.5 ${config.color}`} />
-                          <span className={`text-xs font-semibold uppercase tracking-wider ${config.color}`}>
-                            {config.label}
-                          </span>
-                          <span className="text-[10px] text-slate-500">({entries.length})</span>
+                      <div key={entry.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-800/30 transition-colors">
+                        <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${config.bg}`}>
+                          <TypeIcon className={`w-3 h-3 ${config.color}`} />
                         </div>
-                        <ul className="space-y-1.5 ml-5.5">
-                          {entries.map((entry: string, idx: number) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <div className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${
-                                key === 'added' ? 'bg-emerald-400' :
-                                key === 'fixed' ? 'bg-cyan-400' :
-                                key === 'breaking' ? 'bg-red-400' : 'bg-amber-400'
-                              }`} />
-                              <span className="text-sm text-slate-300">{entry}</span>
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-slate-200">{entry.title}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${config.bg} ${config.color} border ${config.border}`}>
+                              {config.label}
+                            </span>
+                          </div>
+                          {entry.description && (
+                            <p className="text-xs text-slate-500 mt-0.5">{entry.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-600">
+                            {entry.engine && (
+                              <span className="capitalize">{entry.engine}</span>
+                            )}
+                            {entry.deployedAt && (
+                              <span>Deployed {timeAgo(entry.deployedAt)}</span>
+                            )}
+                            {entry.prUrl && (
+                              <a href={entry.prUrl} className="text-cyan-500 hover:text-cyan-400" target="_blank" rel="noreferrer">
+                                PR →
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )
                   })}
@@ -251,7 +291,7 @@ export default function ChangelogEnginePage() {
             )
           })}
         </div>
-      )}
+      ) : null}
 
       {/* ═══════════════════════════════════════════════════════
           5. Footer
@@ -259,19 +299,18 @@ export default function ChangelogEnginePage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-amber-400" />
-          <span>Latest release: <span className="text-slate-300">{latestVersion}</span></span>
+          <span>Latest version: <span className="text-slate-300">{latestVersion}</span></span>
         </div>
         <span className="text-slate-700">|</span>
-        <span>Total releases: <span className="text-slate-300">{totalReleases}</span></span>
+        <span>Total entries: <span className="text-slate-300">{totalEntries}</span></span>
         <span className="text-slate-700">|</span>
-        <span>First release: <span className="text-slate-300">{firstVersion}</span></span>
+        <span>Versions: <span className="text-slate-300">{Object.keys(byVersion).length}</span></span>
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
           <Code className="w-3.5 h-3.5 text-amber-400" />
-          <span>Source: <span className="text-amber-400">Deploy Engine + Git commits</span></span>
+          <span>Source: <span className="text-amber-400">Factory Changelog Engine</span></span>
         </div>
       </div>
-
     </div>
   )
 }

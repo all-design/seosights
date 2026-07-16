@@ -98,12 +98,28 @@ export async function GET() {
     system.aiRouter = 'operational'
   }
 
-  // Engagement
+  // Engagement — full set of engagement sub-data
+  const activeMission = await safe(() => db.engagementMission.findFirst({
+    where: { status: 'active' },
+    include: { steps: { orderBy: { stepOrder: 'asc' } } },
+  }), null as any)
+
   const engagement = {
     momentum: await safe(() => db.engagementMomentum.findFirst({ orderBy: { createdAt: 'desc' } }), null),
     streak: await safe(() => db.engagementStreak.findFirst({ orderBy: { createdAt: 'desc' } }), null),
-    activeMission: await safe(() => db.engagementMission.findFirst({ where: { status: 'active' } }), null),
+    activeMission,
     inboxCount: await safe(() => db.engagementInboxItem.count({ where: { isUnread: true } }), 0),
+    brief: await safe(() => db.engagementBrief.findFirst({ orderBy: { briefDate: 'desc' } }), null),
+    countdowns: await safe(() => db.engagementCountdown.findMany({
+      where: { isCompleted: false },
+      orderBy: { targetTime: 'asc' },
+      take: 5,
+    }), []),
+    mysteryBox: await safe(() => db.engagementMysteryBox.findFirst({ orderBy: { createdAt: 'desc' } }), null),
+    coach: await safe(() => db.engagementCoach.findFirst({ orderBy: { coachDate: 'desc' } }), null),
+    season: await safe(() => db.engagementSeason.findFirst({ where: { status: 'active' } }), null),
+    weeklyMission: await safe(() => db.engagementWeeklyMission.findFirst({ where: { status: 'active' } }), null),
+    activitySummary: await safe(() => db.engagementActivitySummary.findFirst({ orderBy: { summaryDate: 'desc' } }), null),
   }
 
   // Growth
@@ -124,8 +140,58 @@ export async function GET() {
     deltas: await safe(() => db.clientZeroScoreDelta.findMany({ take: 10, orderBy: { createdAt: 'desc' } }), []),
   }
 
-  // Settings
-  const settings = await safe(() => db.systemSetting.findMany(), [])
+  // Settings — merge DB settings with env-derived config
+  const dbSettings = await safe(() => db.systemSetting.findMany(), [])
+
+  // Derive settings from environment when DB is empty
+  const envDerivedSettings: any[] = []
+  const envKeys = [
+    { key: 'GROQ_API_KEY', label: 'Groq API Key', category: 'ai', isSecret: true },
+    { key: 'GEMINI_API_KEY', label: 'Gemini API Key', category: 'ai', isSecret: true },
+    { key: 'OPENROUTER_API_KEY', label: 'OpenRouter API Key', category: 'ai', isSecret: true },
+    { key: 'OPENAI_API_KEY', label: 'OpenAI API Key', category: 'ai', isSecret: true },
+    { key: 'Z_AI_CONFIG', label: 'ZAI Config', category: 'ai', isSecret: true },
+    { key: 'DATABASE_URL', label: 'Database URL', category: 'database', isSecret: true },
+    { key: 'NEXTAUTH_SECRET', label: 'Auth Secret', category: 'auth', isSecret: true },
+    { key: 'NEXTAUTH_URL', label: 'Auth URL', category: 'auth', isSecret: false },
+    { key: 'VERCEL_URL', label: 'Vercel URL', category: 'general', isSecret: false },
+    { key: 'VERCEL_ENV', label: 'Vercel Environment', category: 'general', isSecret: false },
+  ]
+  for (const ek of envKeys) {
+    const val = process.env[ek.key]
+    const existsInDb = (dbSettings as any[]).some((s: any) => s.key === ek.key)
+    if (!existsInDb) {
+      envDerivedSettings.push({
+        id: `env_${ek.key}`,
+        key: ek.key,
+        label: ek.label,
+        value: val ?? null,
+        source: val ? 'env' : 'unset',
+        category: ek.category,
+        type: 'string',
+        description: `${ek.label} from environment`,
+        isSecret: ek.isSecret,
+        required: false,
+      })
+    }
+  }
+
+  // Merge DB settings with env-derived
+  const settings = [
+    ...(dbSettings as any[]).map((s: any) => ({
+      id: s.id,
+      key: s.key,
+      label: s.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      value: s.isSecret && s.value ? '••••••••' : s.value,
+      source: s.value ? 'database' : 'unset',
+      category: s.category || 'general',
+      type: 'string',
+      description: s.description || '',
+      isSecret: s.isSecret ?? false,
+      required: false,
+    })),
+    ...envDerivedSettings,
+  ]
 
   // Recent activity (merged from multiple sources)
   const recentActivity = [
@@ -446,6 +512,13 @@ export async function GET() {
       : null,
   }
 
+  // User / Project / Analysis counts for analytics
+  const entityCounts = {
+    users: await safe(() => db.user.count(), 0),
+    projects: await safe(() => db.project.count(), 0),
+    analyses: await safe(() => db.analysis.count(), 0),
+  }
+
   return NextResponse.json({
     factory: {
       system,
@@ -473,5 +546,6 @@ export async function GET() {
     security,
     aiCost,
     performance,
+    entityCounts,
   })
 }

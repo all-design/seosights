@@ -33,7 +33,7 @@ interface ClientZeroScoreDelta {
 }
 
 interface ClientZeroData {
-  score: ClientZeroKPI | number | null
+  score: ClientZeroKPI | null
   deltas: ClientZeroScoreDelta[]
 }
 
@@ -49,7 +49,7 @@ const engineMeta: Record<string, { color: string; label: string }> = {
   claude: { color: 'amber', label: 'Claude' },
   gemini: { color: 'cyan', label: 'Gemini' },
   perplexity: { color: 'violet', label: 'Perplexity' },
-  copilot: { color: 'blue', label: 'Copilot' },
+  copilot: { color: 'teal', label: 'Copilot' },
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -111,8 +111,9 @@ export default function ClientZeroPage() {
   if (!data) return null
 
   const clientZero = data.clientZero || { score: null, deltas: [] }
-  const kpi = typeof clientZero.score === 'object' ? clientZero.score : null
-  const deltas = clientZero.deltas || []
+  // Fix: typeof null === 'object' in JS, so we must check for truthiness first
+  const kpi = (clientZero.score != null && typeof clientZero.score === 'object') ? clientZero.score : null
+  const deltas = clientZero.deltas ?? []
 
   // Compute per-engine scores from deltas
   const engineScores: Record<string, number> = {}
@@ -152,11 +153,14 @@ export default function ClientZeroPage() {
     : 0
   const totalActions = deltas.length
 
+  // Has any data at all
+  const hasData = kpi !== null || deltas.length > 0
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <Target className="w-6 h-6 text-purple-400" />
+          <Target className="w-6 h-6 text-emerald-400" />
           Client Zero
         </h1>
         <p className="text-slate-400 text-sm mt-1">SeoSights is its own first user — validate everything here</p>
@@ -201,7 +205,7 @@ export default function ClientZeroPage() {
         <div className="mt-3 w-full h-2 bg-slate-800 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
-              canGrow ? 'bg-emerald-500' : 'bg-purple-500'
+              canGrow ? 'bg-emerald-500' : 'bg-slate-500'
             }`}
             style={{ width: `${Math.min((currentScore / goal) * 100, 100)}%` }}
           />
@@ -215,7 +219,7 @@ export default function ClientZeroPage() {
           return (
             <div key={m.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Icon className="w-4 h-4 text-purple-400" />
+                <Icon className="w-4 h-4 text-emerald-400" />
                 <span className="text-[10px] text-slate-500 uppercase">{m.label}</span>
               </div>
               <div className="flex items-baseline gap-2">
@@ -231,7 +235,7 @@ export default function ClientZeroPage() {
       {engineEntries.length > 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Eye className="w-4 h-4 text-purple-400" />
+            <Eye className="w-4 h-4 text-emerald-400" />
             Per-Engine AI Visibility
           </h2>
           <div className="space-y-3">
@@ -242,7 +246,7 @@ export default function ClientZeroPage() {
                   <span className="text-xs text-slate-400 w-24 flex-shrink-0 capitalize">{meta.label}</span>
                   <div className="flex-1 h-6 bg-slate-800 rounded overflow-hidden">
                     <div
-                      className={`h-full rounded flex items-center px-2 bg-${meta.color}-500/30`}
+                      className="h-full rounded flex items-center px-2 bg-emerald-500/30"
                       style={{ width: `${Math.min(scoreVal, 100)}%` }}
                     >
                       <span className="text-[10px] text-white font-medium">{Math.round(scoreVal)}</span>
@@ -265,7 +269,7 @@ export default function ClientZeroPage() {
       {deltas.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-purple-400" />
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
             Recent Score Changes
           </h2>
           <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
@@ -311,7 +315,7 @@ export default function ClientZeroPage() {
           {/* Pipeline Metrics */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-              <Brain className="w-4 h-4 text-purple-400" />
+              <Brain className="w-4 h-4 text-emerald-400" />
               Pipeline Metrics
             </h2>
             <div className="grid grid-cols-2 gap-3">
@@ -328,7 +332,7 @@ export default function ClientZeroPage() {
                 <div className="text-[10px] text-slate-500 uppercase">Recommendations</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-purple-400">{kpi.pipelineValue > 0 ? `$${Math.round(kpi.pipelineValue)}` : '—'}</div>
+                <div className="text-lg font-bold text-emerald-400">{kpi.pipelineValue > 0 ? `$${Math.round(kpi.pipelineValue)}` : '—'}</div>
                 <div className="text-[10px] text-slate-500 uppercase">Pipeline Value</div>
               </div>
             </div>
@@ -337,7 +341,7 @@ export default function ClientZeroPage() {
           {/* Revenue & Visibility */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-              <Database className="w-4 h-4 text-purple-400" />
+              <Database className="w-4 h-4 text-emerald-400" />
               Value Attribution
             </h2>
             <div className="grid grid-cols-2 gap-3">
@@ -363,6 +367,7 @@ export default function ClientZeroPage() {
           <Target className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <h3 className="text-sm font-semibold text-white">No Client Zero data yet</h3>
           <p className="text-xs text-slate-500 mt-1">Data will appear as the platform tracks AI visibility and content performance.</p>
+          <p className="text-[11px] text-slate-600 mt-2">Client Zero is SeoSights validating itself as its own first customer. Once the AI Visibility engine starts tracking and the engagement loop generates score deltas, data will populate here.</p>
         </div>
       )}
     </div>

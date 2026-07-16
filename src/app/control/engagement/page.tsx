@@ -51,7 +51,7 @@ interface EngagementMission {
   totalSteps: number | null
   completedSteps: number | null
   status: string
-  steps: EngagementMissionStep[]
+  steps?: EngagementMissionStep[]
   createdAt: string
 }
 
@@ -84,8 +84,6 @@ interface EngagementCountdown {
   label: string
   targetTime: string
   isCompleted: boolean
-  remainingMs: number
-  remainingHuman: string
 }
 
 interface EngagementMysteryBox {
@@ -138,16 +136,16 @@ interface EngagementWeeklyMission {
 
 interface EngagementData {
   momentum: EngagementMomentum | null
-  brief: EngagementBrief | null
-  activeMission: EngagementMission | null
+  brief: EngagementBrief | null | undefined
+  activeMission: EngagementMission | null | undefined
   streak: EngagementStreak | null
-  activitySummary: EngagementActivitySummary | null
-  unreadInboxCount: number
-  countdowns: EngagementCountdown[]
-  mysteryBox: EngagementMysteryBox | null
-  coach: EngagementCoach | null
-  season: EngagementSeason | null
-  weeklyMission: EngagementWeeklyMission | null
+  activitySummary: EngagementActivitySummary | null | undefined
+  inboxCount: number | undefined
+  countdowns: EngagementCountdown[] | undefined
+  mysteryBox: EngagementMysteryBox | null | undefined
+  coach: EngagementCoach | null | undefined
+  season: EngagementSeason | null | undefined
+  weeklyMission: EngagementWeeklyMission | null | undefined
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -208,6 +206,17 @@ export default function EngagementPage() {
 
   if (!data) return null
 
+  // Safe accessors with defaults
+  const countdowns = data.countdowns ?? []
+  const inboxCount = data.inboxCount ?? 0
+  const brief = data.brief ?? null
+  const mysteryBox = data.mysteryBox ?? null
+  const coach = data.coach ?? null
+  const season = data.season ?? null
+  const weeklyMission = data.weeklyMission ?? null
+  const activitySummary = data.activitySummary ?? null
+  const missionSteps = data.activeMission?.steps ?? []
+
   // Derive section data from API response
   const momentumScore = data.momentum?.momentumScore ?? 0
   const momentumDelta = data.momentum?.previousScore
@@ -216,18 +225,29 @@ export default function EngagementPage() {
   const currentStreak = data.streak?.currentStreak ?? 0
 
   // Brief headline: use headline1 as the primary headline
-  const briefHeadline = data.brief?.headline1 || data.brief?.greeting || null
+  const briefHeadline = brief?.headline1 || brief?.greeting || null
 
   const sections = [
-    { name: 'Daily Brief', icon: Mail, description: briefHeadline || 'No brief today', status: data.brief ? 'active' : 'idle', items: data.brief ? 1 : 0 },
+    { name: 'Daily Brief', icon: Mail, description: briefHeadline || 'No brief today', status: brief ? 'active' : 'idle', items: brief ? 1 : 0 },
     { name: 'Missions', icon: Zap, description: data.activeMission ? data.activeMission.title : 'No active mission', status: data.activeMission ? 'active' : 'idle', items: data.activeMission ? 1 : 0 },
     { name: 'Momentum', icon: Flame, description: `${Math.round(momentumScore)}%${momentumDelta > 0 ? ` — +${Math.round(momentumDelta)} from yesterday` : ''}`, status: momentumScore > 0 ? 'active' : 'idle', items: 0 },
     { name: 'Streak', icon: Trophy, description: currentStreak > 0 ? `${currentStreak} day${currentStreak !== 1 ? 's' : ''} improving` : 'No streak', status: currentStreak > 0 ? 'active' : 'idle', items: 0 },
-    { name: 'Inbox', icon: Inbox, description: `${data.unreadInboxCount} unread notification${data.unreadInboxCount !== 1 ? 's' : ''}`, status: data.unreadInboxCount > 0 ? 'active' : 'idle', items: data.unreadInboxCount },
-    { name: 'Countdowns', icon: Clock, description: `${data.countdowns.length} active countdown${data.countdowns.length !== 1 ? 's' : ''}`, status: data.countdowns.length > 0 ? 'active' : 'idle', items: data.countdowns.length },
-    { name: 'Mystery Box', icon: Lock, description: data.mysteryBox ? (data.mysteryBox.teaserText || 'Vault item') : 'No mystery box', status: data.mysteryBox ? 'active' : 'idle', items: data.mysteryBox ? 1 : 0 },
-    { name: 'Notifications', icon: Bell, description: `${data.unreadInboxCount} unread`, status: data.unreadInboxCount > 0 ? 'active' : 'idle', items: data.unreadInboxCount },
+    { name: 'Inbox', icon: Inbox, description: `${inboxCount} unread notification${inboxCount !== 1 ? 's' : ''}`, status: inboxCount > 0 ? 'active' : 'idle', items: inboxCount },
+    { name: 'Countdowns', icon: Clock, description: `${countdowns.length} active countdown${countdowns.length !== 1 ? 's' : ''}`, status: countdowns.length > 0 ? 'active' : 'idle', items: countdowns.length },
+    { name: 'Mystery Box', icon: Lock, description: mysteryBox ? (mysteryBox.teaserText || 'Vault item') : 'No mystery box', status: mysteryBox ? 'active' : 'idle', items: mysteryBox ? 1 : 0 },
+    { name: 'Notifications', icon: Bell, description: `${inboxCount} unread`, status: inboxCount > 0 ? 'active' : 'idle', items: inboxCount },
   ]
+
+  // Compute remaining time for a countdown
+  function getRemainingHuman(targetTime: string): string {
+    const diff = new Date(targetTime).getTime() - Date.now()
+    if (diff <= 0) return 'Expired'
+    const hours = Math.floor(diff / 3600000)
+    const mins = Math.floor((diff % 3600000) / 60000)
+    if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`
+    if (hours > 0) return `${hours}h ${mins}m`
+    return `${mins}m`
+  }
 
   return (
     <div className="space-y-6">
@@ -261,7 +281,7 @@ export default function EngagementPage() {
       </div>
 
       {/* Coach Tip */}
-      {data.coach && (data.coach.message || data.coach.recommendedAction) && (
+      {coach && (coach.message || coach.recommendedAction) && (
         <div className="bg-slate-900 border border-cyan-500/20 rounded-xl p-5">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
@@ -269,9 +289,9 @@ export default function EngagementPage() {
             </div>
             <div>
               <div className="text-xs text-cyan-400 font-semibold uppercase tracking-wider mb-1">AI Coach</div>
-              {data.coach.message && <div className="text-sm text-slate-300">{data.coach.message}</div>}
-              {data.coach.recommendedAction && <div className="text-xs text-slate-500 mt-1">{data.coach.recommendedAction}</div>}
-              {data.coach.estimatedImpact && <div className="text-[10px] text-cyan-400/60 mt-1">Impact: {data.coach.estimatedImpact}</div>}
+              {coach.message && <div className="text-sm text-slate-300">{coach.message}</div>}
+              {coach.recommendedAction && <div className="text-xs text-slate-500 mt-1">{coach.recommendedAction}</div>}
+              {coach.estimatedImpact && <div className="text-[10px] text-cyan-400/60 mt-1">Impact: {coach.estimatedImpact}</div>}
             </div>
           </div>
         </div>
@@ -322,9 +342,9 @@ export default function EngagementPage() {
               </div>
             </div>
           </div>
-          {data.activeMission.steps && data.activeMission.steps.length > 0 && (
+          {missionSteps.length > 0 && (
             <div className="space-y-2 ml-11">
-              {data.activeMission.steps.map((step) => (
+              {missionSteps.map((step) => (
                 <div key={step.id} className="flex items-center gap-2">
                   <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
                     step.isCompleted ? 'bg-emerald-500/20' : 'bg-slate-700'
@@ -345,21 +365,21 @@ export default function EngagementPage() {
       )}
 
       {/* Countdowns */}
-      {data.countdowns.length > 0 && (
+      {countdowns.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Clock className="w-4 h-4 text-emerald-400" />
             Active Countdowns
           </h2>
           <div className="space-y-3">
-            {data.countdowns.map((countdown) => (
+            {countdowns.map((countdown) => (
               <div key={countdown.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30">
                 <div className="flex items-center gap-3">
                   <Calendar className="w-4 h-4 text-cyan-400" />
                   <span className="text-xs text-slate-300">{countdown.label || countdown.countdownType}</span>
                 </div>
-                <span className={`text-xs font-mono ${countdown.remainingMs < 3600000 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {countdown.remainingHuman}
+                <span className="text-xs font-mono text-emerald-400">
+                  {getRemainingHuman(countdown.targetTime)}
                 </span>
               </div>
             ))}
@@ -368,40 +388,40 @@ export default function EngagementPage() {
       )}
 
       {/* Season / Weekly Mission */}
-      {(data.season || data.weeklyMission) && (
+      {(season || weeklyMission) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.season && (
+          {season && (
             <div className="bg-slate-900 border border-amber-500/20 rounded-xl p-5">
               <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-400" />
                 Current Season
               </h2>
-              <div className="text-lg font-bold text-amber-400">{data.season.seasonName}</div>
-              {data.season.challenge && (
-                <div className="text-xs text-slate-400 mt-1">{data.season.challenge}</div>
+              <div className="text-lg font-bold text-amber-400">{season.seasonName}</div>
+              {season.challenge && (
+                <div className="text-xs text-slate-400 mt-1">{season.challenge}</div>
               )}
               <div className="flex items-center gap-2 mt-2">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  data.season.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                  season.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
                 }`}>
-                  {data.season.status}
+                  {season.status}
                 </span>
               </div>
             </div>
           )}
-          {data.weeklyMission && (
-            <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-5">
+          {weeklyMission && (
+            <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-5">
               <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <Target className="w-4 h-4 text-purple-400" />
+                <Target className="w-4 h-4 text-emerald-400" />
                 Weekly Mission
               </h2>
-              <div className="text-sm font-medium text-white">{data.weeklyMission.title}</div>
+              <div className="text-sm font-medium text-white">{weeklyMission.title}</div>
               <div className="flex items-center gap-2 mt-2">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
-                  {data.weeklyMission.status}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                  {weeklyMission.status}
                 </span>
-                {data.weeklyMission.rewardType && (
-                  <span className="text-[10px] text-amber-400">{data.weeklyMission.rewardType}</span>
+                {weeklyMission.rewardType && (
+                  <span className="text-[10px] text-amber-400">{weeklyMission.rewardType}</span>
                 )}
               </div>
             </div>
@@ -410,7 +430,7 @@ export default function EngagementPage() {
       )}
 
       {/* Activity Summary */}
-      {data.activitySummary && (
+      {activitySummary && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-emerald-400" />
@@ -418,23 +438,23 @@ export default function EngagementPage() {
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">{data.activitySummary.opportunitiesFound}</div>
+              <div className="text-2xl font-bold text-white">{activitySummary.opportunitiesFound}</div>
               <div className="text-[10px] text-slate-500 uppercase">Opportunities</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-400">{data.activitySummary.pagesImproved}</div>
+              <div className="text-2xl font-bold text-emerald-400">{activitySummary.pagesImproved}</div>
               <div className="text-[10px] text-slate-500 uppercase">Improved</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-cyan-400">{data.activitySummary.competitorsDropped}</div>
+              <div className="text-2xl font-bold text-cyan-400">{activitySummary.competitorsDropped}</div>
               <div className="text-[10px] text-slate-500 uppercase">Competitors Dropped</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-amber-400">{data.activitySummary.signalsDetected}</div>
+              <div className="text-2xl font-bold text-amber-400">{activitySummary.signalsDetected}</div>
               <div className="text-[10px] text-slate-500 uppercase">Signals</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-400">{data.activitySummary.articlesPublished}</div>
+              <div className="text-2xl font-bold text-emerald-400">{activitySummary.articlesPublished}</div>
               <div className="text-[10px] text-slate-500 uppercase">Published</div>
             </div>
           </div>
@@ -442,7 +462,7 @@ export default function EngagementPage() {
       )}
 
       {/* Empty state when no data at all */}
-      {!data.momentum && !data.brief && !data.activeMission && !data.streak && data.unreadInboxCount === 0 && data.countdowns.length === 0 && (
+      {!data.momentum && !brief && !data.activeMission && !data.streak && inboxCount === 0 && countdowns.length === 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
           <Inbox className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <h3 className="text-sm font-semibold text-white">No engagement data yet</h3>
