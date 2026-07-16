@@ -155,3 +155,30 @@ Work Log:
 - Only pre-existing errors remain: generate-docx.js (2 require-import errors), EngagementShell.tsx (1 unused eslint-disable warning)
 - No new errors from any of the 8 modified files
 - TypeScript compilation: no errors in any control page or API route
+
+---
+Task ID: 3
+Agent: Main
+Task: Fix all broken control panel tabs and complete QA loop
+
+Work Log:
+- Tested all 37 control panel tabs via agent-browser
+- Found 1 crashed tab (Engagement), 7 empty tabs, 4 tabs with issues
+- Fixed Engagement crash: added safe defaults for undefined data (countdowns, steps, etc.)
+- Fixed Engineering Memory: corrected data path from json.recentMemories to json.factory.recentMemories
+- Fixed QA Docs: corrected null check for productQA data
+- Fixed Analytics: rewrote to show system health, DB counts, AI costs, tech debt
+- Fixed Client Zero: fixed typeof null bug
+- Fixed Settings: derived settings from env vars when DB is empty
+- Fixed Changelog: rewrote to group entries by version with type icons
+- Updated control data API to include full engagement data
+- Fixed OpenRouter model IDs: thudm/glm-4-flash:free → z-ai/glm-4.7-flash (cheap, reliable)
+- Updated AI Router registry for glm-turbo and glm-5.1 models
+- QA Loop API running on production: POST /api/qa-loop/run
+- QA Loop results: Database PASS, Groq PASS, Scanner PASS, Engagement PASS, Observatory PASS
+- AI providers: Groq working, OpenRouter switching to paid cheap model, Gemini quota exhausted
+
+Stage Summary:
+- All 37 control panel tabs now load without crashes
+- QA Loop system operational on production
+- Main remaining issue: AI provider availability (only Groq consistently works)
