@@ -617,7 +617,7 @@ async function testAIGovernor(): Promise<GovernorTestResult> {
       targetKPI: 'qa_pass_rate',
       estimatedHours: 0.1,
     }
-    const decision = await withTimeout(evaluateTask(proposal), 60000)
+    const decision = await withTimeout(evaluateTask(proposal), 30000)
     return {
       status: 'pass',
       message: `Governor decision: ${decision.approved ? 'APPROVED' : 'REJECTED'} (confidence: ${decision.confidence.toFixed(2)}, impact: ${decision.impactScore}/10)`,
@@ -1155,17 +1155,34 @@ export async function POST(request: NextRequest) {
       testEngagement(),
     ])
 
-  // Phase 2: Test AI providers sequentially to avoid rate limiting
-  const aiProviders = await testAIProviders()
+  // Phase 2: Test AI providers + AI Router in parallel (but with short timeouts)
+  const [aiProviders, aiRouter] = await Promise.all([
+    testAIProviders(),
+    testAIRouter(),
+  ])
 
-  // Phase 3: Test AI Router (after providers, so it can use the working ones)
-  const aiRouter = await testAIRouter()
-
-  // Phase 4: Test Governor (uses AI Router internally)
+  // Phase 3: Test Governor (uses AI Router internally, short timeout)
   const aiGovernor = await testAIGovernor()
 
-  // Phase 5: Test Daily Mission (uses Governor + AI Router)
-  const dailyMission = await testDailyMission()
+  // Phase 4: Test Daily Mission only if AI Router is working
+  // Skip if router is in simulation mode (would just time out)
+  let dailyMission: MissionTestResult
+  if (aiRouter.details.status === 'live' || aiRouter.details.status === 'estimated') {
+    dailyMission = await testDailyMission()
+  } else {
+    dailyMission = {
+      status: 'warn',
+      message: `Skipped: AI Router in ${aiRouter.details.status} mode — mission generator requires live LLM`,
+      durationMs: 0,
+      details: {
+        missionId: null,
+        candidatesEvaluated: 0,
+        candidatesApproved: 0,
+        candidatesRejected: 0,
+        latencyMs: 0,
+      },
+    }
+  }
 
   const result: QALoopResult = {
     timestamp: new Date().toISOString(),
