@@ -181,7 +181,7 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
     free: false,
   },
   'openrouter/glm-turbo': {
-    id: 'thudm/glm-4-flash:free',
+    id: 'meta-llama/llama-3.3-70b-instruct:free',
     provider: 'openrouter',
     costPer1kInput: 0,
     costPer1kOutput: 0,
@@ -191,14 +191,14 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
     free: true,
   },
   'openrouter/glm-5.1': {
-    id: 'thudm/glm-4-plus:free',
+    id: 'z-ai/glm-4.7-flash',
     provider: 'openrouter',
-    costPer1kInput: 0,
-    costPer1kOutput: 0,
+    costPer1kInput: 0.00000006,
+    costPer1kOutput: 0.00000006,
     contextWindow: 131072,
     speed: 'fast',
     quality: 'excellent',
-    free: true,
+    free: false,
   },
 
   // ─── OpenAI (Paid — Highest Quality) ──────────────────────────────────

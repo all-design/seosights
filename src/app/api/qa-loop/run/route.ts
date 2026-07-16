@@ -381,7 +381,7 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
           'X-Title': 'SeoSights QA Loop',
         },
         body: JSON.stringify({
-          model: 'thudm/glm-4-flash:free',
+          model: 'meta-llama/llama-3.3-70b-instruct:free',
           messages: [{ role: 'user', content: 'Say OK' }],
           max_tokens: 10,
         }),
@@ -396,7 +396,7 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
         message: `OpenRouter responded: "${content.slice(0, 50)}"`,
         durationMs: Date.now() - start,
         details: {
-          model: 'thudm/glm-4-flash:free',
+          model: 'meta-llama/llama-3.3-70b-instruct:free',
           success: true,
           latencyMs: Date.now() - start,
           responseSnippet: content.slice(0, 100),
@@ -410,7 +410,7 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
         message: `OpenRouter failed: ${err instanceof Error ? err.message : 'Unknown'}`,
         durationMs: Date.now() - start,
         details: {
-          model: 'thudm/glm-4-flash:free',
+          model: 'meta-llama/llama-3.3-70b-instruct:free',
           success: false,
           latencyMs: Date.now() - start,
           responseSnippet: '',
