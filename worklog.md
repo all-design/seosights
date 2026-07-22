@@ -82,3 +82,33 @@ Work Log:
 
 Stage Summary:
 - Strategy/reasoning tasks now use actual Gemini Pro (2.5) instead of Flash when falling back to Gemini
+
+---
+Task ID: 6
+Agent: db-migrate-agent
+Task: Add production database schema migration endpoint for missing Growth Engine columns
+
+Work Log:
+- Read current db-migrate/route.ts (only had 7 Factory tables, no Growth tables)
+- Read Prisma schema to identify all Growth models: GrowthOpportunity, GrowthAsset, GrowthGovernorDecision, GrowthDailySnapshot, GrowthMemory + 4 entirely missing models (GrowthSchedule, GrowthLearning, GrowthReport, GrowthPruningAction)
+- Read seed endpoint to identify columns used but missing from Prisma schema
+- Updated Prisma schema:
+  - GrowthAsset: Added slug, metaDescription, schemaMarkup, internalLinks, reviewScores, reviewNotes, publishedUrl, isUnderperforming + indexes
+  - GrowthGovernorDecision: Added assetId, opportunityId, reason, details, checksPerformed, checkResults, overrideable, overriddenBy, overriddenAt + indexes
+  - Added 4 new models: GrowthSchedule, GrowthLearning, GrowthReport, GrowthPruningAction (with all columns and indexes)
+- Ran db:push successfully — local database now in sync
+- Rewrote db-migrate/route.ts with two-phase migration:
+  - Phase 1: CREATE TABLE IF NOT EXISTS for all 16 tables (7 Factory + 9 Growth)
+  - Phase 2: ALTER TABLE ADD COLUMN self-healing via PRAGMA table_info
+    - Defines COLUMN_SCHEMA map with expected columns for all Growth tables
+    - getExistingColumns() reads PRAGMA table_info to discover existing columns
+    - buildAlterSql() generates ALTER TABLE ADD COLUMN SQL from ColumnSpec
+    - Compares existing vs expected columns, only ALTERs for missing ones
+    - Each ALTER wrapped in try/catch (graceful failure)
+- Verified: ESLint passes, tsc --noEmit has no errors in migration file, prisma validate passes
+
+Stage Summary:
+- Migration endpoint now handles 16 tables (7 Factory + 9 Growth)
+- Phase 2 self-healing ALTER TABLE adds missing columns on existing tables (e.g. GrowthOpportunity columns like sourceDetails, seoScore, aiVisibilityScore, etc.)
+- COLUMN_SCHEMA covers all Growth tables with complete column definitions
+- Seed endpoint /api/growth/seed will now succeed after running /api/admin/db-migrate

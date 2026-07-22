@@ -2085,9 +2085,17 @@ model GrowthOpportunity {
 model GrowthAsset {
   id                  String    @id @default(cuid())
   title               String
+  slug                String?
   type                String    @default("article")
+  content             String?
+  metaDescription      String?
+  schemaMarkup        String?   // JSON: generated schema (Article, FAQ, etc.)
+  internalLinks       String?   // JSON: auto-generated internal links
   reviewStatus        String    @default("draft")
+  reviewScores        String?   // JSON: { seo, aeo, geo, quality, readability }
+  reviewNotes         String?
   executionStatus     String    @default("pending")
+  publishedUrl        String?
   qualityScore        Float     @default(0)
   confidence          Float     @default(0)
   platformValue       Float     @default(0)
@@ -2097,27 +2105,136 @@ model GrowthAsset {
   citations7d         Int       @default(0)
   conversions7d       Int       @default(0)
   aiVisibilityDelta   Float     @default(0)
+  isUnderperforming   Boolean   @default(false)
   opportunityId       String?
-  content             String?
   metadata            String?
   publishedAt         DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+
+  @@index([reviewStatus])
+  @@index([executionStatus])
+  @@index([type])
+  @@index([opportunityId])
+  @@index([publishedAt])
 }
 
 model GrowthGovernorDecision {
   id              String    @id @default(cuid())
+  assetId         String?
+  opportunityId   String?
   decisionType    String
   context         String?
   decision        String
+  reason          String?
+  details         String?
   reasoning       String?
+  checksPerformed String?   // JSON: array of check names performed
+  checkResults    String?   // JSON: detailed check results
   confidence      Float     @default(0)
   impact          String?
   isAutomated     Boolean   @default(true)
+  overrideable    Boolean   @default(true)
+  overriddenBy    String?
+  overriddenAt    DateTime?
   approvedBy      String?
   approvedAt      DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  @@index([decision])
+  @@index([assetId])
+  @@index([opportunityId])
+  @@index([createdAt])
+}
+
+// ─── Growth Engine — Schedule, Learning, Reports & Pruning ────────────
+
+model GrowthSchedule {
+  id                String    @id @default(cuid())
+  engineName        String    @unique
+  intervalMinutes   Int       @default(30)
+  isEnabled         Boolean   @default(true)
+  lastRunAt         DateTime?
+  lastRunStatus     String?   // success | failed | timeout
+  lastRunDuration   Int       @default(0)
+  nextRunAt         DateTime?
+  configJson        String?   // JSON: engine-specific configuration
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([engineName])
+  @@index([isEnabled])
+  @@index([nextRunAt])
+}
+
+model GrowthLearning {
+  id                      String    @id @default(cuid())
+  assetId                 String?
+  predictedTraffic         Int       @default(0)
+  predictedCitations       Int       @default(0)
+  predictedVisibility      Float     @default(0)
+  predictedValue           Float     @default(0)
+  predictionConfidence     Float     @default(0)
+  actualTraffic            Int       @default(0)
+  actualCitations          Int       @default(0)
+  actualVisibility         Float     @default(0)
+  actualValue              Float     @default(0)
+  predictionError          Float     @default(0)
+  errorDirection           String?   // accurate | over | under
+  lessonLearned            String?
+  modelUpdate              String?   // JSON: model adjustment data
+  appliedToNextPrediction  Boolean   @default(false)
+  measuredAt               DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([assetId])
+  @@index([errorDirection])
+  @@index([measuredAt])
+  @@index([createdAt])
+}
+
+model GrowthReport {
+  id                String    @id @default(cuid())
+  date              DateTime  @unique
+  headline          String?
+  summary           String?
+  assetsAdded       Int       @default(0)
+  expectedImpact    String?
+  topOpportunities  String?   // JSON: array of top opportunity summaries
+  governorSummary   String?   // JSON: governor decision summary
+  learningInsights  String?   // JSON: array of learning insight strings
+  recommendations   String?   // JSON: array of recommendation strings
+  reportContent     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([date])
+}
+
+model GrowthPruningAction {
+  id                String    @id @default(cuid())
+  assetId           String?
+  traffic30d        Int       @default(0)
+  citations30d      Int       @default(0)
+  aiVisibilityDelta Float     @default(0)
+  qualityScore      Int       @default(0)
+  platformValue     Float     @default(0)
+  action            String?   // rewrite | merge | redirect | archive | delete
+  reason            String?   // low_traffic | low_citations | negative_trend | duplicate | outdated
+  targetAssetId     String?
+  status            String?   // pending | approved | executed | reverted
+  executedAt        DateTime?
+  executedBy        String?
+  result            String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([assetId])
+  @@index([status])
+  @@index([action])
+  @@index([createdAt])
 }
 
 // ─── Mission Control System Status ────────────────────────────────────
