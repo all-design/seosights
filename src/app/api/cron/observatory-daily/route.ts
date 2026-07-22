@@ -17,7 +17,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -131,12 +131,14 @@ export async function GET() {
       DAILY_PROMPTS.map(async (promptSet) => {
         const responseStart = Date.now()
         try {
-          const responseText = await createChatCompletion([
+          const llmResult = await routeLLM(
+            [
               { role: 'system', content: modelConfig.systemPrompt },
               { role: 'user', content: promptSet.prompt },
             ],
-            { model: 'gpt-4o-mini', temperature: 0.7 }
+            { taskType: 'chat', temperature: 0.7 }
           )
+          const responseText = llmResult.content
           const responseTimeMs = Date.now() - responseStart
 
           // Extract citations (basic heuristic — look for URLs)
@@ -309,7 +311,8 @@ Analyze the differences and return ONLY valid JSON:
 
 If the responses are essentially the same, set hasChange to false. Only report meaningful changes.`
 
-              const raw = await createChatCompletion([
+              const llmResult = await routeLLM(
+                [
                   {
                     role: 'system',
                     content:
@@ -317,8 +320,9 @@ If the responses are essentially the same, set hasChange to false. Only report m
                   },
                   { role: 'user', content: comparisonPrompt },
                 ],
-                { temperature: 0.3 }
+                { taskType: 'classification', temperature: 0.3 }
               )
+              const raw = llmResult.content
               const parsed = parseLLMJson(raw)
 
               if (parsed.hasChange === true) {
@@ -431,7 +435,8 @@ Return ONLY valid JSON:
   "recommendedAction": "what should be done about this, if anything"
 }`
 
-              const raw = await createChatCompletion([
+              const llmResult = await routeLLM(
+                [
                   {
                     role: 'system',
                     content:
@@ -439,8 +444,9 @@ Return ONLY valid JSON:
                   },
                   { role: 'user', content: evaluationPrompt },
                 ],
-                { temperature: 0.3 }
+                { taskType: 'scoring', temperature: 0.3 }
               )
+              const raw = llmResult.content
               const parsed = parseLLMJson(raw)
               const finalScore = Math.min(
                 1,
@@ -589,7 +595,8 @@ The report should be:
 - Written in a professional but accessible tone
 - At least 800 words in total content`
 
-          const raw = await createChatCompletion([
+          const llmResult = await routeLLM(
+            [
               {
                 role: 'system',
                 content:
@@ -597,8 +604,9 @@ The report should be:
               },
               { role: 'user', content: generationPrompt },
             ],
-            { temperature: 0.5 }
+            { taskType: 'long_report', temperature: 0.5 }
           )
+          const raw = llmResult.content
           const parsed = parseLLMJson(raw)
 
           // Build markdown content

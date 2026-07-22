@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { publishToWordPress } from '@/lib/cms-publish'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 interface AutoPublishBody {
   projectId?: string
@@ -195,7 +195,7 @@ async function generateArticle(
   try {
     const pillarLabel = pillar.toUpperCase()
 
-    const responseText = await createChatCompletion([
+    const llmResult = await routeLLM([
         {
           role: 'assistant',
           content: `You are the Content Architect agent of seosights — an AI-powered SEO/AEO/GEO platform. You write high-quality, E-E-A-T compliant blog articles that rank on Google AND get cited by AI search engines (ChatGPT, Perplexity, Claude, etc.).
@@ -236,8 +236,10 @@ Requirements:
 - End with a clear call-to-action`,
         },
       ],
-      { model: 'gpt-4o-mini', temperature: 0.7 }
+      { taskType: 'long_report', temperature: 0.7 }
     )
+
+    const responseText = llmResult.content
 
     try {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
