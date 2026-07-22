@@ -17,7 +17,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { createChatCompletion } from '@/lib/zai'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -107,8 +107,6 @@ export async function GET() {
   }
 
   try {
-    const zai = await getZAI() as any
-
     // ═══════════════════════════════════════════════════════════════
     // STEP 1: Create daily crawl & query AI models
     // ═══════════════════════════════════════════════════════════════
@@ -133,15 +131,12 @@ export async function GET() {
       DAILY_PROMPTS.map(async (promptSet) => {
         const responseStart = Date.now()
         try {
-          const completion = await zai.chat.completions.create({
-            messages: [
+          const responseText = await createChatCompletion([
               { role: 'system', content: modelConfig.systemPrompt },
               { role: 'user', content: promptSet.prompt },
             ],
-            thinking: { type: 'disabled' },
-          })
-
-          const responseText = completion.choices?.[0]?.message?.content || ''
+            { model: 'gpt-4o-mini', temperature: 0.7 }
+          )
           const responseTimeMs = Date.now() - responseStart
 
           // Extract citations (basic heuristic — look for URLs)
@@ -314,8 +309,7 @@ Analyze the differences and return ONLY valid JSON:
 
 If the responses are essentially the same, set hasChange to false. Only report meaningful changes.`
 
-              const completion = await zai.chat.completions.create({
-                messages: [
+              const raw = await createChatCompletion([
                   {
                     role: 'system',
                     content:
@@ -323,10 +317,8 @@ If the responses are essentially the same, set hasChange to false. Only report m
                   },
                   { role: 'user', content: comparisonPrompt },
                 ],
-                thinking: { type: 'disabled' },
-              })
-
-              const raw = completion.choices?.[0]?.message?.content || ''
+                { temperature: 0.3 }
+              )
               const parsed = parseLLMJson(raw)
 
               if (parsed.hasChange === true) {
@@ -439,8 +431,7 @@ Return ONLY valid JSON:
   "recommendedAction": "what should be done about this, if anything"
 }`
 
-              const completion = await zai.chat.completions.create({
-                messages: [
+              const raw = await createChatCompletion([
                   {
                     role: 'system',
                     content:
@@ -448,10 +439,8 @@ Return ONLY valid JSON:
                   },
                   { role: 'user', content: evaluationPrompt },
                 ],
-                thinking: { type: 'disabled' },
-              })
-
-              const raw = completion.choices?.[0]?.message?.content || ''
+                { temperature: 0.3 }
+              )
               const parsed = parseLLMJson(raw)
               const finalScore = Math.min(
                 1,
@@ -600,8 +589,7 @@ The report should be:
 - Written in a professional but accessible tone
 - At least 800 words in total content`
 
-          const completion = await zai.chat.completions.create({
-            messages: [
+          const raw = await createChatCompletion([
               {
                 role: 'system',
                 content:
@@ -609,10 +597,8 @@ The report should be:
               },
               { role: 'user', content: generationPrompt },
             ],
-            thinking: { type: 'disabled' },
-          })
-
-          const raw = completion.choices?.[0]?.message?.content || ''
+            { temperature: 0.5 }
+          )
           const parsed = parseLLMJson(raw)
 
           // Build markdown content

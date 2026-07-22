@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { publishToWordPress } from '@/lib/cms-publish'
-import { getZAI } from '@/lib/zai'
+import { createChatCompletion } from '@/lib/zai'
 
 interface AutoPublishBody {
   projectId?: string
@@ -193,12 +193,9 @@ async function generateArticle(
   domain: string
 ): Promise<GeneratedArticle> {
   try {
-    const zai = await getZAI() as any
-
     const pillarLabel = pillar.toUpperCase()
 
-    const completion = await zai.chat.completions.create({
-      messages: [
+    const responseText = await createChatCompletion([
         {
           role: 'assistant',
           content: `You are the Content Architect agent of seosights — an AI-powered SEO/AEO/GEO platform. You write high-quality, E-E-A-T compliant blog articles that rank on Google AND get cited by AI search engines (ChatGPT, Perplexity, Claude, etc.).
@@ -239,10 +236,8 @@ Requirements:
 - End with a clear call-to-action`,
         },
       ],
-      thinking: { type: 'disabled' },
-    })
-
-    const responseText = completion.choices[0]?.message?.content || '{}'
+      { model: 'gpt-4o-mini', temperature: 0.7 }
+    )
 
     try {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
