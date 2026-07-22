@@ -56,47 +56,53 @@ export async function GET() {
 
   // ══════════════════════════════════════════════════════════════════
   // SECTION 1: DATABASE CONNECTIVITY & REAL DATA
+  // (Sequential queries — Turso can't handle 38 concurrent queries)
   // ══════════════════════════════════════════════════════════════════
 
-  const dbCounts = await safe(async () => ({
-    factoryTasks: await db.factoryTask.count(),
-    governorInterceptions: await db.governorInterception.count(),
-    dailyMissions: await db.dailyMission.count(),
-    qaRuns: await db.qARun.count(),
-    codebaseSnapshots: await db.codebaseSnapshot.count(),
-    engineeringMemories: await db.engineeringMemory.count(),
-    factoryChangelogs: await db.factoryChangelog.count(),
-    growthOpportunities: await db.growthOpportunity.count(),
-    growthDailySnapshots: await db.growthDailySnapshot.count(),
-    observatoryCrawls: await db.observatoryCrawl.count(),
-    observatoryChanges: await db.observatoryChange.count(),
-    observatoryReports: await db.observatoryReport.count(),
-    observatoryResponses: await db.observatoryResponse.count(),
-    tokenUsageLogs: await db.tokenUsageLog.count(),
-    engagementMomentum: await db.engagementMomentum.count(),
-    engagementMissions: await db.engagementMission.count(),
-    engagementStreaks: await db.engagementStreak.count(),
-    engagementInboxItems: await db.engagementInboxItem.count(),
-    clientZeroKPIs: await db.clientZeroKPI.count(),
-    clientZeroScoreDeltas: await db.clientZeroScoreDelta.count(),
-    internalContentQueue: await db.internalContentQueue.count(),
-    outreachLogs: await db.outreachLog.count(),
-    aIModelRegistry: await db.aIModelRegistry.count(),
-    qAIssues: await db.qAIssue.count(),
-    qAPageTests: await db.qAPageTest.count(),
-    mCSystemStatuses: await db.mCSystemStatus.count(),
-    mCScheduleJobs: await db.mCScheduleJob.count(),
-    vSPages: await db.vSPage.count(),
-    systemSettings: await db.systemSetting.count(),
-    contentEngineArticles: await db.contentEngineArticle.count(),
-    contentEngineBriefs: await db.contentEngineBrief.count(),
-    contentEngineSprints: await db.contentEngineSprint.count(),
-    contentEngineExperiments: await db.contentEngineExperiment.count(),
-    digestRecords: await db.digest.count(),
-    industries: await db.industryPage.count(),
-    blogPosts: await db.blogPost.count(),
-    freeToolPages: await db.freeToolPage.count(),
-  }), {} as Record<string, number>)
+  const dbCounts: Record<string, number> = {}
+  const countQueries: [string, () => Promise<number>][] = [
+    ['factoryTasks', () => db.factoryTask.count()],
+    ['governorInterceptions', () => db.governorInterception.count()],
+    ['dailyMissions', () => db.dailyMission.count()],
+    ['qaRuns', () => db.qARun.count()],
+    ['codebaseSnapshots', () => db.codebaseSnapshot.count()],
+    ['engineeringMemories', () => db.engineeringMemory.count()],
+    ['factoryChangelogs', () => db.factoryChangelog.count()],
+    ['growthOpportunities', () => db.growthOpportunity.count()],
+    ['growthDailySnapshots', () => db.growthDailySnapshot.count()],
+    ['observatoryCrawls', () => db.observatoryCrawl.count()],
+    ['observatoryChanges', () => db.observatoryChange.count()],
+    ['observatoryReports', () => db.observatoryReport.count()],
+    ['observatoryResponses', () => db.observatoryResponse.count()],
+    ['tokenUsageLogs', () => db.tokenUsageLog.count()],
+    ['engagementMomentum', () => db.engagementMomentum.count()],
+    ['engagementMissions', () => db.engagementMission.count()],
+    ['engagementStreaks', () => db.engagementStreak.count()],
+    ['engagementInboxItems', () => db.engagementInboxItem.count()],
+    ['clientZeroKPIs', () => db.clientZeroKPI.count()],
+    ['clientZeroScoreDeltas', () => db.clientZeroScoreDelta.count()],
+    ['internalContentQueue', () => db.internalContentQueue.count()],
+    ['outreachLogs', () => db.outreachLog.count()],
+    ['aIModelRegistry', () => db.aIModelRegistry.count()],
+    ['qAIssues', () => db.qAIssue.count()],
+    ['qAPageTests', () => db.qAPageTest.count()],
+    ['mCSystemStatuses', () => db.mCSystemStatus.count()],
+    ['mCScheduleJobs', () => db.mCScheduleJob.count()],
+    ['vSPages', () => db.vSPage.count()],
+    ['systemSettings', () => db.systemSetting.count()],
+    ['contentEngineArticles', () => db.contentEngineArticle.count()],
+    ['contentEngineBriefs', () => db.contentEngineBrief.count()],
+    ['contentEngineSprints', () => db.contentEngineSprint.count()],
+    ['contentEngineExperiments', () => db.contentEngineExperiment.count()],
+    ['digestRecords', () => db.digest.count()],
+    ['industries', () => db.industryPage.count()],
+    ['blogPosts', () => db.blogPost.count()],
+    ['freeToolPages', () => db.freeToolPage.count()],
+  ]
+
+  for (const [key, fn] of countQueries) {
+    dbCounts[key] = await safe(fn, 0)
+  }
 
   const totalDbRecords = Object.values(dbCounts).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0)
 
