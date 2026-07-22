@@ -182,3 +182,28 @@ Stage Summary:
 - All 37 control panel tabs now load without crashes
 - QA Loop system operational on production
 - Main remaining issue: AI provider availability (only Groq consistently works)
+
+---
+Task ID: 3
+Agent: Main
+Task: Create comprehensive QA loop, fix production engines, and test production system
+
+Work Log:
+- Created /api/control/qa-loop endpoint with 21 tests covering database, AI providers, autonomous engines, content generation, self-growth, cron execution, live data verification, and more
+- Found root cause: getZAI() (ZAI SDK's internal API endpoint) is unreachable from Vercel's servers, causing ALL observatory and auto-publish cron LLM calls to fail
+- Fixed observatory-daily cron: replaced getZAI() with routeLLM() from AI router which properly uses Groq/Gemini/OpenRouter (all configured on Vercel)
+- Fixed auto-publish cron: replaced getZAI() with routeLLM() for Vercel compatibility
+- Fixed observatory-daily detection step: replaced `include: { responses: true }` with separate queries (Turso doesn't handle large includes)
+- Fixed QA loop: replaced 38 concurrent Prisma queries with sequential queries (Turso can't handle concurrent query bursts)
+- Deployed 4 commits to production (seosights.com)
+- Triggered observatory-daily cron: Now working! 25/25 prompts completed, 0 errors, 8 changes detected, 6 signals found
+- Triggered daily-mission cron: 7 candidates evaluated, 0 approved (budget/priority constraints)
+
+Stage Summary:
+- Production observatory pipeline now fully functional (crawl → detect → engine → generate)
+- 16 crawls completed, 400 responses, 9+ changes detected, 6 signals found
+- AI Router operational: 4 providers (groq, gemini, openrouter, zai) in live-llm mode
+- System has real data: 3 factory tasks, 66 interceptions, 16 QA runs
+- No published pages yet (reports in proposed status, need publishing step)
+- Token usage logging not working ($0 spend recorded) - needs investigation
+- Key fix: routeLLM() works on Vercel (uses available providers), getZAI() doesn't (ETIMEDOUT)
