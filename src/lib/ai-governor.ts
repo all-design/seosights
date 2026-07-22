@@ -485,7 +485,7 @@ function ruleBasedEvaluation(proposal: TaskProposal): ParsedGovernorResponse {
   return {
     decisionFramework,
     approved,
-    confidence: 0.5,
+    confidence: approved ? 0.65 : 0.3,
     rejectionReason,
     governorNotes: notes.join(' '),
     ruleApplied,

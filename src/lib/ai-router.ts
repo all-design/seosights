@@ -138,7 +138,7 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
     free: true,
   },
   'gemini/pro': {
-    id: 'gemini-2.0-flash',
+    id: 'gemini-2.5-pro',
     provider: 'gemini',
     costPer1kInput: 0,
     costPer1kOutput: 0,

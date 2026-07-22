@@ -13,13 +13,27 @@
  * 4. Generate a weekly summary report
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { routeLLM } from '@/lib/ai-router'
 import { parseLLMJson } from '@/lib/llm-utils'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
+
+function isAuthorized(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return true // No secret → dev/sandbox mode
+
+  const authHeader = request.headers.get('authorization') || ''
+  const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (bearerMatch && bearerMatch[1] === secret) return true
+
+  const xHeader = request.headers.get('x-cron-secret')
+  if (xHeader && xHeader === secret) return true
+
+  return false
+}
 
 /**
  * Generate a URL-friendly slug from a title.
@@ -35,7 +49,14 @@ function slugify(text: string): string {
 /**
  * GET handler — runs the weekly observatory pipeline.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized — invalid or missing CRON_SECRET' },
+      { status: 401 },
+    )
+  }
+
   const pipelineStart = Date.now()
   const summary: {
     industryReports: Record<string, unknown> | null

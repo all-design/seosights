@@ -13,13 +13,45 @@ import { db } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
+function isAuthorized(request: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return true // No secret → dev/sandbox mode
+
+  const authHeader = request.headers.get('authorization') || ''
+  const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (bearerMatch && bearerMatch[1] === secret) return true
+
+  const xHeader = request.headers.get('x-cron-secret')
+  if (xHeader && xHeader === secret) return true
+
+  return false
+}
+
 // ── GET: Vercel Cron Jobs support (delegates to POST) ──────────
-export async function GET() {
-  return POST(new NextRequest('https://localhost/api/cron/digest'))
+export async function GET(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized — invalid or missing CRON_SECRET' },
+      { status: 401 },
+    )
+  }
+  // Pass auth headers through to POST delegate
+  const headers = new Headers({ 'Content-Type': 'application/json' })
+  const authHeader = request.headers.get('authorization')
+  if (authHeader) headers.set('authorization', authHeader)
+  const cronHeader = request.headers.get('x-cron-secret')
+  if (cronHeader) headers.set('x-cron-secret', cronHeader)
+  return POST(new NextRequest('https://localhost/api/cron/digest', { headers }))
 }
 
 // ── POST: Generate overnight digests for all active users ───────
 export async function POST(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized — invalid or missing CRON_SECRET' },
+      { status: 401 },
+    )
+  }
   try {
     const now = new Date()
     const yesterday = new Date(now)
