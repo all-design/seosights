@@ -25,6 +25,8 @@
  */
 
 import { createOllamaCompletion } from './agent-fallback'
+import { TokenTracker } from './token-tracker'
+import type OpenAI from 'openai'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -44,7 +46,7 @@ export type TaskType =
 
 export type DataStatus = 'live' | 'estimated' | 'simulation'
 
-export type ProviderId = 'groq' | 'gemini' | 'openrouter' | 'openai' | 'zai' | 'ollama'
+export type ProviderId = 'groq' | 'gemini' | 'openrouter' | 'openai' | 'zai' | 'ollama' | 'simulation'
 
 export interface RouterResult {
   content: string
@@ -72,6 +74,8 @@ export interface RouterOptions {
   timeout?: number
   /** Whether to allow fallback to simulation data */
   allowSimulation?: boolean
+  /** Agent name for token tracking (defaults to taskType) */
+  agentName?: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -272,11 +276,20 @@ const TIER_CONSTRAINTS: Record<string, { allowedProviders: ProviderId[]; maxCost
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Provider Call Result Type
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ProviderCallResult {
+  content: string
+  tokensUsed?: { prompt: number; completion: number }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Provider Clients
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Groq API client — ultra-fast free inference */
-async function callGroq(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<string> {
+async function callGroq(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<ProviderCallResult> {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) throw new Error('GROQ_API_KEY not configured')
 
@@ -300,12 +313,19 @@ async function callGroq(model: string, messages: Array<{role: string; content: s
     throw new Error(`Groq API error: ${response.status} ${response.statusText} - ${body}`)
   }
 
-  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
-  return data.choices?.[0]?.message?.content || ''
+  const data = await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
+  }
+  const content = data.choices?.[0]?.message?.content || ''
+  const tokensUsed = data.usage?.prompt_tokens != null && data.usage?.completion_tokens != null
+    ? { prompt: data.usage.prompt_tokens, completion: data.usage.completion_tokens }
+    : undefined
+  return { content, tokensUsed }
 }
 
 /** Google Gemini API client — huge context, free tier */
-async function callGemini(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<string> {
+async function callGemini(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<ProviderCallResult> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured')
 
@@ -338,12 +358,19 @@ async function callGemini(model: string, messages: Array<{role: string; content:
     throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${body}`)
   }
 
-  const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const data = await response.json() as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
+  }
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const tokensUsed = data.usageMetadata?.promptTokenCount != null && data.usageMetadata?.candidatesTokenCount != null
+    ? { prompt: data.usageMetadata.promptTokenCount, completion: data.usageMetadata.candidatesTokenCount }
+    : undefined
+  return { content, tokensUsed }
 }
 
 /** OpenRouter API client — access to 100+ models */
-async function callOpenRouter(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<string> {
+async function callOpenRouter(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<ProviderCallResult> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured')
 
@@ -369,17 +396,24 @@ async function callOpenRouter(model: string, messages: Array<{role: string; cont
     throw new Error(`OpenRouter API error: ${response.status} ${response.statusText} - ${body}`)
   }
 
-  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
-  return data.choices?.[0]?.message?.content || ''
+  const data = await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
+  }
+  const content = data.choices?.[0]?.message?.content || ''
+  const tokensUsed = data.usage?.prompt_tokens != null && data.usage?.completion_tokens != null
+    ? { prompt: data.usage.prompt_tokens, completion: data.usage.completion_tokens }
+    : undefined
+  return { content, tokensUsed }
 }
 
 /** OpenAI API client — highest quality (paid) */
-async function callOpenAI(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<string> {
+async function callOpenAI(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<ProviderCallResult> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured')
 
-  const { default: OpenAI } = await import('openai')
-  const openai = new OpenAI({ apiKey })
+  const openaiModule = await import('openai')
+  const openai = new openaiModule.default({ apiKey })
 
   const response = await openai.chat.completions.create({
     model,
@@ -388,23 +422,35 @@ async function callOpenAI(model: string, messages: Array<{role: string; content:
     max_tokens: options?.maxTokens ?? 4096,
   })
 
-  return response.choices[0]?.message?.content || ''
+  const content = response.choices[0]?.message?.content || ''
+  const tokensUsed = response.usage?.prompt_tokens != null && response.usage?.completion_tokens != null
+    ? { prompt: response.usage.prompt_tokens, completion: response.usage.completion_tokens }
+    : undefined
+  return { content, tokensUsed }
 }
 
 /** ZAI SDK client — sandbox default */
-async function callZAI(messages: Array<{role: string; content: string}>): Promise<string> {
+async function callZAI(messages: Array<{role: string; content: string}>): Promise<ProviderCallResult> {
   const { getZAI } = await import('./zai')
   const zai = await getZAI()
   const result = await zai.chat.completions.create({
     messages: messages as Array<{role: string; content: string}>,
   })
-  return (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
+  const content = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
+  // ZAI SDK doesn't reliably return token usage data
+  return { content }
 }
 
 /** Ollama local client — final fallback */
-async function callOllama(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number }): Promise<string> {
+async function callOllama(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number }): Promise<ProviderCallResult> {
   const result = await createOllamaCompletion(messages, { model, temperature: options?.temperature })
-  return (result.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
+  const content = (result.choices as Array<{ message?: { content?: string } }>)?.[0]?.message?.content || ''
+  // Ollama may return usage data in some configurations but not guaranteed
+  const usage = (result as Record<string, unknown>).usage as { prompt_tokens?: number; completion_tokens?: number } | undefined
+  const tokensUsed = usage?.prompt_tokens != null && usage?.completion_tokens != null
+    ? { prompt: usage.prompt_tokens, completion: usage.completion_tokens }
+    : undefined
+  return { content, tokensUsed }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -448,7 +494,7 @@ export async function routeLLM(
     if (!spec) return false
     if (!constraints.allowedProviders.includes(spec.provider)) return false
     if (!spec.free && spec.costPer1kInput && spec.costPer1kInput > 0) {
-      const estimatedCost = (spec.costPer1kInput * 2 + spec.costPer1kOutput * 1) / 1000
+      const estimatedCost = (spec.costPer1kInput * 2 + (spec.costPer1kOutput ?? 0) * 1) / 1000
       if (estimatedCost > constraints.maxCostPerCall) return false
     }
     return true
@@ -473,46 +519,46 @@ export async function routeLLM(
     try {
       console.log(`[ai-router] Trying ${modelKey} (${spec.provider}) for task "${taskType}", tier "${tier}"`)
 
-      let content: string
+      let callResult: ProviderCallResult
 
       switch (spec.provider) {
         case 'groq':
-          content = await Promise.race([
+          callResult = await Promise.race([
             callGroq(spec.id, messages, { temperature, maxTokens }),
             timeoutPromise(timeout),
           ])
           break
 
         case 'gemini':
-          content = await Promise.race([
+          callResult = await Promise.race([
             callGemini(spec.id, messages, { temperature, maxTokens }),
             timeoutPromise(timeout),
           ])
           break
 
         case 'openrouter':
-          content = await Promise.race([
+          callResult = await Promise.race([
             callOpenRouter(spec.id, messages, { temperature, maxTokens }),
             timeoutPromise(timeout),
           ])
           break
 
         case 'openai':
-          content = await Promise.race([
+          callResult = await Promise.race([
             callOpenAI(spec.id, messages, { temperature, maxTokens }),
             timeoutPromise(timeout + 15000), // OpenAI gets extra time
           ])
           break
 
         case 'zai':
-          content = await Promise.race([
+          callResult = await Promise.race([
             callZAI(messages),
             timeoutPromise(timeout),
           ])
           break
 
         case 'ollama':
-          content = await Promise.race([
+          callResult = await Promise.race([
             callOllama(spec.id, messages, { temperature }),
             timeoutPromise(timeout),
           ])
@@ -522,21 +568,52 @@ export async function routeLLM(
           continue
       }
 
-      if (!content || content.trim().length === 0) {
+      if (!callResult.content || callResult.content.trim().length === 0) {
         throw new Error('Empty response from provider')
       }
 
       const latencyMs = Date.now() - attemptStart
 
-      console.log(`[ai-router] ✅ ${modelKey} succeeded (${latencyMs}ms) for task "${taskType}"`)
+      // Calculate actual cost based on token usage (or estimate if tokens not available)
+      const tokensUsed = callResult.tokensUsed
+      let costUsd: number
+      if (tokensUsed) {
+        costUsd = (tokensUsed.prompt / 1000) * (spec.costPer1kInput || 0)
+                  + (tokensUsed.completion / 1000) * (spec.costPer1kOutput || 0)
+      } else {
+        // Fallback estimate: assume ~2K input tokens, ~1K output tokens
+        costUsd = spec.costPer1kInput ? (spec.costPer1kInput * 2 + (spec.costPer1kOutput || 0) * 1) / 1000 : 0
+      }
+
+      console.log(`[ai-router] ✅ ${modelKey} succeeded (${latencyMs}ms) for task "${taskType}"${tokensUsed ? `, tokens: ${tokensUsed.prompt}+${tokensUsed.completion}` : ''}`)
+
+      // Save token usage to database
+      const agentId = options.agentName || `ai-router-${taskType}`
+      const agentName = options.agentName || taskType
+      try {
+        const tracker = new TokenTracker(`route-${Date.now()}`)
+        tracker.track({
+          agentId,
+          agentName,
+          model: modelKey,
+          inputTokens: tokensUsed?.prompt ?? 0,
+          outputTokens: tokensUsed?.completion ?? 0,
+        })
+        await tracker.saveToDatabase()
+        console.log(`[ai-router] Token usage saved to DB: ${agentId}/${modelKey}`)
+      } catch (dbErr) {
+        // Non-blocking: don't fail the request if DB save fails
+        console.warn(`[ai-router] Failed to save token usage to DB:`, dbErr instanceof Error ? dbErr.message : dbErr)
+      }
 
       return {
-        content,
+        content: callResult.content,
         model: modelKey,
         provider: spec.provider,
         status: 'live',
         latencyMs: Date.now() - startTime,
-        costUsd: spec.costPer1kInput ? spec.costPer1kInput * 2 / 1000 : 0,
+        tokensUsed,
+        costUsd,
         fallbackChain,
       }
     } catch (err) {

@@ -53,6 +53,7 @@
 
 import { createHash } from 'crypto'
 import { routeLLM } from './ai-router'
+import { extractJsonObject } from './llm-utils'
 import { db } from './db'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,7 +121,7 @@ export interface GovernorInterception {
   engineResponse: string
   /** approved | rejected | returned */
   outcome: string
-  reasoning: string
+  reasoning: string | null
   ruleApplied: string | null
   createdAt: Date
 }
@@ -131,6 +132,36 @@ export interface GovernorStats {
   rejectionRate: number
   violationsPrevented: number
   recentInterceptions: GovernorInterception[]
+}
+
+/**
+ * Convert a numeric priority (1–5) to the string expected by the FactoryTask
+ * Prisma model.  Mapping: 1 → critical, 2 → high, 3 → medium, 4 → low, 5 → low.
+ */
+function priorityToString(priority: number): string {
+  if (priority <= 1) return 'critical'
+  if (priority === 2) return 'high'
+  if (priority === 3) return 'medium'
+  if (priority >= 4) return 'low'
+  return 'medium' // fallback
+}
+
+/**
+ * Map the Governor sourceEngine to the FactoryTask `type` field.
+ * FactoryTask.type accepts: observation | product | architecture | engineering |
+ * qa | review | security | performance | deploy | replay | learning
+ */
+function sourceEngineToFactoryType(sourceEngine: string): string {
+  const map: Record<string, string> = {
+    growth:         'observation',
+    product:        'product',
+    architecture:   'architecture',
+    engineering:    'engineering',
+    'tech-debt':    'review',
+    documentation:  'review',
+    observatory:    'observation',
+  }
+  return map[sourceEngine] || 'observation'
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -281,57 +312,7 @@ function buildUserPrompt(proposal: TaskProposal): string {
   return lines.join('\n')
 }
 
-/** Extract the first balanced JSON object from a (possibly noisy) LLM response. */
-function extractJsonObject(raw: string): string | null {
-  if (!raw) return null
-  const trimmed = raw.trim()
-
-  // Strip markdown code fences if present
-  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
-  const candidate = fenceMatch ? fenceMatch[1].trim() : trimmed
-
-  // Fast path: try parsing as-is
-  try {
-    JSON.parse(candidate)
-    return candidate
-  } catch {
-    // fall through to brace-scanning
-  }
-
-  const start = candidate.indexOf('{')
-  if (start === -1) return null
-  let depth = 0
-  let inString = false
-  let escape = false
-  for (let i = start; i < candidate.length; i++) {
-    const ch = candidate[i]
-    if (inString) {
-      if (escape) {
-        escape = false
-      } else if (ch === '\\') {
-        escape = true
-      } else if (ch === '"') {
-        inString = false
-      }
-    } else if (ch === '"') {
-      inString = true
-    } else if (ch === '{') {
-      depth++
-    } else if (ch === '}') {
-      depth--
-      if (depth === 0) {
-        const slice = candidate.slice(start, i + 1)
-        try {
-          JSON.parse(slice)
-          return slice
-        } catch {
-          return null
-        }
-      }
-    }
-  }
-  return null
-}
+// extractJsonObject is now imported from ./llm-utils
 
 interface ParsedGovernorResponse {
   decisionFramework: DecisionFramework
@@ -555,9 +536,10 @@ async function persistFactoryTask(
       data: {
         title:                   proposal.title,
         description:              proposal.description,
+        type:                     sourceEngineToFactoryType(proposal.sourceEngine),
         sourceEngine:             proposal.sourceEngine,
         taskType:                 proposal.taskType,
-        priority:                 proposal.priority,
+        priority:                 priorityToString(proposal.priority),
         status:                   'approved',
         rejectionReason:          parsed.rejectionReason ?? null,
         governorNotes:             parsed.governorNotes,

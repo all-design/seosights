@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { routeLLM, type DataStatus } from '@/lib/ai-router'
+import { parseLLMJson } from '@/lib/llm-utils'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -20,15 +21,6 @@ function extractBrandFromUrl(url: string): string {
     const hostname = new URL(url.startsWith('http') ? url : `https://${url}`).hostname
     return hostname.replace(/^www\./, '').split('.')[0]
   } catch { return '' }
-}
-
-/** Strip markdown fences and parse JSON robustly. */
-function parseLLMJson(raw: string): Record<string, unknown> {
-  let c = raw.trim()
-  const m = c.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (m) c = m[1].trim()
-  c = c.replace(/,\s*([}\]])/g, '$1')
-  return JSON.parse(c)
 }
 
 /** Clamp a number to [0, 100]. */

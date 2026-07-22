@@ -11,6 +11,27 @@ const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   'claude-3-5-sonnet': { input: 0.000003, output: 0.000015 },  // $3 / $15 per million
   'claude-3.5-sonnet': { input: 0.000003, output: 0.000015 },  // alt key
   'deepseek-v3':   { input: 0.00000014, output: 0.00000028 },  // $0.14 / $0.28 per million — extremely cheap
+  // ─── OpenRouter GLM models ─────────────────────────────────────────────
+  'z-ai/glm-5.2':            { input: 0.000001,   output: 0.000005 },    // $0.001 / $0.005 per million
+  'z-ai/glm-4.7-flash':      { input: 0.00000006, output: 0.00000006 },  // GLM Turbo — $0.06 per million
+  'openrouter/glm-5.2':      { input: 0.000001,   output: 0.000005 },    // OpenRouter key for GLM 5.2
+  'openrouter/glm-turbo':    { input: 0.00000006, output: 0.00000006 },  // OpenRouter key for GLM Turbo
+  'openrouter/glm-5.1':      { input: 0.00000006, output: 0.00000006 },  // OpenRouter key for GLM 5.1 (same as turbo)
+  // ─── Groq free models ──────────────────────────────────────────────────
+  'groq/llama-3.1-8b':       { input: 0, output: 0 },    // Free
+  'groq/llama-3.1-70b':      { input: 0, output: 0 },    // Free
+  'groq/mixtral-8x7b':       { input: 0, output: 0 },    // Free
+  'llama-3.1-8b-instant':    { input: 0, output: 0 },    // Free (Groq model ID)
+  'llama-3.1-70b-versatile':  { input: 0, output: 0 },    // Free (Groq model ID)
+  // ─── Gemini free tier ─────────────────────────────────────────────────
+  'gemini-2.0-flash':         { input: 0, output: 0 },    // Free tier
+  'gemini/flash':             { input: 0, output: 0 },    // Router key
+  'gemini/pro':               { input: 0, output: 0 },    // Router key
+  // ─── OpenRouter other models ──────────────────────────────────────────
+  'openrouter/deepseek-v3':   { input: 0.00000014, output: 0.00000028 },
+  'openrouter/llama-3.1-8b':  { input: 0.00000002, output: 0.00000006 },
+  // ─── Ollama local (free) ──────────────────────────────────────────────
+  'ollama/llama3':            { input: 0, output: 0 },    // Local, free
 }
 
 export interface TokenUsageRecord {

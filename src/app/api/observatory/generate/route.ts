@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { routeLLM } from '@/lib/ai-router'
+import { extractJsonObject } from '@/lib/llm-utils'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -112,16 +113,34 @@ The report should be:
     )
 
     const raw = result.content || ''
-    let cleaned = raw.trim()
-    const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (jsonMatch) cleaned = jsonMatch[1].trim()
-    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1')
+    const jsonStr = extractJsonObject(raw)
+    if (!jsonStr) {
+      console.error('[observatory/generate] LLM returned invalid JSON. Raw response (first 500 chars):', raw.slice(0, 500))
+      throw new Error('LLM returned invalid JSON — could not extract a valid JSON object from the response')
+    }
 
-    const parsed = JSON.parse(cleaned)
+    interface ObservatoryReportJson {
+      title: string
+      type: string
+      summary: string
+      keyFindings: string[]
+      sections: Array<{ heading: string; content: string }>
+      conclusion: string
+      aiModels: string[]
+      categories: string[]
+    }
+
+    let parsed: ObservatoryReportJson
+    try {
+      parsed = JSON.parse(jsonStr) as ObservatoryReportJson
+    } catch (parseErr) {
+      console.error('[observatory/generate] JSON.parse failed on extracted string. Raw response (first 500 chars):', raw.slice(0, 500))
+      throw new Error(`JSON parsing failed after extraction: ${parseErr instanceof Error ? parseErr.message : 'Unknown parse error'}`)
+    }
 
     // Build the full markdown content
     const markdownSections = (parsed.sections || [])
-      .map((s: { heading: string; content: string }) => `## ${s.heading}\n\n${s.content}`)
+      .map((s) => `## ${s.heading}\n\n${s.content}`)
       .join('\n\n')
 
     const contentMarkdown = `# ${parsed.title}\n\n${parsed.summary}\n\n${markdownSections}\n\n## Conclusion\n\n${parsed.conclusion || ''}`

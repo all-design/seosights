@@ -2046,22 +2046,40 @@ model GrowthDailySnapshot {
 }
 
 model GrowthOpportunity {
-  id              String    @id @default(cuid())
-  title           String
-  description     String?
-  type            String    @default("content")
-  status          String    @default("discovered")
-  priority        String    @default("medium")
-  estimatedImpact Float     @default(0)
-  confidence      Float     @default(0)
-  source          String?
-  data            String?
-  projectId       String?
-  assignedTo      String?
-  dueDate         DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  title             String
+  description       String?
+  type              String    @default("content")
+  status            String    @default("discovered")
+  priority          String    @default("medium")
+  estimatedImpact   Float     @default(0)
+  confidence        Float     @default(0)
+  source            String?
+  sourceDetails     String?   // JSON — engine, signalId, changeType, confidence, dataPoints
+  data              String?   // JSON — additional metadata
+  seoScore          Int       @default(0)
+  aiVisibilityScore Int       @default(0)
+  businessScore     Int       @default(0)
+  noveltyScore      Int       @default(0)
+  competitionScore  Int       @default(0)
+  implementationCost Int      @default(0)
+  expectedROI       Int       @default(0)
+  growthScore       Int       @default(0)
+  targetKeywords    String?   // JSON array of keywords
+  targetEntities    String?   // JSON array of entities
+  relatedExisting   String?   // JSON array of related content IDs
+  opportunityId     String?
+  projectId         String?
+  assignedTo        String?
+  dueDate           DateTime?
+  scheduledAt       DateTime?
+  discoveredAt      DateTime?
+  scoredAt          DateTime?
+  queuedAt          DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model GrowthAsset {
@@ -2293,22 +2311,39 @@ model MCScheduleJob {
 }
 
 model FactoryTask {
-  id            String    @id @default(cuid())
-  type          String    // observation | product | architecture | engineering | qa | review | security | performance | deploy | replay | learning
-  title         String
-  description   String?
-  status        String    @default("pending")  // pending | in_progress | completed | failed | blocked
-  priority      String    @default("medium")  // low | medium | high | critical
-  assignee      String?   // engine name
-  branch        String?
-  prUrl         String?
-  result        String?   // JSON
-  parentTaskId  String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  type                String    // observation | product | architecture | engineering | qa | review | security | performance | deploy | replay | learning
+  title               String
+  description         String?
+  status              String    @default("pending")  // pending | approved | in_progress | completed | failed | blocked
+  priority            String    @default("medium")  // low | medium | high | critical
+  assignee            String?   // engine name
+  branch              String?
+  prUrl               String?
+  result              String?   // JSON
+  parentTaskId        String?
+  missionId           String?   // linked to DailyMission
+  sourceEngine        String?   // growth | product | architecture | engineering | tech-debt | documentation
+  taskType            String?   // feature | bugfix | refactor | docs | cleanup | test
+  rejectionReason     String?
+  governorNotes       String?
+  confidence          Float     @default(0)
+  impactScore         Float     @default(0)
+  estimatedHours      Float     @default(0)
+  targetKPI           String?
+  evaluatedAt         DateTime?
+  // Decision Framework booleans
+  solvesRealProblem   Boolean   @default(false)
+  hasEvidence         Boolean   @default(false)
+  fitsArchitecture    Boolean   @default(false)
+  existingModuleSolves Boolean  @default(false)
+  improvesKPI         Boolean   @default(false)
+  canMeasure          Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  subtasks      FactoryTask[]   @relation("TaskSubtasks")
-  parent        FactoryTask?    @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  subtasks            FactoryTask[]   @relation("TaskSubtasks")
+  parent              FactoryTask?    @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
 }
 
 model EngineeringMemory {
@@ -2364,17 +2399,17 @@ model FactoryChangelog {
 
 model DailyMission {
   id                    String    @id @default(cuid())
-  date                  DateTime
+  date                  DateTime  @unique
   goal                  String
   strategy              String?
-  maxHours              Int       @default(0)
-  maxComponents         Int       @default(0)
-  maxPages              Int       @default(0)
-  confidenceThreshold   Float     @default(0)
+  maxHours              Int       @default(6)
+  maxComponents         Int       @default(3)
+  maxPages              Int       @default(5)
+  confidenceThreshold   Float     @default(0.6)
   hoursUsed             Int       @default(0)
   componentsCreated     Int       @default(0)
   pagesCreated          Int       @default(0)
-  status                String    @default("pending")
+  status                String    @default("active")
   outcome               String?
   kpiImproved           String?
   candidatesEvaluated   Int       @default(0)
@@ -2393,15 +2428,22 @@ model DailyMission {
 }
 
 model GovernorInterception {
-  id            String    @id @default(cuid())
-  type          String    // feature_creep | scope_violation | budget_exceeded | quality_gate | architecture_violation
-  engine        String
-  description   String
-  severity      String    @default("warning")  // info | warning | critical
-  action        String?   // blocked | modified | approved_with_note
-  reasoning     String?
-  resolvedAt    DateTime?
-  createdAt     DateTime  @default(now())
+  id              String    @id @default(cuid())
+  engineName      String    // growth | product | architecture | engineering | tech-debt | documentation | observatory
+  proposedAction  String    // the task title + description
+  governorQuestion String   // "Does this task satisfy all 6 Decision Framework questions?"
+  engineResponse  String    // the task description
+  outcome         String    // approved | rejected | returned
+  reasoning       String?
+  ruleApplied     String?   // one of the 7 Golden Rules or null
+  taskId          String?
+  severity        String    @default("warning")  // info | warning | critical
+  action          String?   // blocked | modified | approved_with_note
+  type            String?   // feature_creep | scope_violation | budget_exceeded | quality_gate | architecture_violation (legacy)
+  description     String?   // legacy field
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model ClientZeroScoreDelta {

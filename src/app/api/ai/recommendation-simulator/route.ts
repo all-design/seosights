@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { routeLLM, type DataStatus } from '@/lib/ai-router'
+import { parseLLMJson } from '@/lib/llm-utils'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -41,17 +42,6 @@ function extractBrandFromUrl(url: string): string {
   } catch {
     return ''
   }
-}
-
-/** Strip markdown fences and parse JSON robustly. */
-function parseLLMJson(raw: string): Record<string, unknown> {
-  let cleaned = raw.trim()
-  // Remove ```json ... ``` fences
-  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (fenceMatch) cleaned = fenceMatch[1].trim()
-  // Remove trailing commas before } or ]
-  cleaned = cleaned.replace(/,\s*([}\]])/g, '$1')
-  return JSON.parse(cleaned)
 }
 
 /** Build the mapping of engine name to dot/glow CSS classes. */

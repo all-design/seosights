@@ -13,11 +13,13 @@
  * 4. Compare latest two crawls to detect changes (LLM-powered)
  * 5. Evaluate changes for signal significance
  * 6. Generate draft ObservatoryReport records for significant signals
+ * 7. Seed GrowthOpportunity records from observatory signals (→ content queue)
  */
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { routeLLM } from '@/lib/ai-router'
+import { parseLLMJson } from '@/lib/llm-utils'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -65,16 +67,7 @@ const CHANGE_TYPES = [
   'behavior_change',
 ] as const
 
-/**
- * Parse JSON from LLM response, handling markdown code blocks and trailing commas.
- */
-function parseLLMJson(raw: string): any {
-  let cleaned = raw.trim()
-  const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (jsonMatch) cleaned = jsonMatch[1].trim()
-  cleaned = cleaned.replace(/,\s*([}\]])/g, '$1')
-  return JSON.parse(cleaned)
-}
+// parseLLMJson imported from '@/lib/llm-utils' (shared robust JSON extraction)
 
 /**
  * Generate a URL-friendly slug from a title.
@@ -95,6 +88,7 @@ export async function GET() {
     detection: Record<string, unknown> | null
     engine: Record<string, unknown> | null
     generation: Record<string, unknown> | null
+    growthSeeding: Record<string, unknown> | null
     errors: string[]
     totalDurationMs: number
   } = {
@@ -102,6 +96,7 @@ export async function GET() {
     detection: null,
     engine: null,
     generation: null,
+    growthSeeding: null,
     errors: [],
     totalDurationMs: 0,
   }
@@ -615,11 +610,20 @@ The report should be:
             { taskType: 'long_report', temperature: 0.5 }
           )
           const raw = llmResult.content
-          const parsed = parseLLMJson(raw)
+          const parsed = parseLLMJson<{
+            title: string
+            type: string
+            summary: string
+            keyFindings: string[]
+            sections: Array<{ heading: string; content: string }>
+            conclusion: string
+            aiModels: string[]
+            categories: string[]
+          }>(raw)
 
           // Build markdown content
           const markdownSections = (parsed.sections || [])
-            .map((s: { heading: string; content: string }) => `## ${s.heading}\n\n${s.content}`)
+            .map((s) => `## ${s.heading}\n\n${s.content}`)
             .join('\n\n')
 
           const contentMarkdown = `# ${parsed.title}\n\n${parsed.summary}\n\n${markdownSections}\n\n## Conclusion\n\n${parsed.conclusion || ''}`
@@ -673,6 +677,157 @@ The report should be:
       summary.errors.push(`Generation step failed: ${msg}`)
       summary.generation = { failed: true, error: msg }
       console.error('[cron/observatory-daily] Step 4 failed:', msg)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 5: Seed GrowthOpportunity records from observatory signals
+    // ═══════════════════════════════════════════════════════════════
+    console.log('[cron/observatory-daily] Step 5: Seeding growth opportunities from signals...')
+
+    try {
+      // Get today's signals that haven't been seeded as growth opportunities yet
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      const signals = await db.observatoryChange.findMany({
+        where: {
+          isSignal: true,
+          createdAt: { gte: today },
+        },
+        orderBy: { significanceScore: 'desc' },
+        take: 15,
+      })
+
+      if (signals.length === 0) {
+        summary.growthSeeding = {
+          skipped: true,
+          reason: 'No new signals today to seed as growth opportunities',
+        }
+      } else {
+        let opportunitiesSeeded = 0
+        const seedingErrors: string[] = []
+
+        for (const signal of signals) {
+          try {
+            // Check if this signal already has a growth opportunity (avoid duplicates)
+            const existing = await db.growthOpportunity.findFirst({
+              where: {
+                source: 'observatory',
+                sourceDetails: { contains: signal.id },
+              },
+            })
+
+            if (existing) continue // Already seeded
+
+            // Determine content type based on change category
+            const typeMap: Record<string, string> = {
+              citation_shift: 'blog',
+              sentiment_shift: 'research',
+              source_shift: 'blog',
+              ranking_change: 'research',
+              new_capability: 'blog',
+              behavior_change: 'research',
+            }
+            const contentType = typeMap[signal.changeType] || 'research'
+
+            // Build title from signal data
+            const titlePrefix = signal.changeType === 'citation_shift'
+              ? 'AI Citation Shift'
+              : signal.changeType === 'ranking_change'
+              ? 'AI Ranking Change'
+              : signal.changeType === 'new_capability'
+              ? 'New AI Capability'
+              : signal.changeType === 'sentiment_shift'
+              ? 'AI Sentiment Shift'
+              : 'AI Behavior Change'
+
+            const title = `${titlePrefix}: ${signal.aiModel} — ${signal.category}`
+            const description = `Observatory signal detected: ${signal.aiModel} changed ${signal.changeType} in ${signal.category}. Before: "${signal.beforeSummary}". After: "${signal.afterSummary}". Significance: ${signal.significanceScore.toFixed(2)}. Reason: ${signal.signalReason || 'N/A'}.`
+
+            // Calculate growth scores
+            const seoScore = Math.round(signal.significanceScore * 60 + 20)
+            const aiVisibilityScore = Math.round(signal.significanceScore * 80 + 10)
+            const businessScore = Math.round(signal.significanceScore * 50 + 25)
+            const noveltyScore = Math.round(signal.significanceScore * 70 + 15)
+            const competitionScore = 30 // Observatory signals are unique, low competition
+            const implementationCost = 25 // Content creation cost
+            const expectedROI = Math.round(signal.significanceScore * 70 + 20)
+            const growthScore = Math.round(
+              seoScore * 0.2 +
+              aiVisibilityScore * 0.25 +
+              businessScore * 0.2 +
+              noveltyScore * 0.1 +
+              (100 - competitionScore) * 0.1 +
+              expectedROI * 0.15
+            )
+
+            const priority = signal.significanceScore > 0.8 ? 'p1'
+              : signal.significanceScore > 0.6 ? 'p2'
+              : 'p3'
+
+            await db.growthOpportunity.create({
+              data: {
+                title,
+                description,
+                type: contentType,
+                source: 'observatory',
+                sourceDetails: JSON.stringify({
+                  engine: 'observatory',
+                  signalId: signal.id,
+                  changeType: signal.changeType,
+                  aiModel: signal.aiModel,
+                  category: signal.category,
+                  significanceScore: signal.significanceScore,
+                  confidence: signal.significanceScore,
+                  dataPoints: 1,
+                }),
+                seoScore,
+                aiVisibilityScore,
+                businessScore,
+                noveltyScore,
+                competitionScore,
+                implementationCost,
+                expectedROI,
+                growthScore,
+                confidence: signal.significanceScore,
+                targetKeywords: JSON.stringify([
+                  `${signal.aiModel} ${signal.changeType}`,
+                  `${signal.category} AI visibility`,
+                  'AI observatory',
+                ]),
+                targetEntities: JSON.stringify([signal.aiModel, signal.category]),
+                relatedExisting: JSON.stringify([]),
+                status: 'discovered',
+                priority,
+                discoveredAt: new Date(),
+              },
+            })
+
+            opportunitiesSeeded++
+          } catch (seedErr) {
+            seedingErrors.push(`Signal ${signal.id}: ${seedErr instanceof Error ? seedErr.message : 'Unknown'}`)
+          }
+        }
+
+        summary.growthSeeding = {
+          signalsAnalyzed: signals.length,
+          opportunitiesSeeded,
+          errors: seedingErrors.length,
+        }
+
+        if (seedingErrors.length > 0) {
+          summary.errors.push(`Growth seeding errors: ${seedingErrors.join('; ')}`)
+        }
+
+        console.log(
+          `[cron/observatory-daily] Step 5 complete: ${signals.length} signals → ${opportunitiesSeeded} growth opportunities seeded`
+        )
+      }
+    } catch (seedError) {
+      const msg = seedError instanceof Error ? seedError.message : 'Unknown error'
+      summary.errors.push(`Growth seeding step failed: ${msg}`)
+      summary.growthSeeding = { failed: true, error: msg }
+      console.error('[cron/observatory-daily] Step 5 failed:', msg)
     }
   } catch (fatalError) {
     const msg = fatalError instanceof Error ? fatalError.message : 'Unknown error'

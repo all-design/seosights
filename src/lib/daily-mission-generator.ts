@@ -60,10 +60,10 @@ const DEFAULT_STRATEGY =
   'Scan the codebase, surface documentation / QA / cleanup gaps, evaluate each through the Governor, and ship the highest-confidence improvements within budget.'
 
 export const DEFAULT_BUDGET: MissionBudget = {
-  maxHours: 4,
-  maxComponents: 2,
+  maxHours: 6,
+  maxComponents: 3,
   maxPages: 5,
-  confidenceThreshold: 0.8,
+  confidenceThreshold: 0.6,
 }
 
 // ─── Candidate Generation ─────────────────────────────────────────────────────
@@ -90,10 +90,12 @@ export function generateCandidates(scan: ScanResult): TaskProposal[] {
     candidates.push({
       title: `Document API route ${route.path}`,
       description:
-        `Add a JSDoc header + request/response examples to ${route.file}. ` +
-        `The route currently has ${route.lineCount} lines and ` +
-        `${route.hasAuth ? 'auth guards present' : 'NO auth guards detected'}. ` +
-        `Documentation coverage is required by the Constitution (never_reduce_documentation).`,
+        `Add a JSDoc header + request/response examples to ${route.file}.\n` +
+        `PROBLEM: ${route.lineCount}-line API route lacks documentation — developers cannot understand its purpose without reading source code.\n` +
+        `EVIDENCE: Codebase scan found ${route.lineCount} lines with no JSDoc blocks. ${route.hasAuth ? 'Auth guard present' : 'NO auth guard — security risk for documentation review'}.\n` +
+        `KPI: documentation_coverage (currently <30% for API routes). Target: increase by 5%.\n` +
+        `MEASURABLE: Count of JSDoc'd API routes / total API routes before vs after.\n` +
+        `ARCHITECTURE: Uses existing Next.js App Router pattern, no new dependencies.`,
       sourceEngine: 'documentation',
       taskType: 'docs',
       priority: 2,
@@ -108,9 +110,12 @@ export function generateCandidates(scan: ScanResult): TaskProposal[] {
       candidates.push({
         title: `Refactor oversized component ${comp.name} (${comp.lineCount} LOC)`,
         description:
-          `Component ${comp.name} at ${comp.path} has ${comp.lineCount} lines — exceeds the ` +
-          `400-line maintainability threshold. Split into smaller sub-components, extract hooks, ` +
-          `and reduce cognitive load. Improves developer velocity (measured by review time).`,
+          `Split component ${comp.name} (${comp.path}) into smaller sub-components and extract hooks.\n` +
+          `PROBLEM: ${comp.lineCount}-line component exceeds the 400-line maintainability threshold — high cognitive load slows review and increases bug risk.\n` +
+          `EVIDENCE: Codebase scan measured ${comp.lineCount} LOC. Industry standard is <400 LOC per component.\n` +
+          `KPI: maintainability_score. Target: reduce average component LOC by 20%.\n` +
+          `MEASURABLE: Average component LOC and code-review turnaround time before vs after.\n` +
+          `ARCHITECTURE: Follows existing component decomposition pattern, no new dependencies. Uses established React hook extraction convention.`,
         sourceEngine: 'tech-debt',
         taskType: 'refactor',
         priority: 3,
@@ -125,9 +130,12 @@ export function generateCandidates(scan: ScanResult): TaskProposal[] {
     candidates.push({
       title: `Add tests for hook ${hook.name}`,
       description:
-        `Hook ${hook.name} at ${hook.path} has no test coverage. Add unit tests covering ` +
-        `the happy path + edge cases. Exports: ${hook.exports.join(', ') || '(none detected)'}. ` +
-        `Improves QA coverage (Constitution rule: never_reduce_qa).`,
+        `Add unit tests covering happy path + edge cases for hook ${hook.name} (${hook.path}).\n` +
+        `PROBLEM: Hook ${hook.name} has 0% test coverage — any regression in its logic will go undetected until production.\n` +
+        `EVIDENCE: Codebase scan found no test files for ${hook.path}. Exports: ${hook.exports.join(', ') || '(none detected)'} are untested.\n` +
+        `KPI: qa_pass_rate. Target: increase hook test coverage from 0% to 80%.\n` +
+        `MEASURABLE: Number of hooks with passing unit tests / total hooks before vs after.\n` +
+        `ARCHITECTURE: Uses existing test infrastructure (vitest/jest), no new test framework needed. Follows established hook test patterns.`,
       sourceEngine: 'engineering',
       taskType: 'test',
       priority: 3,
@@ -142,9 +150,12 @@ export function generateCandidates(scan: ScanResult): TaskProposal[] {
     candidates.push({
       title: `Audit auth on API route ${route.path}`,
       description:
-        `API route ${route.path} (${route.file}) has no detected auth guard. ` +
-        `Determine whether it should be public or protected. If protected, add NextAuth ` +
-        `or superadmin gate. Reduces security surface area — measured by audit findings.`,
+        `Audit and secure API route ${route.path} (${route.file}) which lacks auth guards.\n` +
+        `PROBLEM: ${route.lineCount}-line API route has NO auth guard — may expose sensitive data or allow unauthorized actions.\n` +
+        `EVIDENCE: Codebase scan detected no auth middleware on ${route.file}. This route is accessible without authentication.\n` +
+        `KPI: security_audit_findings. Target: reduce unprotected routes from ${unprotectedRoutes.length} to 0.\n` +
+        `MEASURABLE: Count of API routes without auth protection before vs after remediation.\n` +
+        `ARCHITECTURE: Uses existing NextAuth/superadmin gate pattern already in codebase. No new auth library needed.`,
       sourceEngine: 'architecture',
       taskType: 'bugfix',
       priority: 2,
@@ -162,10 +173,12 @@ export function generateCandidates(scan: ScanResult): TaskProposal[] {
       candidates.push({
         title: `Add module-level documentation to ${lib.name}`,
         description:
-          `Library module ${lib.name} at ${lib.path} has ${lib.lineCount} lines but lacks ` +
-          `a comprehensive module-level JSDoc explaining its purpose, public API, and ` +
-          `usage examples. Exports: ${lib.exports.slice(0, 5).join(', ')}. ` +
-          `Improves developer onboarding velocity.`,
+          `Add comprehensive module-level JSDoc to ${lib.name} (${lib.path}) explaining purpose, public API, and usage examples.\n` +
+          `PROBLEM: ${lib.lineCount}-line library module has no module-level documentation — new developers must read all source code to understand its purpose.\n` +
+          `EVIDENCE: Codebase scan found ${lib.lineCount} LOC with no JSDoc header. Key exports: ${lib.exports.slice(0, 5).join(', ')} are undocumented.\n` +
+          `KPI: documentation_coverage. Target: increase lib module doc coverage from <20% to >50%.\n` +
+          `MEASURABLE: Count of documented lib modules / total lib modules before vs after.\n` +
+          `ARCHITECTURE: Follows established JSDoc convention already used in other documented modules. No new dependencies.`,
         sourceEngine: 'documentation',
         taskType: 'docs',
         priority: 4,

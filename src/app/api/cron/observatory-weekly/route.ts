@@ -16,20 +16,10 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { routeLLM } from '@/lib/ai-router'
+import { parseLLMJson } from '@/lib/llm-utils'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
-
-/**
- * Parse JSON from LLM response, handling markdown code blocks and trailing commas.
- */
-function parseLLMJson(raw: string): any {
-  let cleaned = raw.trim()
-  const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (jsonMatch) cleaned = jsonMatch[1].trim()
-  cleaned = cleaned.replace(/,\s*([}\]])/g, '$1')
-  return JSON.parse(cleaned)
-}
 
 /**
  * Generate a URL-friendly slug from a title.
