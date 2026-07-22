@@ -232,31 +232,39 @@ export async function GET() {
     console.log('[cron/observatory-daily] Step 2: Running detection...')
 
     try {
+      // Find the 2 most recent completed crawls (without include — Turso compat)
       const recentCrawls = await db.observatoryCrawl.findMany({
         where: { status: { in: ['completed', 'partial'] } },
         orderBy: { startedAt: 'desc' },
         take: 2,
-        include: { responses: true },
       })
 
       if (recentCrawls.length < 2) {
         summary.detection = {
           skipped: true,
-          reason: 'Fewer than 2 completed crawls — cannot compare',
+          reason: `Only ${recentCrawls.length} completed crawls — need 2 for comparison`,
         }
       } else {
-        const currentCrawl = recentCrawls[0]
-        const previousCrawl = recentCrawls[1]
+        const currentCrawlId = recentCrawls[0].id
+        const previousCrawlId = recentCrawls[1].id
+
+        // Fetch responses separately (Turso doesn't handle large includes well)
+        const currentResponses = await db.observatoryResponse.findMany({
+          where: { crawlId: currentCrawlId },
+        })
+        const previousResponses = await db.observatoryResponse.findMany({
+          where: { crawlId: previousCrawlId },
+        })
 
         // Build maps for comparison
         const currentMap = new Map<string, { promptText: string; responseText: string }>()
-        for (const r of currentCrawl.responses) {
+        for (const r of currentResponses) {
           const key = `${r.aiModel}::${r.promptCategory}::${r.promptText}`
           currentMap.set(key, { promptText: r.promptText, responseText: r.responseText })
         }
 
         const previousMap = new Map<string, { promptText: string; responseText: string }>()
-        for (const r of previousCrawl.responses) {
+        for (const r of previousResponses) {
           const key = `${r.aiModel}::${r.promptCategory}::${r.promptText}`
           previousMap.set(key, { promptText: r.promptText, responseText: r.responseText })
         }
@@ -332,8 +340,8 @@ If the responses are essentially the same, set hasChange to false. Only report m
 
                 await db.observatoryChange.create({
                   data: {
-                    crawlId: currentCrawl.id,
-                    previousCrawlId: previousCrawl.id,
+                    crawlId: currentCrawlId,
+                    previousCrawlId: previousCrawlId,
                     aiModel: comp.aiModel,
                     changeType,
                     category: comp.promptCategory,
@@ -357,8 +365,8 @@ If the responses are essentially the same, set hasChange to false. Only report m
         }
 
         summary.detection = {
-          crawlId: currentCrawl.id,
-          previousCrawlId: previousCrawl.id,
+          crawlId: currentCrawlId,
+          previousCrawlId: previousCrawlId,
           comparisonsAnalyzed: comparisons.length,
           changesDetected,
           errors: detectErrors.length,
