@@ -24,15 +24,12 @@ export const dynamic = 'force-dynamic'
 
 // Map provider → env var that gates it
 const PROVIDER_ENV_KEY: Record<ProviderId, string | null> = {
+  openrouter: 'OPENROUTER_API_KEY',  // PRIMARY — GLM 5.2 / GLM Turbo default
   groq: 'GROQ_API_KEY',
   gemini: 'GEMINI_API_KEY',
-  openrouter: 'OPENROUTER_API_KEY',
   openai: 'OPENAI_API_KEY',
-  zai: 'ZAI_API_KEY',
-  // Ollama runs as a local daemon; check for an explicit base URL.
-  // If unset, we still mark it as "available" since localhost:11434 is the
-  // default — the call will simply fail at runtime if not running.
-  ollama: 'OLLAMA_BASE_URL',
+  zai: 'Z_AI_CONFIG',               // Sandbox-only (ETIMEDOUT on Vercel)
+  ollama: 'OLLAMA_BASE_URL',        // Local daemon, localhost:11434 default
 }
 
 interface ProviderStatus {
@@ -91,14 +88,14 @@ export async function GET() {
       })
     }
 
-    // Sort providers in a stable, intuitive order
+    // Sort providers in priority order — OpenRouter first as PRIMARY default
     const PROVIDER_ORDER: ProviderId[] = [
-      'groq',
-      'gemini',
-      'openrouter',
-      'openai',
-      'zai',
-      'ollama',
+      'openrouter',  // Primary — GLM 5.2 / GLM Turbo
+      'groq',        // Free, ultra-fast
+      'gemini',      // Free, huge context
+      'openai',      // Paid, highest quality
+      'ollama',      // Local fallback
+      'zai',         // LAST resort (sandbox-only)
     ]
     const providers = PROVIDER_ORDER
       .map((id) => providersById.get(id))

@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -345,10 +345,11 @@ ${JSON.stringify(rawData, null, 2)}
 
 Write the report sections as JSON.`
 
-      const content = await createChatCompletion([
+      const result = await routeLLM([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
-        ], { temperature: 0.4 })
+        ], { taskType: 'long_report', temperature: 0.4 })
+      const content = result.content
       if (content) {
         // Try to parse JSON from AI response
         const jsonMatch = content.match(/\{[\s\S]*\}/)

@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -127,13 +127,15 @@ ${sourceContent.substring(0, 6000)}
 
 Generate the adapted content now. Use markdown format.`
 
-        const articleContent = await createChatCompletion([
+        const aiResult = await routeLLM([
           {
             role: 'system',
             content: `You are a content adaptation specialist for seosights.com. Transform content across formats while preserving key messages and SEO optimization. Domain: ${DEFAULT_DOMAIN}.`,
           },
           { role: 'user', content: contentPrompt },
-        ], { temperature: 0.7 })
+        ], { taskType: 'long_report', temperature: 0.7 })
+
+        const articleContent = aiResult.content
 
         const wordCount = articleContent.split(/\s+/).length
 

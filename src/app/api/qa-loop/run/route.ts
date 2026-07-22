@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -472,30 +473,24 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
     }
   }
 
-  // ── ZAI ──
+  // ── ZAI (via routeLLM — ZAI SDK doesn't work on Vercel) ──
   {
     const start = Date.now()
     try {
-      const { getZAI } = await import('@/lib/zai')
-      const zai = await getZAI()
-      const result = await withTimeout(
-        zai.chat.completions.create({
-          messages: [{ role: 'user', content: 'Say OK' }],
-        }),
-        10000
+      const result = await routeLLM(
+        [{ role: 'user', content: 'Say OK' }],
+        { taskType: 'chat', timeout: 10000 }
       )
-      const content =
-        (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message
-          ?.content || ''
+      const content = result.content || ''
       results.push({
         provider: 'zai',
         status: content ? 'pass' : 'warn',
         message: content
-          ? `ZAI responded: "${content.slice(0, 50)}"`
-          : 'ZAI returned empty response',
+          ? `AI Router responded: "${content.slice(0, 50)}" (provider: ${result.provider}, model: ${result.model})`
+          : 'AI Router returned empty response',
         durationMs: Date.now() - start,
         details: {
-          model: 'zai-default',
+          model: result.model,
           success: !!content,
           latencyMs: Date.now() - start,
           responseSnippet: content.slice(0, 100),
@@ -506,10 +501,10 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
       results.push({
         provider: 'zai',
         status: 'fail',
-        message: `ZAI failed: ${err instanceof Error ? err.message : 'Unknown'}`,
+        message: `AI Router failed: ${err instanceof Error ? err.message : 'Unknown'}`,
         durationMs: Date.now() - start,
         details: {
-          model: 'zai-default',
+          model: 'failed',
           success: false,
           latencyMs: Date.now() - start,
           responseSnippet: '',

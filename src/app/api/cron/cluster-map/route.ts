@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 interface ClusterMapBody {
   projectId?: string // optional: limit to specific project
@@ -119,19 +119,16 @@ interface TopicEntry {
 
 async function generateTopicClusters(domain: string, count: number): Promise<TopicEntry[]> {
   try {
-    const zai = await getZAI() as any
-
-    const completion = await zai.chat.completions.create({
-      messages: [
-        {
-          role: 'assistant',
-          content: `You are the Keyword Researcher agent of an AI-powered SEO platform called seosights. Your job is to generate high-value blog post topics that will rank on Google AND get cited by AI search engines (ChatGPT, Perplexity, Claude, etc.).
+    const result = await routeLLM([
+      {
+        role: 'system',
+        content: `You are the Keyword Researcher agent of an AI-powered SEO platform called seosights. Your job is to generate high-value blog post topics that will rank on Google AND get cited by AI search engines (ChatGPT, Perplexity, Claude, etc.).
 
 You must return ONLY a valid JSON array — no markdown, no backticks, no commentary.`,
-        },
-        {
-          role: 'user',
-          content: `Generate ${count} SEO/AEO/GEO blog post topics for the website "${domain}". 
+      },
+      {
+        role: 'user',
+        content: `Generate ${count} SEO/AEO/GEO blog post topics for the website "${domain}". 
 
 Requirements:
 - Each topic should target a specific long-tail keyword
@@ -152,12 +149,12 @@ Return a JSON array with this exact structure:
 
 Ensure roughly equal distribution across pillars (seo, aeo, geo, all).
 Ensure topics are grouped into 8-12 distinct clusters.`,
-        },
-      ],
-      thinking: { type: 'disabled' },
-    })
+      },
+    ],
+    { taskType: 'strategy' }
+    )
 
-    const responseText = completion.choices[0]?.message?.content || '[]'
+    const responseText = result.content || '[]'
 
     // Parse the JSON response
     let topics: TopicEntry[]

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -8,7 +9,6 @@ export const dynamic = 'force-dynamic'
  * AI Visibility Check API
  *
  * POST — Run a visibility check for a domain
- *   - Uses z-ai-web-dev-sdk to search for AI citations
  *   - Checks robots.txt for bot access changes
  *   - Checks for llms.txt presence
  *   - Compares current state with last known state (from previous alerts/analyses)
@@ -58,6 +58,37 @@ function parseRobotsTxt(robotsTxt: string): BotStatus[] {
   return results
 }
 
+/**
+ * Fetch a URL using native fetch() and extract text content.
+ * Replaces zai.functions.invoke('page_reader', { url })
+ */
+async function fetchPage(url: string): Promise<{ html: string; title: string; text: string } | null> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'SeoSights-Bot/1.0' },
+    })
+    if (!response.ok) return null
+    const html = await response.text()
+
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    const title = titleMatch ? titleMatch[1].trim() : ''
+
+    // Extract plain text (strip scripts, styles, HTML tags)
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    return { html, title, text }
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -70,24 +101,11 @@ export async function POST(request: NextRequest) {
     const alertUserId = userId || 'default-user'
     const createdAlerts: Record<string, unknown>[] = []
 
-    const { getZAI } = await import('@/lib/zai')
-    const zai = await getZAI()
-
     // ── Step 1: Search for AI citations of the domain ──
+    // NOTE: web_search via ZAI SDK is no longer available (ETIMEDOUT on Vercel).
+    // TODO: Integrate with an external web search API (e.g., Google Custom Search, SerpAPI)
     let citationCount = 0
     let citationSources: string[] = []
-    try {
-      const searchResults = await (zai as any).functions.invoke('web_search', {
-        query: `"${domain}" site:perplexity.ai OR site:chat.openai.com OR site:gemini.google.com`,
-        num: 10,
-      })
-      if (searchResults && Array.isArray(searchResults)) {
-        citationCount = searchResults.length
-        citationSources = searchResults.map((r: { url?: string; name?: string }) => r.url || r.name || '').filter(Boolean)
-      }
-    } catch {
-      // Search may fail, continue with other checks
-    }
 
     // ── Step 2: Fetch robots.txt and check bot access ──
     let currentBotStatus: BotStatus[] = []
@@ -95,13 +113,9 @@ export async function POST(request: NextRequest) {
     try {
       const protocol = domain.startsWith('http') ? '' : 'https://'
       const robotsUrl = `${protocol}${domain}/robots.txt`
-      const robotsResult = await (zai as any).functions.invoke('page_reader', { url: robotsUrl })
+      const robotsResult = await fetchPage(robotsUrl)
       if (robotsResult) {
-        const rd = robotsResult.data || robotsResult
-        robotsTxtContent = (rd.html || rd.text || '')
-          .replace(/<[^>]*>/g, '')
-          .replace(/\s+/g, ' ')
-          .trim()
+        robotsTxtContent = robotsResult.text.slice(0, 2000)
         currentBotStatus = parseRobotsTxt(robotsTxtContent)
       }
     } catch {
@@ -113,10 +127,9 @@ export async function POST(request: NextRequest) {
     try {
       const protocol = domain.startsWith('http') ? '' : 'https://'
       const llmsUrl = `${protocol}${domain}/llms.txt`
-      const llmsResult = await (zai as any).functions.invoke('page_reader', { url: llmsUrl })
+      const llmsResult = await fetchPage(llmsUrl)
       if (llmsResult) {
-        const ld = llmsResult.data || llmsResult
-        const content = (ld.html || ld.text || '').trim()
+        const content = llmsResult.text.trim()
         llmsTxtExists = content.length > 10
       }
     } catch {
@@ -255,19 +268,10 @@ export async function POST(request: NextRequest) {
       createdAlerts.push(alert)
     }
 
-    // Check 5: AI Overview presence check via search
+    // Check 5: AI Overview presence check
+    // NOTE: web_search via ZAI SDK is no longer available (ETIMEDOUT on Vercel).
+    // TODO: Integrate with an external web search API
     let aiOverviewDetected = false
-    try {
-      const overviewSearch = await (zai as any).functions.invoke('web_search', {
-        query: `${domain} AI overview Google`,
-        num: 5,
-      })
-      if (overviewSearch && Array.isArray(overviewSearch) && overviewSearch.length > 0) {
-        aiOverviewDetected = true
-      }
-    } catch {
-      // Search may fail
-    }
 
     // If no AI Overview presence found and we have citations before
     if (!aiOverviewDetected && lastKnownCitationCount > 3) {

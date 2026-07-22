@@ -5,6 +5,7 @@ import { AgentFallback } from '@/lib/agent-fallback'
 import { db } from '@/lib/db'
 import { sharedContextCache, redisSharedContext } from '@/lib/shared-context'
 import { scrapeAndCleanWebsite, getAgentSpecificContext, type ScrapedSharedContext } from '@/lib/scraper'
+import { routeLLM } from '@/lib/ai-router'
 import {
   createContextWindow,
   validateAgentResponse,
@@ -514,8 +515,53 @@ export async function POST(request: NextRequest) {
 
     async function* generateEvents(): AsyncGenerator<string> {
       try {
-        const { getZAI } = await import('@/lib/zai')
-        const zai = await getZAI() as any
+        // Create LLM shim that wraps routeLLM() into the zai.chat.completions.create interface
+        // and provides functions.invoke shim using native fetch()
+        const llmShim = {
+          chat: {
+            completions: {
+              create: async (opts: { messages?: Array<{ role: string; content: string }>; response_format?: { type: string } }) => {
+                const messages = opts.messages || []
+                // Determine taskType based on whether JSON output is expected
+                const taskType = opts.response_format?.type === 'json_object' ? 'reasoning' : 'chat'
+                const result = await routeLLM(messages, { taskType, maxTokens: 4096 })
+                return {
+                  choices: [{ message: { content: result.content } }],
+                  model: result.model,
+                }
+              },
+            },
+          },
+          functions: {
+            invoke: async (fn: string, opts: unknown) => {
+              if (fn === 'page_reader') {
+                const { url } = opts as { url: string }
+                try {
+                  const response = await fetch(url, {
+                    signal: AbortSignal.timeout(15000),
+                    headers: { 'User-Agent': 'SeoSights-Bot/1.0' },
+                  })
+                  if (!response.ok) return null
+                  const html = await response.text()
+                  const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+                  const title = titleMatch ? titleMatch[1].trim() : ''
+                  const text = html
+                    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                    .replace(/<[^>]*>/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                  return { data: { html, title, text } }
+                } catch { return null }
+              }
+              if (fn === 'web_search') {
+                console.warn('[analyze-shim] web_search not available without ZAI SDK — returning empty results')
+                return []
+              }
+              throw new Error(`Unknown function: ${fn}`)
+            },
+          },
+        }
 
         // Create the token tracker for this analysis session
         const tokenTracker = new TokenTracker(analysisSessionId, {
@@ -581,7 +627,7 @@ export async function POST(request: NextRequest) {
           yield sendProgress(5, 'Scanning website (Scrape Once, Read Many)...', analysisSessionId, analysisId)
           await flush()
 
-          scrapedContext = await scrapeAndCleanWebsite(url, zai, {
+          scrapedContext = await scrapeAndCleanWebsite(url, llmShim, {
             includeSearchData: true,
             targetMarket,
           })
@@ -689,7 +735,7 @@ export async function POST(request: NextRequest) {
           action: 'Strategy lead',
         })
 
-        const mdResult = await runAgent(zai, agents[0], agentContext, 39, (p, s) => {
+        const mdResult = await runAgent(llmShim, agents[0], agentContext, 39, (p, s) => {
           emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: 'master-director', progress: p, message: s })
         }, flush, tokenTracker, analysisId)
 
@@ -749,7 +795,7 @@ export async function POST(request: NextRequest) {
             action: agent.role.split(':')[0] || 'Analyzing...',
           })
 
-          let result = await runAgent(zai, agent, enhancedContext, progress, (p, s) => {
+          let result = await runAgent(llmShim, agent, enhancedContext, progress, (p, s) => {
             emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: agent.id, progress: p, message: s })
           }, flush, tokenTracker, analysisId)
 
@@ -786,7 +832,7 @@ export async function POST(request: NextRequest) {
           // Wait a moment before retry
           await new Promise(r => setTimeout(r, 2000))
 
-          result = await runAgent(zai, agent, enhancedContext, progress, (p, s) => {
+          result = await runAgent(llmShim, agent, enhancedContext, progress, (p, s) => {
             emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: agent.id, progress: p, message: s })
           }, flush, tokenTracker, analysisId)
 
@@ -935,7 +981,7 @@ export async function POST(request: NextRequest) {
           action: 'Final synthesis',
         })
 
-        const synthesisResult = await runAgent(zai, agents[0], synthesisAgentContext, 79, (p, s) => {
+        const synthesisResult = await runAgent(llmShim, agents[0], synthesisAgentContext, 79, (p, s) => {
           emitWS(analysisSessionId, 'agent:progress', { sessionId: analysisSessionId, agentId: 'master-director', progress: p, message: s })
         }, flush, tokenTracker, analysisId)
 

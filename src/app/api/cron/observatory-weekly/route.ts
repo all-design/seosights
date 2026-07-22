@@ -15,7 +15,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -64,7 +64,6 @@ export async function GET() {
   }
 
   try {
-    const zai = await getZAI() as any
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
@@ -163,8 +162,7 @@ Return ONLY valid JSON:
 
 Make the report insightful, actionable, and at least 600 words.`
 
-          const completion = await zai.chat.completions.create({
-            messages: [
+          const result = await routeLLM([
               {
                 role: 'system',
                 content:
@@ -172,10 +170,10 @@ Make the report insightful, actionable, and at least 600 words.`
               },
               { role: 'user', content: industryPrompt },
             ],
-            thinking: { type: 'disabled' },
-          })
+            { taskType: 'long_report' }
+          )
 
-          const raw = completion.choices?.[0]?.message?.content || ''
+          const raw = result.content || ''
           const parsed = parseLLMJson(raw)
 
           const markdownSections = (parsed.sections || [])
@@ -302,8 +300,7 @@ Return ONLY valid JSON:
 
 Make it engaging and at least 600 words.`
 
-        const completion = await zai.chat.completions.create({
-          messages: [
+        const result = await routeLLM([
             {
               role: 'system',
               content:
@@ -311,10 +308,10 @@ Make it engaging and at least 600 words.`
             },
             { role: 'user', content: moversPrompt },
           ],
-          thinking: { type: 'disabled' },
-        })
+          { taskType: 'long_report' }
+        )
 
-        const raw = completion.choices?.[0]?.message?.content || ''
+        const raw = result.content || ''
         const parsed = parseLLMJson(raw)
 
         const markdownSections = (parsed.sections || [])
@@ -550,8 +547,7 @@ Return ONLY valid JSON:
 
 Make it comprehensive and at least 800 words.`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
+      const result = await routeLLM([
           {
             role: 'system',
             content:
@@ -559,10 +555,10 @@ Make it comprehensive and at least 800 words.`
           },
           { role: 'user', content: weeklySummaryPrompt },
         ],
-        thinking: { type: 'disabled' },
-      })
+        { taskType: 'long_report' }
+      )
 
-      const raw = completion.choices?.[0]?.message?.content || ''
+      const raw = result.content || ''
       const parsed = parseLLMJson(raw)
 
       const markdownSections = (parsed.sections || [])

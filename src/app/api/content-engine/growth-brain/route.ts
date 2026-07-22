@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -268,12 +268,12 @@ Generate exactly 3 missions, ordered by impact.`
     }
 
     try {
-      const aiResponse = await createChatCompletion([
+      const aiResult = await routeLLM([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Give me today\'s briefing.' },
-      ], { temperature: 0.7 })
+      ], { taskType: 'strategy', temperature: 0.7 })
 
-      aiResult = JSON.parse(aiResponse)
+      aiResult = JSON.parse(aiResult.content)
     } catch {
       // ── Conversational fallback briefing ───────────────────────────────
       const greeting = getTimeGreeting()
@@ -518,12 +518,12 @@ Prioritize: highest impact + lowest effort first. Always consider the sprint goa
     }>
 
     try {
-      const aiResponse = await createChatCompletion([
+      const aiResult = await routeLLM([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Generate today\'s 5 prioritized recommendations.' },
-      ], { temperature: 0.7 })
+      ], { taskType: 'strategy', temperature: 0.7 })
 
-      recommendations = JSON.parse(aiResponse)
+      recommendations = JSON.parse(aiResult.content)
     } catch {
       // ── Conversational fallback recommendations ────────────────────────
       const articleCount = recentMemories.filter(m => m.actionType === 'published_article').length

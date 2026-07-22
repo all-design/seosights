@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -72,9 +72,6 @@ export async function POST(req: NextRequest) {
     let promptsCompleted = 0
     const errors: string[] = []
 
-    // Initialize ZAI SDK
-    const zai = await getZAI()
-
     // Select the first `limit` prompts from the set
     const selectedPrompts = PROMPT_SETS.slice(0, limit)
 
@@ -83,15 +80,14 @@ export async function POST(req: NextRequest) {
       selectedPrompts.map(async (promptSet) => {
         const responseStart = Date.now()
         try {
-          const completion = await zai.chat.completions.create({
-            messages: [
+          const result = await routeLLM([
               { role: 'system', content: modelConfig.systemPrompt },
               { role: 'user', content: promptSet.prompt },
             ],
-            thinking: { type: 'disabled' },
-          })
+            { taskType: 'chat' }
+          )
 
-          const responseText = completion.choices?.[0]?.message?.content || ''
+          const responseText = result.content || ''
           const responseTimeMs = Date.now() - responseStart
 
           // Extract citations (basic heuristic — look for URLs in the response)

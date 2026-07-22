@@ -207,3 +207,96 @@ Stage Summary:
 - No published pages yet (reports in proposed status, need publishing step)
 - Token usage logging not working ($0 spend recorded) - needs investigation
 - Key fix: routeLLM() works on Vercel (uses available providers), getZAI() doesn't (ETIMEDOUT)
+
+---
+Task ID: 3-b
+Agent: content-engine-refactor-agent
+Task: Replace createChatCompletion() calls in content-engine routes with routeLLM()
+
+Work Log:
+- board-report/route.ts: Replaced import + 1 call (taskType: 'long_report', temperature: 0.4)
+- execute/route.ts: Replaced import + 3 calls (brief: 'strategy', article: 'long_report', review: 'classification')
+- sprints/route.ts: Replaced import + 2 calls (both 'strategy', temperature: 0.7)
+- briefs/route.ts: Replaced import + 1 call ('summarization', temperature: 0.7)
+- growth-brain/route.ts: Replaced import + 2 calls (briefing: 'strategy', recommendations: 'strategy')
+- articles/[id]/review/route.ts: Replaced import + 1 call in loop ('classification', temperature: 0.3)
+- articles/[id]/auto-execute/route.ts: Replaced import + 2 calls (schema: 'code', links: 'entity_extraction')
+- articles/[id]/replay/route.ts: Replaced import + 1 call ('reasoning', temperature: 0.3)
+- articles/route.ts: Replaced import + 1 call ('long_report', temperature: 0.7)
+- knowledge-graph/route.ts: Replaced import + 1 call ('entity_extraction', temperature: 0.5)
+- content-factory/route.ts: Replaced import + 1 call ('long_report', temperature: 0.7)
+
+Stage Summary:
+- All 11 content-engine API route files migrated from createChatCompletion() → routeLLM()
+- 0 remaining createChatCompletion() calls in content-engine routes (verified via grep)
+- All imports changed from '@/lib/zai' → '@/lib/ai-router'
+- TaskType mapping: long_report (5 calls), strategy (5 calls), classification (2 calls), summarization (1), reasoning (1), code (1), entity_extraction (2)
+- Each routeLLM() call uses .content property to extract text (result.content instead of direct string return)
+- Original temperature/maxTokens values preserved where applicable
+- Lint check passes (pre-existing errors unrelated to changes)
+- Dev server running without errors
+
+---
+Task ID: 4
+Agent: Main
+Task: Replace ZAI SDK with OpenRouter GLM 5.2/GLM Turbo as default, keep other LLMs as backup
+
+Work Log:
+- Updated AI Router (ai-router.ts):
+  - Made OpenRouter GLM 5.2 and GLM Turbo the DEFAULT (first) model for ALL task types in TASK_MODEL_MAP
+  - New priority: openrouter/glm-turbo → openrouter/glm-5.2 → groq → gemini → deepseek → openai → ollama → zai
+  - Long reports and strategy use GLM 5.2 first (1M context, state_of_art)
+  - Scoring, entity extraction, summarization, classification use GLM Turbo first (ultra fast)
+  - ZAI moved to LAST position in every chain (sandbox-only, ETIMEDOUT on Vercel)
+  - Updated header comment to reflect new priority order
+  - Marked ZAI registry entry as "Sandbox — LAST resort, fails on Vercel"
+
+- Refactored zai.ts to use routeLLM() internally:
+  - getZAI() now returns a shim object that delegates chat.completions.create() to routeLLM()
+  - createChatCompletion() now delegates to routeLLM() with specified taskType
+  - Both functions marked as @deprecated with note to use routeLLM() directly
+  - zai.functions.invoke() throws error (not supported, use direct implementation)
+
+- Replaced all getZAI() calls (15+ files) with routeLLM():
+  - All observatory routes: engine, generate, detect, crawl, publish → routeLLM()
+  - All cron routes: observatory-weekly, observatory-monthly, cluster-map → routeLLM()
+  - Other routes: quick-audit, alerts/check, analyze, generate-llms-txt, qa-loop/run → routeLLM()
+  - audit-worker-init.ts: Uses llmShim that wraps routeLLM() + native fetch for scraping
+
+- Replaced all createChatCompletion() calls (11 files) with routeLLM():
+  - All content-engine routes: board-report, execute, sprints, briefs, growth-brain, articles/review, articles/auto-execute, articles/replay, articles, knowledge-graph, content-factory → routeLLM()
+  - Each route uses appropriate taskType (strategy, long_report, classification, etc.)
+
+- Updated AI Router status endpoint:
+  - Fixed ZAI env var check: ZAI_API_KEY → Z_AI_CONFIG (was wrong)
+  - Reordered providers: OpenRouter first (primary), then Groq, Gemini, OpenAI, Ollama, ZAI (last)
+  - Added priority comments to each provider
+
+- Updated control/data API:
+  - Added primary field: 'openrouter' 
+  - Added primaryModels field: ['z-ai/glm-5.2', 'z-ai/glm-4.7-flash (glm-turbo)']
+  - Reordered env var checks: openrouter first
+  - aiProviders now shows OpenRouter as primary provider
+
+- Updated .env:
+  - Added Z_AI_CONFIG for local dev (from /etc/.z-ai-config)
+  - Added comments for all LLM provider keys (OPENROUTER_API_KEY, GROQ_API_KEY, etc.)
+  - Noted that production keys are on Vercel env vars
+
+- Verified:
+  - Homepage HTTP 200 ✓
+  - Control data API HTTP 200 ✓
+  - AI Router status API HTTP 200 ✓
+  - ZAI provider shows as configured locally ✓
+  - Quick-audit POST endpoint works with routeLLM() ✓
+  - Lint check: only pre-existing errors (generate-docx.js, EngagementShell.tsx) ✓
+
+Stage Summary:
+- OpenRouter GLM 5.2 / GLM Turbo is now the DEFAULT for ALL LLM calls
+- ZAI SDK removed from primary position, now LAST fallback (sandbox-only)
+- All 26+ route files refactored from getZAI()/createChatCompletion() → routeLLM()
+- 0 remaining direct ZAI SDK usage for LLM calls (verified via grep)
+- On Vercel production: OpenRouter works (has OPENROUTER_API_KEY set)
+- Locally: ZAI fallback works (has Z_AI_CONFIG from sandbox file)
+- AI Router fallback chain: OpenRouter → Groq → Gemini → DeepSeek → OpenAI → Ollama → ZAI
+- Control panel now shows OpenRouter as primary provider

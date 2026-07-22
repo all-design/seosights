@@ -17,6 +17,7 @@ import { TokenTracker } from './token-tracker'
 import { AgentFallback } from './agent-fallback'
 import { sharedContextCache, redisSharedContext } from './shared-context'
 import { scrapeAndCleanWebsite, getAgentSpecificContext, type ScrapedSharedContext } from './scraper'
+import { routeLLM } from './ai-router'
 import {
   createContextWindow,
   validateAgentResponse,
@@ -414,9 +415,52 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
 
     emitWS(sessionId, 'analysis:start', { sessionId, url: targetUrl, market: targetMarket })
 
-    // Initialize z-ai-web-dev-sdk (uses getZAI which supports env var config on Vercel)
-    const { getZAI } = await import('./zai')
-    const zai = await getZAI()
+    // Initialize LLM shim that wraps routeLLM() into the zai.chat.completions.create interface
+    // (ZAI SDK doesn't work on Vercel — ETIMEDOUT on internal-api.z.ai)
+    const llmShim = {
+      chat: {
+        completions: {
+          create: async (opts: { messages?: Array<{ role: string; content: string }>; response_format?: { type: string } }) => {
+            const messages = opts.messages || []
+            const taskType = opts.response_format?.type === 'json_object' ? 'reasoning' : 'chat'
+            const result = await routeLLM(messages, { taskType, maxTokens: 4096 })
+            return {
+              choices: [{ message: { content: result.content } }],
+              model: result.model,
+            }
+          },
+        },
+      },
+      functions: {
+        invoke: async (fn: string, opts: unknown) => {
+          if (fn === 'page_reader') {
+            const { url } = opts as { url: string }
+            try {
+              const response = await fetch(url, {
+                signal: AbortSignal.timeout(15000),
+                headers: { 'User-Agent': 'SeoSights-Bot/1.0' },
+              })
+              if (!response.ok) return null
+              const html = await response.text()
+              const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+              const title = titleMatch ? titleMatch[1].trim() : ''
+              const text = html
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+              return { data: { html, title, text } }
+            } catch { return null }
+          }
+          if (fn === 'web_search') {
+            console.warn('[audit-worker-shim] web_search not available without ZAI SDK — returning empty results')
+            return []
+          }
+          throw new Error(`Unknown function: ${fn}`)
+        },
+      },
+    }
 
     const tokenTracker = new TokenTracker(sessionId, { userId, analysisId })
 
@@ -495,7 +539,7 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
       emitProgress(5, 'Scanning website (Scrape Once, Read Many)...')
       console.log(`[audit-worker] Cache MISS for ${projectId} — running scrapeAndCleanWebsite()`)
 
-      scrapedContext = await scrapeAndCleanWebsite(targetUrl, zai, {
+      scrapedContext = await scrapeAndCleanWebsite(targetUrl, llmShim, {
         includeSearchData: true,
         targetMarket,
       })
@@ -558,7 +602,7 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
     emitProgress(38, 'Master Director: Analyzing raw data & creating plan...')
     emitWS(sessionId, 'agent:start', { sessionId, agentId: 'master-director', agentName: 'Master Director', action: 'Strategy lead' })
 
-    const mdResult = await runAgent(zai, agents[0], agentContext, 39, emitProgress, tokenTracker, analysisId)
+    const mdResult = await runAgent(llmShim, agents[0], agentContext, 39, emitProgress, tokenTracker, analysisId)
     if (Object.keys(mdResult.data).length > 0) {
       allAgentResults.push(mdResult.data)
       const mdValidated = validateAgentResponse(mdResult.data)
@@ -588,7 +632,7 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
           await new Promise(r => setTimeout(r, index * 1800))
           const startProgress = 44 + index * 5
           emitProgress(startProgress, `Running ${agent.name}...`)
-          const result = await runSubAgentWithProtocol(zai, agent, agentContext, contextWindow, sessionId, startProgress, emitProgress, tokenTracker, analysisId, sharedScrapedContext)
+          const result = await runSubAgentWithProtocol(llmShim, agent, agentContext, contextWindow, sessionId, startProgress, emitProgress, tokenTracker, analysisId, sharedScrapedContext)
           resolve(result)
         })
       )
@@ -613,7 +657,7 @@ async function processAuditJob(job: { id: string; data: AuditJobData }): Promise
           await new Promise(r => setTimeout(r, index * 1800))
           const startProgress = 60 + index * 5
           emitProgress(startProgress, `Running ${agent.name}...`)
-          const result = await runSubAgentWithProtocol(zai, agent, agentContext, contextWindow, sessionId, startProgress, emitProgress, tokenTracker, analysisId, sharedScrapedContext)
+          const result = await runSubAgentWithProtocol(llmShim, agent, agentContext, contextWindow, sessionId, startProgress, emitProgress, tokenTracker, analysisId, sharedScrapedContext)
           resolve(result)
         })
       )

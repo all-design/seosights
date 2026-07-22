@@ -1,9 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TokenTracker } from '@/lib/token-tracker'
+import { routeLLM } from '@/lib/ai-router'
 import { randomUUID } from 'crypto'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
+
+/**
+ * Fetch a URL using native fetch() and extract text content.
+ * Replaces zai.functions.invoke('page_reader', { url })
+ */
+async function fetchPage(url: string): Promise<{ html: string; title: string; text: string } | null> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'SeoSights-Bot/1.0' },
+    })
+    if (!response.ok) return null
+    const html = await response.text()
+
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    const title = titleMatch ? titleMatch[1].trim() : ''
+
+    // Extract plain text (strip scripts, styles, HTML tags)
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    return { html, title, text }
+  } catch {
+    return null
+  }
+}
 
 /**
  * Quick Audit API — "Trojan Horse" Free Scanner
@@ -37,26 +69,16 @@ export async function POST(request: NextRequest) {
     const sessionId = randomUUID()
     const tokenTracker = new TokenTracker(sessionId)
 
-    const { getZAI } = await import('@/lib/zai')
-    const zai = await getZAI()
-
     // ── Step 1: Fetch the page ──
     let siteData: { title?: string; html?: string; text?: string } = { title: url, text: '' }
     try {
-      const pageResult = await (zai as any).functions.invoke('page_reader', { url })
+      const pageResult = await fetchPage(url)
       if (pageResult) {
-        const rawData = pageResult.data || pageResult
-        const htmlContent = rawData.html || ''
-        const plainText = htmlContent
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 4000)
+        const htmlContent = pageResult.html || ''
+        const plainText = pageResult.text.slice(0, 4000)
 
         siteData = {
-          title: rawData.title || url,
+          title: pageResult.title || url,
           html: htmlContent.slice(0, 2000),
           text: plainText,
         }
@@ -77,16 +99,9 @@ export async function POST(request: NextRequest) {
     // ── Step 2: Try to fetch robots.txt ──
     let robotsTxt = ''
     try {
-      const robotsResult = await (zai as any).functions.invoke('page_reader', {
-        url: `${parsedUrl.origin}/robots.txt`,
-      })
+      const robotsResult = await fetchPage(`${parsedUrl.origin}/robots.txt`)
       if (robotsResult) {
-        const rd = robotsResult.data || robotsResult
-        robotsTxt = (rd.html || rd.text || '')
-          .replace(/<[^>]*>/g, '')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 2000)
+        robotsTxt = robotsResult.text.slice(0, 2000)
 
         // Track robots.txt data gathering
         tokenTracker.track({
@@ -104,12 +119,9 @@ export async function POST(request: NextRequest) {
     // ── Step 3: Check for llms.txt ──
     let llmsTxtExists = false
     try {
-      const llmsResult = await (zai as any).functions.invoke('page_reader', {
-        url: `${parsedUrl.origin}/llms.txt`,
-      })
+      const llmsResult = await fetchPage(`${parsedUrl.origin}/llms.txt`)
       if (llmsResult) {
-        const ld = llmsResult.data || llmsResult
-        const content = (ld.html || ld.text || '').trim()
+        const content = llmsResult.text.trim()
         llmsTxtExists = content.length > 10
 
         // Track llms.txt check
@@ -197,21 +209,19 @@ IMPORTANT: Return ONLY raw JSON. No code fences.`
 
     let analysisResult: Record<string, unknown> = {}
     try {
-      const result = await (zai as any).chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: quickAnalysisPrompt },
-        ],
-      })
+      const result = await routeLLM([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: quickAnalysisPrompt },
+      ], { taskType: 'scoring' })
 
-      const raw = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
+      const raw = result.content || ''
       outputTokens = tokenTracker.estimateTokens(raw)
 
       // Track the LLM call
       tokenTracker.track({
         agentId: 'quick-audit-llm',
         agentName: 'Quick Audit (LLM)',
-        model: 'default',
+        model: result.model,
         inputTokens,
         outputTokens,
       })

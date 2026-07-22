@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -27,7 +27,6 @@ export async function POST() {
       })
     }
 
-    const zai = await getZAI()
     let published = 0
     let rejected = 0
     const results: Array<{
@@ -74,18 +73,17 @@ Return ONLY valid JSON:
   "suggestions": ["improvement suggestions if any"]
 }`
 
-        const completion = await zai.chat.completions.create({
-          messages: [
+        const result = await routeLLM([
             {
               role: 'system',
               content: 'You are an expert editorial AI that evaluates research reports for publication quality. You must return ONLY valid JSON with no extra commentary.',
             },
             { role: 'user', content: evaluationPrompt },
           ],
-          thinking: { type: 'disabled' },
-        })
+          { taskType: 'scoring' }
+        )
 
-        const raw = completion.choices?.[0]?.message?.content || ''
+        const raw = result.content || ''
         let cleaned = raw.trim()
         const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
         if (jsonMatch) cleaned = jsonMatch[1].trim()

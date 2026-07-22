@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -152,13 +152,14 @@ Write the complete article now:`
 
     let articleContent: string
     try {
-      articleContent = await createChatCompletion([
+      const aiResult = await routeLLM([
         {
           role: 'system',
           content: `You are a senior content writer for seosights.com, an AI-powered SEO/AEO/GEO platform. Write authoritative, data-driven content that ranks in both traditional search and AI search engines. Domain: ${DEFAULT_DOMAIN}. Always use markdown format.`,
         },
         { role: 'user', content: articlePrompt },
-      ], { temperature: 0.7 })
+      ], { taskType: 'long_report', temperature: 0.7 })
+      articleContent = aiResult.content
     } catch (aiError) {
       console.warn('[Content Engine Articles] AI article generation failed, using fallback:', aiError)
       articleContent = `# ${title}\n\n## Introduction\n\n${brief.topic} is a critical area of focus for modern SEO professionals. In this guide, we explore ${brief.keywordTarget} and how it impacts your search visibility.\n\n## Key Concepts\n\nUnderstanding ${brief.keywordTarget} requires a grasp of the fundamental principles that drive AI search visibility.\n\n## Conclusion\n\n${brief.keywordTarget} represents the future of search optimization. Start implementing these strategies today.`

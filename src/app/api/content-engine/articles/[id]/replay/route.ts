@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 // ── POST: Run replay check ────────────────────────────────────────────────────
 
@@ -81,12 +81,12 @@ Return valid JSON only:
 
     let replayResult: Record<string, unknown>
     try {
-      const aiResponse = await createChatCompletion([
+      const aiResult = await routeLLM([
         { role: 'system', content: 'You are an AI visibility simulation engine. Respond with valid JSON only.' },
         { role: 'user', content: replayPrompt },
-      ], { temperature: 0.3 })
+      ], { taskType: 'reasoning', temperature: 0.3 })
 
-      replayResult = JSON.parse(aiResponse)
+      replayResult = JSON.parse(aiResult.content)
     } catch (aiError) {
       console.warn('[Content Engine Replay] AI simulation failed, using heuristic:', aiError)
 

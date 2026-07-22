@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -73,8 +73,6 @@ Significance: ${s.significanceScore.toFixed(2)}
 Reason: ${s.signalReason || 'N/A'}`)
       .join('\n\n')
 
-    const zai = await getZAI()
-
     const generationPrompt = `Based on these AI observability signals, generate a comprehensive research report.
 
 SIGNALS:
@@ -103,18 +101,17 @@ The report should be:
 - Written in a professional but accessible tone
 - At least 800 words in total content`
 
-    const completion = await zai.chat.completions.create({
-      messages: [
+    const result = await routeLLM([
         {
           role: 'system',
           content: 'You are an expert research analyst who writes high-quality reports about AI model behavior, visibility, and search trends. You must return ONLY valid JSON with no extra commentary.',
         },
         { role: 'user', content: generationPrompt },
       ],
-      thinking: { type: 'disabled' },
-    })
+      { taskType: 'long_report' }
+    )
 
-    const raw = completion.choices?.[0]?.message?.content || ''
+    const raw = result.content || ''
     let cleaned = raw.trim()
     const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (jsonMatch) cleaned = jsonMatch[1].trim()

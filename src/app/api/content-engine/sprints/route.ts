@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -131,12 +131,12 @@ Generate a focused 2-week sprint plan. Format as JSON:
 Make the plan specific, actionable, and realistic. Target the highest-impact, lowest-effort actions first.`
 
       try {
-        const aiResponse = await createChatCompletion([
+        const aiResult = await routeLLM([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: 'Create the sprint plan.' },
-        ], { temperature: 0.7 })
+        ], { taskType: 'strategy', temperature: 0.7 })
 
-        const parsed = JSON.parse(aiResponse)
+        const parsed = JSON.parse(aiResult.content)
         sprintGoal = parsed.goal
         sprintMetric = parsed.goalMetric
         sprintTarget = parsed.goalTarget
@@ -211,12 +211,12 @@ Generate a JSON plan:
 }`
 
       try {
-        const aiResponse = await createChatCompletion([
+        const aiResult = await routeLLM([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: 'Create the sprint plan.' },
-        ], { temperature: 0.7 })
+        ], { taskType: 'strategy', temperature: 0.7 })
 
-        const parsed = JSON.parse(aiResponse)
+        const parsed = JSON.parse(aiResult.content)
         sprintPlan = parsed.plan
         sprintPlannedActions = parsed.plannedActions
       } catch {

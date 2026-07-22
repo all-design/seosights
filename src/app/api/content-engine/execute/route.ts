@@ -21,7 +21,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -109,11 +109,11 @@ Respond in JSON:
 
       let briefData: Record<string, unknown>
       try {
-        const aiResponse = await createChatCompletion([
+        const aiResult = await routeLLM([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: 'Generate a brief.' },
-        ], { temperature: 0.7 })
-        briefData = JSON.parse(aiResponse)
+        ], { taskType: 'strategy', temperature: 0.7 })
+        briefData = JSON.parse(aiResult.content)
       } catch {
         briefData = {
           topic: 'AI Visibility Optimization Guide',
@@ -172,10 +172,11 @@ Requirements:
 
     let articleContent: string
     try {
-      articleContent = await createChatCompletion([
+      const writeResult = await routeLLM([
         { role: 'system', content: writePrompt },
         { role: 'user', content: `Write the article now: "${brief.suggestedTitle}"` },
-      ], { temperature: 0.7 })
+      ], { taskType: 'long_report', temperature: 0.7 })
+      articleContent = writeResult.content
     } catch {
       articleContent = `# ${brief.suggestedTitle}\n\n## Introduction\n\n${brief.topic} is a critical area for modern businesses seeking AI visibility. This guide covers everything you need to know about ${brief.keywordTarget}.\n\n## Core Concepts\n\nUnderstanding ${brief.keywordTarget} requires grasping how AI engines discover, evaluate, and cite content. The key principles include entity authority, content structure, and citation optimization.\n\n## Implementation\n\nHere is a step-by-step guide to implementing ${brief.keywordTarget} strategies effectively.\n\n## FAQ\n\n**What is ${brief.keywordTarget}?**\n${brief.keywordTarget} is the practice of optimizing content for visibility in AI-generated responses.\n\n**Why does ${brief.keywordTarget} matter?**\nAs AI engines become primary discovery channels, ${brief.keywordTarget} directly impacts brand visibility.`
     }
@@ -217,11 +218,11 @@ Respond in JSON:
 
       let reviewData: { score: number; status: string; findings: string[]; autoFixes: string[] }
       try {
-        const reviewResponse = await createChatCompletion([
+        const reviewResult = await routeLLM([
           { role: 'system', content: reviewPrompt },
           { role: 'user', content: `Review: "${article.title}"` },
-        ], { temperature: 0.3 })
-        reviewData = JSON.parse(reviewResponse)
+        ], { taskType: 'classification', temperature: 0.3 })
+        reviewData = JSON.parse(reviewResult.content)
       } catch {
         // Default review
         reviewData = {

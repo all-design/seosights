@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -83,7 +83,6 @@ export async function POST() {
     }
 
     // Use LLM to compare each pair and detect changes
-    const zai = await getZAI()
     const detectedChanges: Array<{
       aiModel: string
       changeType: string
@@ -125,18 +124,17 @@ Analyze the differences and return ONLY valid JSON:
 
 If the responses are essentially the same, set hasChange to false. Only report meaningful changes.`
 
-          const completion = await zai.chat.completions.create({
-            messages: [
+          const result = await routeLLM([
               {
                 role: 'system',
                 content: 'You are an expert at detecting changes in AI model behavior and responses. You must return ONLY valid JSON with no extra commentary.',
               },
               { role: 'user', content: comparisonPrompt },
             ],
-            thinking: { type: 'disabled' },
-          })
+            { taskType: 'classification' }
+          )
 
-          const raw = completion.choices?.[0]?.message?.content || ''
+          const raw = result.content || ''
           // Parse JSON from the response
           let cleaned = raw.trim()
           const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)

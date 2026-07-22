@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,15 +73,15 @@ export async function POST(
 
 Return ONLY a valid JSON array of schema objects (no markdown):`
 
-        const schemaResponse = await createChatCompletion([
+        const schemaResult = await routeLLM([
           { role: 'system', content: 'You are a schema markup specialist. Generate valid JSON-LD only. No markdown formatting.' },
           { role: 'user', content: schemaPrompt },
-        ], { temperature: 0.2 })
+        ], { taskType: 'code', temperature: 0.2 })
 
         // Validate it's valid JSON
         let schemaMarkup: unknown
         try {
-          schemaMarkup = JSON.parse(schemaResponse)
+          schemaMarkup = JSON.parse(schemaResult.content)
         } catch {
           // Wrap in array if single object
           schemaMarkup = [{ '@context': 'https://schema.org', '@type': 'Article', headline: article.title }]
@@ -129,14 +129,14 @@ Suggest 5-8 internal links with anchor text and URL paths. Return as a JSON arra
 
 Return ONLY valid JSON, no markdown:`
 
-        const linkResponse = await createChatCompletion([
+        const linkResult = await routeLLM([
           { role: 'system', content: 'You are an internal linking strategist for seosights.com. Generate link suggestions as valid JSON only.' },
           { role: 'user', content: linkPrompt },
-        ], { temperature: 0.3 })
+        ], { taskType: 'entity_extraction', temperature: 0.3 })
 
         let internalLinks: unknown
         try {
-          internalLinks = JSON.parse(linkResponse)
+          internalLinks = JSON.parse(linkResult.content)
         } catch {
           internalLinks = [
             { anchorText: article.brief.keywordTarget, url: `/blog/${article.brief.keywordTarget.replace(/\s+/g, '-')}`, context: 'Introduction' },

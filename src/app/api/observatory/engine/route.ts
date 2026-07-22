@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -40,7 +40,6 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const zai = await getZAI()
     let detectedSignals = 0
     const evaluatedChanges: Array<{
       id: string
@@ -85,18 +84,17 @@ Return ONLY valid JSON:
   "recommendedAction": "what should be done about this, if anything"
 }`
 
-          const completion = await zai.chat.completions.create({
-            messages: [
+          const result = await routeLLM([
               {
                 role: 'system',
                 content: 'You are an expert AI observability analyst who evaluates changes in AI model behavior. You must return ONLY valid JSON with no extra commentary.',
               },
               { role: 'user', content: evaluationPrompt },
             ],
-            thinking: { type: 'disabled' },
-          })
+            { taskType: 'classification' }
+          )
 
-          const raw = completion.choices?.[0]?.message?.content || ''
+          const raw = result.content || ''
           let cleaned = raw.trim()
           const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
           if (jsonMatch) cleaned = jsonMatch[1].trim()

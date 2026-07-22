@@ -80,12 +80,14 @@ export async function GET() {
     qaEngine: counts.qaRuns > 0 ? 'operational' : 'offline',
   }
 
-  // AI providers from env
+  // AI providers from env — OpenRouter GLM 5.2/GLM Turbo is DEFAULT primary
   const aiProviders = {
+    primary: 'openrouter',
+    primaryModels: ['z-ai/glm-5.2', 'z-ai/glm-4.7-flash (glm-turbo)'],
     configured: Object.entries({
+      openrouter: process.env.OPENROUTER_API_KEY,
       groq: process.env.GROQ_API_KEY,
       gemini: process.env.GEMINI_API_KEY,
-      openrouter: process.env.OPENROUTER_API_KEY,
       openai: process.env.OPENAI_API_KEY,
       zai: process.env.Z_AI_CONFIG,
     }).filter(([, v]) => typeof v === 'string' && v.trim().length > 0).map(([k]) => k),

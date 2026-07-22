@@ -17,7 +17,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getZAI } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -68,7 +68,6 @@ export async function GET() {
   }
 
   try {
-    const zai = await getZAI() as any
     const now = new Date()
     const oneMonthAgo = new Date(now)
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
@@ -156,8 +155,7 @@ Return ONLY valid JSON:
 
 This is the flagship monthly report — make it thorough, data-driven, and at least 1200 words.`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
+      const result = await routeLLM([
           {
             role: 'system',
             content:
@@ -165,10 +163,10 @@ This is the flagship monthly report — make it thorough, data-driven, and at le
           },
           { role: 'user', content: reportPrompt },
         ],
-        thinking: { type: 'disabled' },
-      })
+        { taskType: 'long_report' }
+      )
 
-      const raw = completion.choices?.[0]?.message?.content || ''
+      const raw = result.content || ''
       const parsed = parseLLMJson(raw)
 
       const markdownSections = (parsed.sections || [])
@@ -314,8 +312,7 @@ Return ONLY valid JSON:
 
 Make it analytical and at least 800 words.`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
+      const result = await routeLLM([
           {
             role: 'system',
             content:
@@ -323,10 +320,10 @@ Make it analytical and at least 800 words.`
           },
           { role: 'user', content: comparisonPrompt },
         ],
-        thinking: { type: 'disabled' },
-      })
+        { taskType: 'reasoning' }
+      )
 
-      const raw = completion.choices?.[0]?.message?.content || ''
+      const raw = result.content || ''
       const parsed = parseLLMJson(raw)
 
       const markdownSections = (parsed.sections || [])
@@ -460,8 +457,7 @@ Return ONLY valid JSON:
 
 Make it analytical, trend-focused, and at least 800 words.`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
+      const result = await routeLLM([
           {
             role: 'system',
             content:
@@ -469,10 +465,10 @@ Make it analytical, trend-focused, and at least 800 words.`
           },
           { role: 'user', content: trendPrompt },
         ],
-        thinking: { type: 'disabled' },
-      })
+        { taskType: 'reasoning' }
+      )
 
-      const raw = completion.choices?.[0]?.message?.content || ''
+      const raw = result.content || ''
       const parsed = parseLLMJson(raw)
 
       const markdownSections = (parsed.sections || [])
@@ -700,8 +696,7 @@ Return ONLY valid JSON:
 
 This is a premium, client-facing report — make it exceptional, comprehensive, and at least 1500 words.`
 
-      const completion = await zai.chat.completions.create({
-        messages: [
+      const result = await routeLLM([
           {
             role: 'system',
             content:
@@ -709,10 +704,10 @@ This is a premium, client-facing report — make it exceptional, comprehensive, 
           },
           { role: 'user', content: pdfReportPrompt },
         ],
-        thinking: { type: 'disabled' },
-      })
+        { taskType: 'long_report' }
+      )
 
-      const raw = completion.choices?.[0]?.message?.content || ''
+      const raw = result.content || ''
       const parsed = parseLLMJson(raw)
 
       const markdownSections = (parsed.sections || [])

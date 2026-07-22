@@ -1,32 +1,27 @@
 /**
  * AI Router — Smart Task-Based Model Routing
  *
- * Instead of a static fallback chain, the AI Router selects the optimal LLM
- * model based on the TASK TYPE. Different tasks have different requirements:
+ * OpenRouter GLM 5.2 / GLM Turbo is the DEFAULT for all tasks.
+ * Fallback chain ensures resilience with multiple providers.
  *
- * | Task              | Best Model          | Why                        |
+ * | Task              | Default Model       | Why                        |
  * |-------------------|---------------------|----------------------------|
- * | scoring           | Gemini Flash        | Fast, cheap, good at numbers |
- * | entity_extraction | Groq Llama 3.1      | Fast inference, structured output |
- * | summarization     | Groq                | Speed + quality balance    |
- * | long_report       | Gemini              | Huge context window        |
- * | strategy          | OpenAI / ZAI        | Best reasoning             |
- * | code              | DeepSeek            | Code-specialized           |
- * | reasoning         | Best available      | Complex chain-of-thought   |
+ * | scoring           | GLM Turbo (OR)      | Ultra-fast, cheap, good at numbers |
+ * | entity_extraction | GLM Turbo (OR)      | Fast, structured output    |
+ * | summarization     | GLM Turbo (OR)      | Speed + quality balance    |
+ * | long_report       | GLM 5.2 (OR)        | Huge context (1M), state-of-art |
+ * | strategy          | GLM 5.2 (OR)        | Best reasoning, 1M context |
+ * | code              | GLM Turbo (OR)      | Fast, code-specialized     |
+ * | reasoning         | GLM 5.2 (OR)        | Complex chain-of-thought   |
  *
- * Then the Smart Budget Engine applies TIER constraints:
- * | Free    → Gemini Flash (free tier)  |
- * | Starter → Groq (free tier)          |
- * | Pro     → OpenAI / best available   |
- * | Managed → Best model available      |
- *
- * Provider Priority:
- * 1. Groq (free, ultra-fast, Llama 3.1 70B / Mixtral)
- * 2. Google Gemini (free tier, Gemini 1.5 Flash)
- * 3. OpenRouter (free models, 100+ options)
- * 4. OpenAI (paid, highest quality)
- * 5. ZAI SDK (sandbox default)
+ * Provider Priority (default):
+ * 1. OpenRouter GLM 5.2 / GLM Turbo (primary — cheap, reliable, huge context)
+ * 2. Groq (free, ultra-fast, Llama 3.1)
+ * 3. Google Gemini (free tier, huge context)
+ * 4. DeepSeek V3 (via OpenRouter, code/reasoning)
+ * 5. OpenAI (paid, highest quality)
  * 6. Ollama (local fallback)
+ * 7. ZAI SDK (sandbox-only, LAST resort — doesn't work on Vercel)
  */
 
 import { createOllamaCompletion } from './agent-fallback'
@@ -223,7 +218,7 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
     free: false,
   },
 
-  // ─── ZAI SDK (Sandbox Default) ────────────────────────────────────────
+  // ─── ZAI SDK (Sandbox — LAST resort, fails on Vercel) ────────────────
   'zai/default': {
     id: 'default',
     provider: 'zai',
@@ -253,16 +248,16 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TASK_MODEL_MAP: Record<TaskType, string[]> = {
-  scoring:           ['groq/llama-3.1-8b', 'openrouter/glm-turbo', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'zai/default', 'ollama/llama3'],
-  entity_extraction: ['groq/llama-3.1-8b', 'openrouter/glm-turbo', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'zai/default', 'ollama/llama3'],
-  summarization:     ['groq/llama-3.1-8b', 'openrouter/glm-turbo', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'zai/default', 'ollama/llama3'],
-  long_report:       ['openrouter/glm-turbo', 'gemini/pro', 'gemini/flash', 'openrouter/glm-5.2', 'openrouter/deepseek-v3', 'openai/gpt-4o', 'zai/default', 'ollama/llama3'],
-  strategy:          ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'zai/default', 'ollama/llama3'],
-  code:              ['openrouter/glm-turbo', 'openrouter/deepseek-v3', 'openrouter/glm-5.2', 'gemini/flash', 'openai/gpt-4o-mini', 'zai/default', 'ollama/llama3'],
-  reasoning:         ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'zai/default', 'ollama/llama3'],
-  classification:    ['groq/llama-3.1-8b', 'openrouter/glm-turbo', 'gemini/flash', 'openrouter/deepseek-v3', 'zai/default', 'ollama/llama3'],
-  chat:              ['groq/llama-3.1-8b', 'openrouter/glm-turbo', 'gemini/flash', 'openai/gpt-4o-mini', 'zai/default', 'ollama/llama3'],
-  embedding:         ['gemini/flash', 'zai/default'],
+  scoring:           ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  entity_extraction: ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  summarization:     ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  long_report:       ['openrouter/glm-5.2', 'openrouter/glm-turbo', 'gemini/pro', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o', 'ollama/llama3', 'zai/default'],
+  strategy:          ['openrouter/glm-5.2', 'openrouter/glm-turbo', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'ollama/llama3', 'zai/default'],
+  code:              ['openrouter/glm-turbo', 'openrouter/deepseek-v3', 'openrouter/glm-5.2', 'gemini/flash', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  reasoning:         ['openrouter/glm-5.2', 'openrouter/glm-turbo', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'ollama/llama3', 'zai/default'],
+  classification:    ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'ollama/llama3', 'zai/default'],
+  chat:              ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  embedding:         ['gemini/flash', 'openrouter/glm-turbo', 'ollama/llama3', 'zai/default'],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,9 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { TokenTracker } from '@/lib/token-tracker'
+import { routeLLM } from '@/lib/ai-router'
 import { randomUUID } from 'crypto'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
+
+/**
+ * Fetch a URL using native fetch() and extract text content.
+ * Replaces zai.functions.invoke('page_reader', { url })
+ */
+async function fetchPage(url: string): Promise<{ html: string; title: string; text: string } | null> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'SeoSights-Bot/1.0' },
+    })
+    if (!response.ok) return null
+    const html = await response.text()
+
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+    const title = titleMatch ? titleMatch[1].trim() : ''
+
+    // Extract plain text (strip scripts, styles, HTML tags)
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    return { html, title, text }
+  } catch {
+    return null
+  }
+}
 
 /**
  * llms.txt Generator API
@@ -28,37 +60,26 @@ export async function POST(request: NextRequest) {
     const sessionId = randomUUID()
     const tokenTracker = new TokenTracker(sessionId)
 
-    const { getZAI } = await import('@/lib/zai')
-    const zai = await getZAI()
-
     // Gather site content if not provided
     let content = siteContent || ''
     let title = siteName || url
 
     if (!content) {
       try {
-        const pageResult = await (zai as any).functions.invoke('page_reader', { url })
+        const pageResult = await fetchPage(url)
         if (pageResult) {
-          const rawData = pageResult.data || pageResult
-          const htmlContent = rawData.html || ''
-          content = htmlContent
-            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-            .replace(/<[^>]*>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 5000)
-          title = rawData.title || title
-        }
+          content = pageResult.text.slice(0, 5000)
+          title = pageResult.title || title
 
-        // Track page_reader data gathering
-        tokenTracker.track({
-          agentId: 'llms-txt-page-reader',
-          agentName: 'llms.txt Generator (Page Reader)',
-          model: 'default',
-          inputTokens: tokenTracker.estimateTokens(url),
-          outputTokens: tokenTracker.estimateTokens(content),
-        })
+          // Track page_reader data gathering
+          tokenTracker.track({
+            agentId: 'llms-txt-page-reader',
+            agentName: 'llms.txt Generator (Page Reader)',
+            model: 'default',
+            inputTokens: tokenTracker.estimateTokens(url),
+            outputTokens: tokenTracker.estimateTokens(content),
+          })
+        }
       } catch {
         content = ''
       }
@@ -107,20 +128,19 @@ Rules:
 
     let llmsTxt = ''
     try {
-      const result = await (zai as any).chat.completions.create({
-        messages: [
-          { role: 'system', content: llmsTxtSystemPrompt },
-          { role: 'user', content: llmsTxtPrompt },
-        ],
-      })
-      llmsTxt = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
+      const result = await routeLLM([
+        { role: 'system', content: llmsTxtSystemPrompt },
+        { role: 'user', content: llmsTxtPrompt },
+      ], { taskType: 'code' })
+
+      llmsTxt = result.content || ''
       llmsTxt = llmsTxt.replace(/```(?:markdown|md)?\s*/g, '').replace(/```\s*$/g, '').trim()
 
       llmsTxtOutputTokens = tokenTracker.estimateTokens(llmsTxt)
       tokenTracker.track({
         agentId: 'llms-txt-generator',
         agentName: 'llms.txt Generator (Concise)',
-        model: 'default',
+        model: result.model,
         inputTokens: llmsTxtInputTokens,
         outputTokens: llmsTxtOutputTokens,
       })
@@ -182,20 +202,19 @@ Rules:
 
     let llmsFullTxt = ''
     try {
-      const result = await (zai as any).chat.completions.create({
-        messages: [
-          { role: 'system', content: llmsFullTxtSystemPrompt },
-          { role: 'user', content: llmsFullTxtPrompt },
-        ],
-      })
-      llmsFullTxt = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
+      const result = await routeLLM([
+        { role: 'system', content: llmsFullTxtSystemPrompt },
+        { role: 'user', content: llmsFullTxtPrompt },
+      ], { taskType: 'code' })
+
+      llmsFullTxt = result.content || ''
       llmsFullTxt = llmsFullTxt.replace(/```(?:markdown|md)?\s*/g, '').replace(/```\s*$/g, '').trim()
 
       llmsFullTxtOutputTokens = tokenTracker.estimateTokens(llmsFullTxt)
       tokenTracker.track({
         agentId: 'llms-txt-generator',
         agentName: 'llms.txt Generator (Full)',
-        model: 'default',
+        model: result.model,
         inputTokens: llmsFullTxtInputTokens,
         outputTokens: llmsFullTxtOutputTokens,
       })

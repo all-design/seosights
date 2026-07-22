@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -119,13 +119,13 @@ Return a JSON object with these fields (and ONLY a valid JSON object, no markdow
 
     let briefContent: string
     try {
-      const aiResponse = await createChatCompletion([
+      const aiResult = await routeLLM([
         { role: 'system', content: 'You are a senior content strategist specializing in SEO, AEO (Answer Engine Optimization), and GEO (Generative Engine Optimization). Always respond with valid JSON only, no markdown formatting.' },
         { role: 'user', content: briefPrompt },
-      ], { temperature: 0.7 })
+      ], { taskType: 'summarization', temperature: 0.7 })
 
       // Try to parse and re-serialize to ensure valid JSON
-      const parsed = JSON.parse(aiResponse)
+      const parsed = JSON.parse(aiResult.content)
       briefContent = JSON.stringify(parsed)
     } catch (aiError) {
       console.warn('[Content Engine Briefs] AI brief generation failed, using fallback:', aiError)

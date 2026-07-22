@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 const DEFAULT_DOMAIN = 'seosights.com'
 
@@ -194,12 +194,12 @@ Important:
     }
 
     try {
-      const aiResponse = await createChatCompletion([
+      const aiResult = await routeLLM([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Build the knowledge graph for this brand.' },
-      ], { temperature: 0.5 })
+      ], { taskType: 'entity_extraction', temperature: 0.5 })
 
-      graphData = JSON.parse(aiResponse)
+      graphData = JSON.parse(aiResult.content)
     } catch {
       // Fallback: build a basic graph without AI
       graphData = buildFallbackGraph(domain)

@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { createChatCompletion } from '@/lib/zai'
+import { routeLLM } from '@/lib/ai-router'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -286,17 +286,17 @@ export async function POST(
       if (!reviewerConfig) return null
 
       try {
-        const aiResponse = await createChatCompletion([
+        const aiResult = await routeLLM([
           { role: 'system', content: reviewerConfig.system },
           {
             role: 'user',
             content: `${reviewerConfig.prompt}\n\n**Article Title:** ${article.title}\n**Target Keyword:** ${article.brief.keywordTarget}\n**Pillar:** ${article.brief.pillar}\n\n**Article Content:**\n${contentPreview}`,
           },
-        ], { temperature: 0.3 })
+        ], { taskType: 'classification', temperature: 0.3 })
 
         let parsed: Record<string, unknown>
         try {
-          parsed = JSON.parse(aiResponse)
+          parsed = JSON.parse(aiResult.content)
         } catch {
           parsed = {
             score: 50,
