@@ -871,19 +871,28 @@ function buildAlterSql(tableName: string, columnName: string, spec: ColumnSpec):
   const parts: string[] = [`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${spec.type}`]
 
   if (spec.notNull && spec.default !== undefined) {
-    parts.push(`NOT NULL DEFAULT ${spec.default}`)
+    // SQLite ALTER TABLE ADD COLUMN cannot use non-constant defaults like
+    // (datetime('now')). Replace with a static ISO timestamp string.
+    const safeDefault = spec.default === "(datetime('now'))"
+      ? "'2026-01-01T00:00:00Z'"
+      : spec.default
+    parts.push(`NOT NULL DEFAULT ${safeDefault}`)
   } else if (spec.notNull && spec.default === undefined) {
     // NOT NULL without DEFAULT — SQLite requires a default for ALTER ADD COLUMN
     // on non-empty tables. Use a sensible fallback:
-    //   TEXT → '' (empty string), INTEGER → 0, REAL → 0, DATETIME → current time
+    //   TEXT → '' (empty string), INTEGER → 0, REAL → 0, DATETIME → static timestamp
     const fallback = spec.type === 'TEXT' ? "''"
       : spec.type === 'INTEGER' ? '0'
       : spec.type === 'REAL' ? '0'
-      : spec.type === 'DATETIME' ? "(datetime('now'))"
+      : spec.type === 'DATETIME' ? "'2026-01-01T00:00:00Z'"
       : "''"
     parts.push(`NOT NULL DEFAULT ${fallback}`)
   } else if (!spec.notNull && spec.default !== undefined) {
-    parts.push(`DEFAULT ${spec.default}`)
+    // Same fix: replace (datetime('now')) with static timestamp
+    const safeDefault = spec.default === "(datetime('now'))"
+      ? "'2026-01-01T00:00:00Z'"
+      : spec.default
+    parts.push(`DEFAULT ${safeDefault}`)
   }
   // nullable without default → no DEFAULT clause (NULL is implied)
 
