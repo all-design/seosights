@@ -24,7 +24,6 @@ function slugify(text: string): string {
  */
 async function generateReportFromSignals(
   signalContext: string,
-  modelPreference?: string,
 ): Promise<{ raw: string; jsonStr: string; model: string } | null> {
   const systemPrompt = `You are an expert research analyst who writes high-quality reports about AI model behavior, visibility, and search trends.
 
@@ -51,49 +50,63 @@ The report should be data-driven, actionable for businesses tracking AI visibili
 
 IMPORTANT: Output ONLY the JSON object. Start your response with { and end with }. Nothing else.`
 
-  // Try up to 2 different models (primary + fallback)
-  const modelsToTry = modelPreference
-    ? [modelPreference, 'gemini/flash']
-    : ['openrouter/glm-5.2', 'gemini/flash']
+  // Strategy: Try 3 approaches with decreasing complexity
+  // 1. Full fallback chain with jsonMode (most models should work)
+  // 2. Full fallback chain without jsonMode (some models produce better JSON without the constraint)
+  // 3. Simple prompt on Groq (fast, reliable, free — always produces JSON)
 
-  for (const model of modelsToTry) {
+  const approaches = [
+    { label: 'jsonMode-full-chain', jsonMode: true, temperature: 0.4, taskType: 'long_report' as const },
+    { label: 'no-jsonMode-full-chain', jsonMode: false, temperature: 0.4, taskType: 'long_report' as const },
+    { label: 'groq-reliable-fallback', jsonMode: true, temperature: 0.3, taskType: 'classification' as const, preferredModel: 'groq/llama-3.1-70b' },
+  ]
+
+  for (const approach of approaches) {
     try {
-      console.log(`[observatory/generate] Trying model: ${model} with jsonMode=true`)
+      console.log(`[observatory/generate] Trying approach: ${approach.label}`)
       const result = await routeLLM(
         [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: generationPrompt },
         ],
         {
-          taskType: 'long_report',
-          jsonMode: true,
-          preferredModel: model,
-          temperature: 0.4, // Lower temp for more deterministic JSON output
+          taskType: approach.taskType,
+          jsonMode: approach.jsonMode,
+          preferredModel: approach.preferredModel,
+          temperature: approach.temperature,
           maxTokens: 4096,
           timeout: 60000,
         }
       )
 
       const raw = result.content || ''
-      console.log(`[observatory/generate] Model ${model} returned ${raw.length} chars. First 200: ${raw.slice(0, 200)}`)
+      console.log(`[observatory/generate] Approach ${approach.label}: model=${result.model}, rawLength=${raw.length}, first200=${raw.slice(0, 200)}`)
+
+      if (!raw || raw.trim().length === 0) {
+        console.warn(`[observatory/generate] Approach ${approach.label}: empty response, trying next`)
+        continue
+      }
 
       const jsonStr = extractJsonObject(raw)
       if (jsonStr) {
-        // Verify it parses
         try {
-          JSON.parse(jsonStr)
-          return { raw, jsonStr, model: result.model || model }
+          const parsed = JSON.parse(jsonStr)
+          // Validate minimum structure for a report
+          if (parsed.title && parsed.summary) {
+            console.log(`[observatory/generate] Approach ${approach.label} SUCCESS with model ${result.model}`)
+            return { raw, jsonStr, model: result.model || approach.label }
+          }
+          console.warn(`[observatory/generate] Approach ${approach.label}: JSON parsed but missing title/summary, trying next`)
+          continue
         } catch {
-          console.warn(`[observatory/generate] JSON.parse failed for model ${model}, trying next`)
+          console.warn(`[observatory/generate] Approach ${approach.label}: JSON.parse failed, trying next`)
           continue
         }
       }
 
-      console.warn(`[observatory/generate] extractJsonObject returned null for model ${model}. Raw (first 300): ${raw.slice(0, 300)}`)
-      // Try next model in the chain
+      console.warn(`[observatory/generate] Approach ${approach.label}: extractJsonObject returned null, trying next`)
     } catch (err) {
-      console.warn(`[observatory/generate] Model ${model} failed: ${err instanceof Error ? err.message : 'Unknown'}`)
-      // Try next model
+      console.warn(`[observatory/generate] Approach ${approach.label} failed: ${err instanceof Error ? err.message : 'Unknown'}`)
     }
   }
 
