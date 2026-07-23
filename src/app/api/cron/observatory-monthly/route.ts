@@ -170,11 +170,11 @@ This is the flagship monthly report — make it thorough, data-driven, and at le
           {
             role: 'system',
             content:
-              'You are a senior research analyst who authors the flagship monthly AI Visibility Report. This is the most important publication of the month. You must return ONLY valid JSON with no extra commentary.',
+              'You are a senior research analyst who authors the flagship monthly AI Visibility Report. This is the most important publication of the month. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
           },
           { role: 'user', content: reportPrompt },
         ],
-        { taskType: 'long_report' }
+        { taskType: 'long_report', jsonMode: true, temperature: 0.4 }
       )
 
       const raw = result.content || ''
@@ -327,11 +327,11 @@ Make it analytical and at least 800 words.`
           {
             role: 'system',
             content:
-              'You are an expert AI model behavior analyst who produces detailed comparison reports. You must return ONLY valid JSON with no extra commentary.',
+              'You are an expert AI model behavior analyst who produces detailed comparison reports. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
           },
           { role: 'user', content: comparisonPrompt },
         ],
-        { taskType: 'reasoning' }
+        { taskType: 'reasoning', jsonMode: true, temperature: 0.4 }
       )
 
       const raw = result.content || ''
@@ -472,11 +472,11 @@ Make it analytical, trend-focused, and at least 800 words.`
           {
             role: 'system',
             content:
-              'You are a trend analyst who specializes in AI visibility and search behavior trends. You must return ONLY valid JSON with no extra commentary.',
+              'You are a trend analyst who specializes in AI visibility and search behavior trends. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
           },
           { role: 'user', content: trendPrompt },
         ],
-        { taskType: 'reasoning' }
+        { taskType: 'reasoning', jsonMode: true, temperature: 0.4 }
       )
 
       const raw = result.content || ''
@@ -711,11 +711,11 @@ This is a premium, client-facing report — make it exceptional, comprehensive, 
           {
             role: 'system',
             content:
-              'You are a senior research director who authors premium, client-facing AI visibility reports suitable for PDF publication. You must return ONLY valid JSON with no extra commentary.',
+              'You are a senior research director who authors premium, client-facing AI visibility reports suitable for PDF publication. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
           },
           { role: 'user', content: pdfReportPrompt },
         ],
-        { taskType: 'long_report' }
+        { taskType: 'long_report', jsonMode: true, temperature: 0.4 }
       )
 
       const raw = result.content || ''

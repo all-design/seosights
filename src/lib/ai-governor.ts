@@ -715,9 +715,10 @@ async function runLLMEvaluation(proposal: TaskProposal): Promise<{
         taskType:    'reasoning',
         tier:        'managed',
         temperature: 0.3,
-        maxTokens:   4096, // GLM 5.2 is a reasoning model — needs extra tokens for chain-of-thought
+        maxTokens:   4096,
         timeout:     45000,
-        allowSimulation: false, // Governor must NOT run on simulation data
+        jsonMode:    true,  // Governor output is always JSON
+        allowSimulation: false,
       },
     )
 

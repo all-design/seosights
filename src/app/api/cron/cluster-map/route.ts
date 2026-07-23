@@ -156,7 +156,7 @@ async function generateTopicClusters(domain: string, count: number): Promise<Top
         role: 'system',
         content: `You are the Keyword Researcher agent of an AI-powered SEO platform called seosights. Your job is to generate high-value blog post topics that will rank on Google AND get cited by AI search engines (ChatGPT, Perplexity, Claude, etc.).
 
-You must return ONLY a valid JSON array — no markdown, no backticks, no commentary.`,
+You MUST respond with ONLY a valid JSON array — no markdown, no code fences, no backticks, no commentary. Start with [ and end with ].`,
       },
       {
         role: 'user',
@@ -183,7 +183,7 @@ Ensure roughly equal distribution across pillars (seo, aeo, geo, all).
 Ensure topics are grouped into 8-12 distinct clusters.`,
       },
     ],
-    { taskType: 'strategy' }
+    { taskType: 'strategy', jsonMode: true, temperature: 0.4 }
     )
 
     const responseText = result.content || '[]'

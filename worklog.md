@@ -112,3 +112,28 @@ Stage Summary:
 - Phase 2 self-healing ALTER TABLE adds missing columns on existing tables (e.g. GrowthOpportunity columns like sourceDetails, seoScore, aiVisibilityScore, etc.)
 - COLUMN_SCHEMA covers all Growth tables with complete column definitions
 - Seed endpoint /api/growth/seed will now succeed after running /api/admin/db-migrate
+
+---
+Task ID: 9-a
+Agent: json-mode-cron-agent
+Task: Add jsonMode: true + temperature: 0.4 to routeLLM calls in observatory-weekly and observatory-monthly cron, and update system prompts for explicit JSON-only output
+
+Work Log:
+- observatory-weekly/route.ts: Updated 3 routeLLM calls (lines ~176, ~314, ~561)
+  - Call 1 (industry reports): Added `jsonMode: true, temperature: 0.4` to `{ taskType: 'long_report' }`
+  - Call 2 (top movers): Added `jsonMode: true, temperature: 0.4` to `{ taskType: 'long_report' }`
+  - Call 3 (weekly summary): Added `jsonMode: true, temperature: 0.4` to `{ taskType: 'long_report' }`
+  - All 3 system prompts updated from "You must return ONLY valid JSON with no extra commentary." → "You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }."
+
+- observatory-monthly/route.ts: Updated 4 routeLLM calls (lines ~169, ~326, ~471, ~710)
+  - Call 1 (monthly flagship report): Added `jsonMode: true, temperature: 0.4` to `{ taskType: 'long_report' }`
+  - Call 2 (model comparison): Added `jsonMode: true, temperature: 0.4` to `{ taskType: 'reasoning' }`
+  - Call 3 (trend analysis): Added `jsonMode: true, temperature: 0.4` to `{ taskType: 'reasoning' }`
+  - Call 4 (PDF-ready report): Added `jsonMode: true, temperature: 0.4` to `{ taskType: 'long_report' }`
+  - All 4 system prompts updated with the same explicit JSON-only instruction
+
+Stage Summary:
+- 7 routeLLM calls across 2 cron files now have jsonMode: true (activates response_format=json in underlying API)
+- temperature lowered to 0.4 for deterministic JSON structure generation
+- System prompts now explicitly forbid markdown fences and extra text, and mandate starting/ending with braces
+- Combined with existing parseLLMJson() + extractJsonObject() fallback, this creates a belt-and-suspenders approach for reliable JSON parsing

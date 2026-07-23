@@ -18,6 +18,89 @@ function slugify(text: string): string {
 }
 
 /**
+ * Try to generate an observatory report from signals using the LLM.
+ * Uses jsonMode for structured output and retries with a fallback model
+ * if the primary model fails to produce parseable JSON.
+ */
+async function generateReportFromSignals(
+  signalContext: string,
+  modelPreference?: string,
+): Promise<{ raw: string; jsonStr: string; model: string } | null> {
+  const systemPrompt = `You are an expert research analyst who writes high-quality reports about AI model behavior, visibility, and search trends.
+
+CRITICAL OUTPUT REQUIREMENT: You MUST respond with ONLY a valid JSON object. No markdown, no explanation, no commentary, no code fences. Just the raw JSON object starting with { and ending with }. Do NOT wrap it in code blocks. Do NOT add any text before or after the JSON.`
+
+  const generationPrompt = `Based on these AI observability signals, generate a comprehensive research report.
+
+SIGNALS:
+${signalContext}
+
+Respond with a JSON object exactly matching this schema (no extra keys, no missing keys):
+{
+  "title": "string — Compelling, SEO-friendly title",
+  "type": "string — one of: research, blog, industry_update, benchmark, monthly_report",
+  "summary": "string — 2-3 sentence executive summary",
+  "keyFindings": ["string — finding 1", "string — finding 2", "string — finding 3"],
+  "sections": [{"heading": "string", "content": "string — markdown content with analysis"}],
+  "conclusion": "string — actionable takeaways",
+  "aiModels": ["string — AI models mentioned"],
+  "categories": ["string — categories mentioned"]
+}
+
+The report should be data-driven, actionable for businesses tracking AI visibility, professional tone, at least 800 words total content.
+
+IMPORTANT: Output ONLY the JSON object. Start your response with { and end with }. Nothing else.`
+
+  // Try up to 2 different models (primary + fallback)
+  const modelsToTry = modelPreference
+    ? [modelPreference, 'gemini/flash']
+    : ['openrouter/glm-5.2', 'gemini/flash']
+
+  for (const model of modelsToTry) {
+    try {
+      console.log(`[observatory/generate] Trying model: ${model} with jsonMode=true`)
+      const result = await routeLLM(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: generationPrompt },
+        ],
+        {
+          taskType: 'long_report',
+          jsonMode: true,
+          preferredModel: model,
+          temperature: 0.4, // Lower temp for more deterministic JSON output
+          maxTokens: 4096,
+          timeout: 60000,
+        }
+      )
+
+      const raw = result.content || ''
+      console.log(`[observatory/generate] Model ${model} returned ${raw.length} chars. First 200: ${raw.slice(0, 200)}`)
+
+      const jsonStr = extractJsonObject(raw)
+      if (jsonStr) {
+        // Verify it parses
+        try {
+          JSON.parse(jsonStr)
+          return { raw, jsonStr, model: result.model || model }
+        } catch {
+          console.warn(`[observatory/generate] JSON.parse failed for model ${model}, trying next`)
+          continue
+        }
+      }
+
+      console.warn(`[observatory/generate] extractJsonObject returned null for model ${model}. Raw (first 300): ${raw.slice(0, 300)}`)
+      // Try next model in the chain
+    } catch (err) {
+      console.warn(`[observatory/generate] Model ${model} failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+      // Try next model
+    }
+  }
+
+  return null
+}
+
+/**
  * POST /api/observatory/generate
  * Generate content (reports) from signals.
  * Gets all signaled changes that don't have reports yet and uses LLM to generate research reports.
@@ -52,7 +135,7 @@ export async function POST() {
       }
     }
 
-    // Filter to only unsignaled changes
+    // Filter to only unreported changes
     const unreportedSignals = signals.filter((s) => !reportedChangeIds.has(s.id))
 
     if (unreportedSignals.length === 0) {
@@ -74,50 +157,18 @@ Significance: ${s.significanceScore.toFixed(2)}
 Reason: ${s.signalReason || 'N/A'}`)
       .join('\n\n')
 
-    const generationPrompt = `Based on these AI observability signals, generate a comprehensive research report.
+    // Generate report with retry/fallback across models
+    const reportResult = await generateReportFromSignals(signalContext)
 
-SIGNALS:
-${signalContext}
-
-Generate a research report with the following structure. Return ONLY valid JSON:
-{
-  "title": "Compelling, SEO-friendly title for this report",
-  "type": "research" | "blog" | "industry_update" | "benchmark" | "monthly_report",
-  "summary": "2-3 sentence executive summary",
-  "keyFindings": ["finding 1", "finding 2", "finding 3"],
-  "sections": [
-    {
-      "heading": "Section Title",
-      "content": "Section content in markdown format with analysis and insights"
+    if (!reportResult) {
+      console.error('[observatory/generate] All models failed to produce valid JSON')
+      return NextResponse.json(
+        { error: 'Report generation failed', details: 'All LLM models failed to produce valid JSON output. This may indicate an API key issue or model availability problem.' },
+        { status: 500 }
+      )
     }
-  ],
-  "conclusion": "Conclusion and actionable takeaways",
-  "aiModels": ["list of AI models mentioned"],
-  "categories": ["list of categories mentioned"]
-}
 
-The report should be:
-- Data-driven and analytical
-- Actionable for businesses tracking AI visibility
-- Written in a professional but accessible tone
-- At least 800 words in total content`
-
-    const result = await routeLLM([
-        {
-          role: 'system',
-          content: 'You are an expert research analyst who writes high-quality reports about AI model behavior, visibility, and search trends. You must return ONLY valid JSON with no extra commentary.',
-        },
-        { role: 'user', content: generationPrompt },
-      ],
-      { taskType: 'long_report' }
-    )
-
-    const raw = result.content || ''
-    const jsonStr = extractJsonObject(raw)
-    if (!jsonStr) {
-      console.error('[observatory/generate] LLM returned invalid JSON. Raw response (first 500 chars):', raw.slice(0, 500))
-      throw new Error('LLM returned invalid JSON — could not extract a valid JSON object from the response')
-    }
+    const { jsonStr, model: usedModel } = reportResult
 
     interface ObservatoryReportJson {
       title: string
@@ -130,13 +181,7 @@ The report should be:
       categories: string[]
     }
 
-    let parsed: ObservatoryReportJson
-    try {
-      parsed = JSON.parse(jsonStr) as ObservatoryReportJson
-    } catch (parseErr) {
-      console.error('[observatory/generate] JSON.parse failed on extracted string. Raw response (first 500 chars):', raw.slice(0, 500))
-      throw new Error(`JSON parsing failed after extraction: ${parseErr instanceof Error ? parseErr.message : 'Unknown parse error'}`)
-    }
+    const parsed = JSON.parse(jsonStr) as ObservatoryReportJson
 
     // Build the full markdown content
     const markdownSections = (parsed.sections || [])
@@ -174,6 +219,8 @@ The report should be:
       },
     })
 
+    console.log(`[observatory/generate] Report created: ${report.id} using model ${usedModel}`)
+
     return NextResponse.json({
       reportId: report.id,
       slug: report.slug,
@@ -183,6 +230,7 @@ The report should be:
       wordCount,
       readingTimeMin,
       signalsProcessed: unreportedSignals.length,
+      modelUsed: usedModel,
     })
   } catch (error) {
     console.error('[observatory/generate] POST error:', error)

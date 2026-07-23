@@ -177,11 +177,11 @@ Make the report insightful, actionable, and at least 600 words.`
               {
                 role: 'system',
                 content:
-                  'You are an expert industry analyst who writes weekly AI visibility reports for specific industries. You must return ONLY valid JSON with no extra commentary.',
+                  'You are an expert industry analyst who writes weekly AI visibility reports for specific industries. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
               },
               { role: 'user', content: industryPrompt },
             ],
-            { taskType: 'long_report' }
+            { taskType: 'long_report', jsonMode: true, temperature: 0.4 }
           )
 
           const raw = result.content || ''
@@ -315,11 +315,11 @@ Make it engaging and at least 600 words.`
             {
               role: 'system',
               content:
-                'You are an expert analyst who writes engaging "Top Movers" reports about changes in AI model behavior and visibility. You must return ONLY valid JSON with no extra commentary.',
+                'You are an expert analyst who writes engaging "Top Movers" reports about changes in AI model behavior and visibility. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
             },
             { role: 'user', content: moversPrompt },
           ],
-          { taskType: 'long_report' }
+          { taskType: 'long_report', jsonMode: true, temperature: 0.4 }
         )
 
         const raw = result.content || ''
@@ -562,11 +562,11 @@ Make it comprehensive and at least 800 words.`
           {
             role: 'system',
             content:
-              'You are an expert analyst who writes comprehensive weekly summary reports about AI model behavior and visibility trends. You must return ONLY valid JSON with no extra commentary.',
+              'You are an expert analyst who writes comprehensive weekly summary reports about AI model behavior and visibility trends. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
           },
           { role: 'user', content: weeklySummaryPrompt },
         ],
-        { taskType: 'long_report' }
+        { taskType: 'long_report', jsonMode: true, temperature: 0.4 }
       )
 
       const raw = result.content || ''

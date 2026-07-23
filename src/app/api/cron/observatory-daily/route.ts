@@ -340,11 +340,11 @@ If the responses are essentially the same, set hasChange to false. Only report m
                   {
                     role: 'system',
                     content:
-                      'You are an expert at detecting changes in AI model behavior and responses. You must return ONLY valid JSON with no extra commentary.',
+                      'You are an expert at detecting changes in AI model behavior and responses. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
                   },
                   { role: 'user', content: comparisonPrompt },
                 ],
-                { taskType: 'classification', temperature: 0.3 }
+                { taskType: 'classification', temperature: 0.3, jsonMode: true }
               )
               const raw = llmResult.content
               const parsed = parseLLMJson(raw)
@@ -464,11 +464,11 @@ Return ONLY valid JSON:
                   {
                     role: 'system',
                     content:
-                      'You are an expert AI observability analyst who evaluates changes in AI model behavior. You must return ONLY valid JSON with no extra commentary.',
+                      'You are an expert AI observability analyst who evaluates changes in AI model behavior. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
                   },
                   { role: 'user', content: evaluationPrompt },
                 ],
-                { taskType: 'scoring', temperature: 0.3 }
+                { taskType: 'scoring', temperature: 0.3, jsonMode: true }
               )
               const raw = llmResult.content
               const parsed = parseLLMJson(raw)
@@ -624,11 +624,11 @@ The report should be:
               {
                 role: 'system',
                 content:
-                  'You are an expert research analyst who writes high-quality reports about AI model behavior, visibility, and search trends. You must return ONLY valid JSON with no extra commentary.',
+                  'You are an expert research analyst who writes high-quality reports about AI model behavior, visibility, and search trends. You MUST respond with ONLY a valid JSON object — no markdown, no code fences, no extra text. Start with { and end with }.',
               },
               { role: 'user', content: generationPrompt },
             ],
-            { taskType: 'long_report', temperature: 0.5 }
+            { taskType: 'long_report', temperature: 0.4, jsonMode: true }
           )
           const raw = llmResult.content
           const parsed = parseLLMJson<{

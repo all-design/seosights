@@ -268,7 +268,7 @@ Requirements:
 - End with a clear call-to-action`,
         },
       ],
-      { taskType: 'long_report', temperature: 0.7 }
+      { taskType: 'long_report', temperature: 0.5, jsonMode: true }
     )
 
     const responseText = llmResult.content

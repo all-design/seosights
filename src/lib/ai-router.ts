@@ -76,6 +76,8 @@ export interface RouterOptions {
   allowSimulation?: boolean
   /** Agent name for token tracking (defaults to taskType) */
   agentName?: string
+  /** Force JSON-only output — adds response_format:json_object for supported providers */
+  jsonMode?: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,13 +182,13 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
     free: false,
   },
   'openrouter/glm-turbo': {
-    id: 'z-ai/glm-4.7-flash',
+    id: 'z-ai/glm-5-turbo',
     provider: 'openrouter',
     costPer1kInput: 0.00000006,
     costPer1kOutput: 0.00000006,
-    contextWindow: 131072,
+    contextWindow: 202752,
     speed: 'ultra',
-    quality: 'good',
+    quality: 'excellent',
     free: false,
   },
   'openrouter/glm-5.1': {
@@ -370,9 +372,21 @@ async function callGemini(model: string, messages: Array<{role: string; content:
 }
 
 /** OpenRouter API client — access to 100+ models */
-async function callOpenRouter(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number }): Promise<ProviderCallResult> {
+async function callOpenRouter(model: string, messages: Array<{role: string; content: string}>, options?: { temperature?: number; maxTokens?: number; jsonMode?: boolean }): Promise<ProviderCallResult> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured')
+
+  const bodyPayload: Record<string, unknown> = {
+    model,
+    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    temperature: options?.temperature ?? 0.7,
+    max_tokens: options?.maxTokens ?? 4096,
+  }
+
+  // Add JSON response_format when jsonMode is requested
+  if (options?.jsonMode) {
+    bodyPayload.response_format = { type: 'json_object' }
+  }
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -382,12 +396,7 @@ async function callOpenRouter(model: string, messages: Array<{role: string; cont
       'HTTP-Referer': 'https://seosights.com',
       'X-Title': 'seosights AI Visibility Platform',
     },
-    body: JSON.stringify({
-      model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-      temperature: options?.temperature ?? 0.7,
-      max_tokens: options?.maxTokens ?? 4096,
-    }),
+    body: JSON.stringify(bodyPayload),
     signal: AbortSignal.timeout(45000),
   })
 
@@ -478,6 +487,7 @@ export async function routeLLM(
     maxTokens = 4096,
     timeout = 30000,
     allowSimulation = true,
+    jsonMode = false,
   } = options
 
   const constraints = TIER_CONSTRAINTS[tier] || TIER_CONSTRAINTS.free_trial
@@ -538,7 +548,7 @@ export async function routeLLM(
 
         case 'openrouter':
           callResult = await Promise.race([
-            callOpenRouter(spec.id, messages, { temperature, maxTokens }),
+            callOpenRouter(spec.id, messages, { temperature, maxTokens, jsonMode }),
             timeoutPromise(timeout),
           ])
           break
