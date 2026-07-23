@@ -137,3 +137,67 @@ Stage Summary:
 - temperature lowered to 0.4 for deterministic JSON structure generation
 - System prompts now explicitly forbid markdown fences and extra text, and mandate starting/ending with braces
 - Combined with existing parseLLMJson() + extractJsonObject() fallback, this creates a belt-and-suspenders approach for reliable JSON parsing
+
+---
+Task ID: 10
+Agent: Main Orchestrator (Production Deployment)
+Task: Deploy seosights.com to production on Vercel and fix LLM JSON issues
+
+Work Log:
+- Verified git push is up-to-date (all commits pushed to origin/main)
+- Ran db-migrate on production: all 16 tables exist, all columns present, 0 needed to add
+- Verified production data: 57 GrowthOpportunities, 24 GrowthAssets, 18 GovernorDecisions
+- Discovered observatory/generate was failing with "LLM returned invalid JSON"
+- Created debug/llm-test endpoint to diagnose the issue
+- Key findings from debug endpoint:
+  - OPENROUTER_API_KEY: ✅ set on Vercel
+  - GROQ_API_KEY: ✅ set on Vercel
+  - GEMINI_API_KEY: ✅ set on Vercel
+  - OPENAI_API_KEY: ❌ not set on Vercel (expected)
+  - Root cause 1: OpenRouter GLM models fail to produce valid JSON on Vercel (empty/non-parseable responses)
+  - Root cause 2: Gemini models also fail with response_format: json_object
+  - Root cause 3: free_trial/starter tier had maxCostPerCall=0, blocking even ultra-cheap GLM models
+  - Root cause 4: long_report/strategy/reasoning task types had NO Groq models in fallback chain
+- Applied fixes (5 commits pushed to Vercel):
+  1. Added jsonMode to RouterOptions + callOpenRouter response_format support
+  2. Updated GLM Turbo from z-ai/glm-4.7-flash to z-ai/glm-5-turbo
+  3. Rewrote observatory/generate with 3-approach fallback strategy
+  4. Added jsonMode=true + improved system prompts to ALL JSON-producing routeLLM calls (7 cron endpoints + ai-governor + auto-publish + cluster-map)
+  5. Added Groq/llama-3.1-70b to ALL task type fallback chains (was missing from long_report, strategy, reasoning)
+  6. Raised maxCostPerCall: free_trial=0.01, starter=0.05, pro=0.10 (allows ultra-cheap GLM models)
+  7. Removed debug/llm-test endpoint (security - exposed env key checks)
+
+Stage Summary:
+- Production seosights.com is LIVE and functional on Vercel
+- Observatory generate now works (produced first report on production)
+- LLM calls work via Groq fallback chain (free, reliable, always produces JSON)
+- Full fallback chain: Groq 70b → GLM 5.2 → GLM Turbo → Gemini Pro → Gemini Flash → DeepSeek → Groq 8b → ZAI SDK
+- All 8 cron endpoints secured with CRON_SECRET
+- Token usage tracking active (742 calls, 50k tokens, 4.99% failure rate)
+- Production health check results:
+  - Homepage: 200 OK ✅
+  - Observatory: 18 crawls, 450 responses, 18 signals, 75% signal rate ✅
+  - Growth Dashboard: Today's snapshot exists ✅
+  - Growth Opportunities: 25 items ✅
+  - Superadmin Auth: Working ✅
+  - LLM Integration: Working via Groq ✅
+  - Observatory Reports: 1 report created ✅
+
+---
+Task ID: PRODUCTION-STATUS
+Agent: System
+Status: PRODUCTION DEPLOYED AND OPERATIONAL
+
+Production URL: https://seosights.com
+Deployment: Vercel auto-deploy from git push (origin/main)
+Database: Turso libsql://seosights-db-sdata.aws-eu-west-1.turso.io
+LLM Provider: Groq (primary fallback) → OpenRouter GLM → Gemini → ZAI SDK (last resort)
+Cron Jobs: 8 crons configured in vercel.json, all secured with CRON_SECRET
+
+Key Production Notes:
+- OpenRouter GLM models and Gemini models currently FAIL on Vercel (return empty/non-JSON responses)
+- Groq is the reliable production provider (free, fast, always produces valid JSON)
+- ZAI SDK works intermittently on Vercel (not reliable due to ETIMEDOUT issues)
+- The 3-approach fallback in observatory/generate ensures at least one approach always succeeds
+- OPENROUTER_API_KEY is set but GLM models don't respond correctly - may need investigation
+- OPENAI_API_KEY is not set on Vercel (GPT-4o not available for pro/managed tiers)
