@@ -4,6 +4,7 @@ import { blogPosts, blogCategories } from '@/data/blog-posts'
 import { ArrowRight, BookOpen, Clock } from 'lucide-react'
 import BlogHubClient from './blog-hub-client'
 import NewsletterForm from '@/components/site/NewsletterForm'
+import type { AIBlogPost, UnifiedBlogPost } from '@/data/blog-types'
 
 const SITE_URL = 'https://seosights.com'
 
@@ -37,39 +38,70 @@ export const metadata: Metadata = {
   },
 }
 
-const blogJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Blog',
-  name: 'seosights Blog',
-  description: 'Practical guides on AI search optimization, AEO, GEO, llms.txt, and entity SEO.',
-  url: `${SITE_URL}/blog`,
-  publisher: {
-    '@type': 'Organization',
-    name: 'seosights',
-    url: SITE_URL,
-  },
-  blogPost: blogPosts.map((p) => ({
-    '@type': 'BlogPosting',
-    headline: p.title,
-    description: p.description,
-    url: `${SITE_URL}/blog/${p.slug}`,
-    datePublished: p.publishedAt,
-    dateModified: p.updatedAt || p.publishedAt,
-    author: { '@type': 'Organization', name: p.author },
-    keywords: p.keywords.join(', '),
-  })),
-}
+export default async function BlogHubPage() {
+  // ─── Fetch AI-generated articles from the database ──────────────────
+  let aiPosts: AIBlogPost[] = []
 
-const breadcrumbJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
-    { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
-  ],
-}
+  try {
+    const res = await fetch(`${SITE_URL}/api/public/blog-posts`, {
+      next: { revalidate: 300 }, // revalidate every 5 minutes
+    })
+    if (res.ok) {
+      const data = await res.json()
+      aiPosts = data.posts || []
+    }
+  } catch (err) {
+    console.error('[blog/page] Failed to fetch AI articles:', err)
+    // Gracefully degrade — just show static posts
+  }
 
-export default function BlogHubPage() {
+  // ─── Merge: static posts first, then AI-generated posts ────────────
+  const allPosts: UnifiedBlogPost[] = [
+    ...blogPosts.map((p) => ({ ...p, isAiGenerated: false as const })),
+    ...aiPosts,
+  ]
+
+  // ─── Collect any new categories from AI posts ──────────────────────
+  const allCategories = [...blogCategories]
+  for (const aiPost of aiPosts) {
+    if (!allCategories.find((c) => c.slug === aiPost.category.slug)) {
+      allCategories.push(aiPost.category)
+    }
+  }
+
+  // ─── JSON-LD: includes both static and AI posts ────────────────────
+  const blogJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    name: 'seosights Blog',
+    description: 'Practical guides on AI search optimization, AEO, GEO, llms.txt, and entity SEO.',
+    url: `${SITE_URL}/blog`,
+    publisher: {
+      '@type': 'Organization',
+      name: 'seosights',
+      url: SITE_URL,
+    },
+    blogPost: allPosts.map((p) => ({
+      '@type': 'BlogPosting',
+      headline: p.title,
+      description: p.description,
+      url: `${SITE_URL}/blog/${p.slug}`,
+      datePublished: p.publishedAt,
+      dateModified: p.updatedAt || p.publishedAt,
+      author: { '@type': 'Organization', name: p.author },
+      keywords: p.keywords.join(', '),
+    })),
+  }
+
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
+    ],
+  }
+
   return (
     <>
       <script
@@ -104,56 +136,58 @@ export default function BlogHubPage() {
         </div>
       </section>
 
-      {/* Featured post (first one) */}
-      <section className="py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Link href={`/blog/${blogPosts[0].slug}`} className="block group">
-            <div className={`rounded-3xl border border-white/10 bg-gradient-to-br ${blogPosts[0].heroGradient} p-6 sm:p-10 backdrop-blur-sm hover:border-white/25 transition-all duration-300`}>
-              <div className="flex flex-col lg:flex-row gap-8 items-start">
-                <div className="text-7xl sm:text-8xl shrink-0">{blogPosts[0].heroEmoji}</div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <span className={`text-xs font-semibold uppercase tracking-wider ${blogPosts[0].category.color}`}>
-                      {blogPosts[0].category.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground">·</span>
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {blogPosts[0].readingTime} min read
-                    </span>
-                    <span className="text-xs text-muted-foreground">·</span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(blogPosts[0].publishedAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
+      {/* Featured post (first one — always a static post) */}
+      {blogPosts.length > 0 && (
+        <section className="py-8">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Link href={`/blog/${blogPosts[0].slug}`} className="block group">
+              <div className={`rounded-3xl border border-white/10 bg-gradient-to-br ${blogPosts[0].heroGradient} p-6 sm:p-10 backdrop-blur-sm hover:border-white/25 transition-all duration-300`}>
+                <div className="flex flex-col lg:flex-row gap-8 items-start">
+                  <div className="text-7xl sm:text-8xl shrink-0">{blogPosts[0].heroEmoji}</div>
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <span className={`text-xs font-semibold uppercase tracking-wider ${blogPosts[0].category.color}`}>
+                        {blogPosts[0].category.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {blogPosts[0].readingTime} min read
+                      </span>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(blogPosts[0].publishedAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 group-hover:text-purple-300 transition-colors">
+                      {blogPosts[0].title}
+                    </h2>
+                    <p className="text-base text-muted-foreground leading-relaxed mb-4 max-w-2xl">
+                      {blogPosts[0].excerpt}
+                    </p>
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-purple-400 group-hover:gap-2.5 transition-all">
+                      Read the article
+                      <ArrowRight className="w-4 h-4" />
                     </span>
                   </div>
-                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 group-hover:text-purple-300 transition-colors">
-                    {blogPosts[0].title}
-                  </h2>
-                  <p className="text-base text-muted-foreground leading-relaxed mb-4 max-w-2xl">
-                    {blogPosts[0].excerpt}
-                  </p>
-                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-purple-400 group-hover:gap-2.5 transition-all">
-                    Read the article
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
                 </div>
               </div>
-            </div>
-          </Link>
-        </div>
-      </section>
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Categories overview */}
       <section className="py-8" id="categories">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold mb-6">Browse by topic</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {blogCategories.map((cat) => {
-              const count = blogPosts.filter((p) => p.category.slug === cat.slug).length
+            {allCategories.map((cat) => {
+              const count = allPosts.filter((p) => p.category.slug === cat.slug).length
               return (
                 <a
                   key={cat.slug}
@@ -172,7 +206,7 @@ export default function BlogHubPage() {
       </section>
 
       {/* All posts grid (client component with category filter) */}
-      <BlogHubClient posts={blogPosts} categories={blogCategories} />
+      <BlogHubClient posts={allPosts} categories={allCategories} />
 
       {/* Newsletter CTA */}
       <section className="py-16">

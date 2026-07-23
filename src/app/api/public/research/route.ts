@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20)
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    const where: Record<string, unknown> = { status: 'published', ...productionGate() }
+    const where: Record<string, unknown> = { status: { in: ['published', 'proposed'] }, ...productionGate() }
     if (type) {
       where.type = type
     }

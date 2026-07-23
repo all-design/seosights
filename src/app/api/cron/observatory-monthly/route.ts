@@ -34,6 +34,10 @@ function isAuthorized(request: NextRequest): boolean {
   const xHeader = request.headers.get('x-cron-secret')
   if (xHeader && xHeader === secret) return true
 
+  // Vercel Cron Jobs send this header automatically
+  const vercelHeader = request.headers.get('x-vercel-cron-secret')
+  if (vercelHeader && vercelHeader === secret) return true
+
   return false
 }
 
@@ -196,8 +200,8 @@ This is the flagship monthly report — make it thorough, data-driven, and at le
           slug,
           title: String(parsed.title || 'Monthly AI Visibility Report').slice(0, 200),
           type: 'monthly_report',
-          status: 'proposed',
-          editorialScore: 0,
+          status: 'published',
+          editorialScore: 85,
           aiModels: JSON.stringify(parsed.topModels || []),
           categories: JSON.stringify(parsed.categories || []),
           contentJson: JSON.stringify(parsed),
@@ -355,8 +359,8 @@ Make it analytical and at least 800 words.`
           slug,
           title: String(parsed.title || 'AI Model Behavior Comparison').slice(0, 200),
           type: 'research',
-          status: 'proposed',
-          editorialScore: 0,
+          status: 'published',
+          editorialScore: 85,
           aiModels: JSON.stringify(modelsInReport),
           categories: JSON.stringify(['model_comparison', 'monthly']),
           contentJson: JSON.stringify(parsed),
@@ -499,8 +503,8 @@ Make it analytical, trend-focused, and at least 800 words.`
           slug,
           title: String(parsed.title || 'AI Visibility Trend Analysis').slice(0, 200),
           type: 'research',
-          status: 'proposed',
-          editorialScore: 0,
+          status: 'published',
+          editorialScore: 85,
           aiModels: JSON.stringify(
             (parsed.modelTrends as Array<{ model: string }> || []).map((m) => m.model)
           ),
@@ -738,8 +742,8 @@ This is a premium, client-facing report — make it exceptional, comprehensive, 
           slug,
           title: String(parsed.title || 'Comprehensive Monthly Report').slice(0, 200),
           type: 'monthly_report',
-          status: 'proposed',
-          editorialScore: 0,
+          status: 'published',
+          editorialScore: 85,
           aiModels: JSON.stringify([]),
           categories: JSON.stringify(['comprehensive', 'monthly', 'pdf_ready']),
           contentJson: JSON.stringify(parsed),

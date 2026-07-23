@@ -5,8 +5,9 @@
  * Calls the same `generateDailyMission()` logic as POST /api/factory/daily-mission.
  *
  * Security:
- *   - If `CRON_SECRET` is set in env, the `Authorization: Bearer <secret>`
- *     header MUST match. Otherwise the request is rejected with 401.
+ *   - If `CRON_SECRET` is set in env, the `Authorization: Bearer <secret>`,
+ *     `x-cron-secret: <secret>`, or `x-vercel-cron-secret: <secret>` header
+ *     MUST match. Otherwise the request is rejected with 401.
  *   - If `CRON_SECRET` is NOT set, the endpoint is open (useful for local dev
  *     and sandboxes without configured secrets).
  *
@@ -38,12 +39,17 @@ function isAuthorized(request: NextRequest): boolean {
   // Accept either:
   //   - Authorization: Bearer <secret>
   //   - x-cron-secret: <secret>
+  //   - x-vercel-cron-secret: <secret>
   const authHeader = request.headers.get('authorization') || ''
   const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i)
   if (bearerMatch && bearerMatch[1] === secret) return true
 
   const xHeader = request.headers.get('x-cron-secret')
   if (xHeader && xHeader === secret) return true
+
+  // Vercel Cron Jobs send this header automatically
+  const vercelHeader = request.headers.get('x-vercel-cron-secret')
+  if (vercelHeader && vercelHeader === secret) return true
 
   return false
 }

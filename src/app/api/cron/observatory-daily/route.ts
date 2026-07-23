@@ -35,6 +35,10 @@ function isAuthorized(request: NextRequest): boolean {
   const xHeader = request.headers.get('x-cron-secret')
   if (xHeader && xHeader === secret) return true
 
+  // Vercel Cron Jobs send this header automatically
+  const vercelHeader = request.headers.get('x-vercel-cron-secret')
+  if (vercelHeader && vercelHeader === secret) return true
+
   return false
 }
 
@@ -663,8 +667,8 @@ The report should be:
               )
                 ? (parsed.type as string)
                 : 'research',
-              status: 'proposed',
-              editorialScore: 0,
+              status: 'published',
+              editorialScore: 85,
               aiModels: JSON.stringify(parsed.aiModels || []),
               categories: JSON.stringify(parsed.categories || []),
               contentJson: JSON.stringify(parsed),

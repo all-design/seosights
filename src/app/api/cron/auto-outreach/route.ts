@@ -37,6 +37,10 @@ function isAuthorized(request: NextRequest): boolean {
   const xHeader = request.headers.get('x-cron-secret')
   if (xHeader && xHeader === secret) return true
 
+  // Vercel Cron Jobs send this header automatically
+  const vercelHeader = request.headers.get('x-vercel-cron-secret')
+  if (vercelHeader && vercelHeader === secret) return true
+
   return false
 }
 
@@ -54,6 +58,8 @@ export async function GET(request: NextRequest) {
   if (authHeader) headers.set('authorization', authHeader)
   const cronHeader = request.headers.get('x-cron-secret')
   if (cronHeader) headers.set('x-cron-secret', cronHeader)
+  const vercelCronHeader = request.headers.get('x-vercel-cron-secret')
+  if (vercelCronHeader) headers.set('x-vercel-cron-secret', vercelCronHeader)
   return POST(new NextRequest('https://localhost/api/cron/auto-outreach', {
     method: 'POST',
     body: JSON.stringify({}),

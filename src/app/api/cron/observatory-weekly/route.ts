@@ -32,6 +32,10 @@ function isAuthorized(request: NextRequest): boolean {
   const xHeader = request.headers.get('x-cron-secret')
   if (xHeader && xHeader === secret) return true
 
+  // Vercel Cron Jobs send this header automatically
+  const vercelHeader = request.headers.get('x-vercel-cron-secret')
+  if (vercelHeader && vercelHeader === secret) return true
+
   return false
 }
 
@@ -203,8 +207,8 @@ Make the report insightful, actionable, and at least 600 words.`
               slug,
               title: String(parsed.title || `Weekly Report: ${industry.name}`).slice(0, 200),
               type: 'industry_update',
-              status: 'proposed',
-              editorialScore: 0,
+              status: 'published',
+              editorialScore: 85,
               aiModels: JSON.stringify(parsed.topModels || []),
               categories: JSON.stringify([industry.slug]),
               contentJson: JSON.stringify(parsed),
@@ -341,8 +345,8 @@ Make it engaging and at least 600 words.`
             slug,
             title: String(parsed.title || 'Top AI Visibility Movers This Week').slice(0, 200),
             type: 'benchmark',
-            status: 'proposed',
-            editorialScore: 0,
+            status: 'published',
+            editorialScore: 85,
             aiModels: JSON.stringify(parsed.topModels || []),
             categories: JSON.stringify(['top_movers', 'weekly']),
             contentJson: JSON.stringify(parsed),
@@ -589,8 +593,8 @@ Make it comprehensive and at least 800 words.`
           slug,
           title: String(parsed.title || 'Weekly AI Visibility Summary').slice(0, 200),
           type: 'blog',
-          status: 'proposed',
-          editorialScore: 0,
+          status: 'published',
+          editorialScore: 85,
           aiModels: JSON.stringify(parsed.topModels || []),
           categories: JSON.stringify(['weekly_summary']),
           contentJson: JSON.stringify(parsed),

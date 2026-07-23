@@ -1,23 +1,42 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Clock, ChevronRight, ArrowRight, BookOpen, Check, Mail } from 'lucide-react'
-import type { BlogPost } from '@/data/blog-posts'
+import type { UnifiedBlogPost, AIBlogPost } from '@/data/blog-types'
+import { isAIPost } from '@/data/blog-types'
 
 export default function BlogPostClient({
   post,
   related,
 }: {
-  post: BlogPost
-  related: BlogPost[]
+  post: UnifiedBlogPost
+  related: UnifiedBlogPost[]
 }) {
   const [activeSection, setActiveSection] = useState<string>('')
+  const isAI = isAIPost(post)
 
-  // Track active section for TOC highlighting
+  // Parse HTML content for TOC sections from AI posts
+  const aiSections = useMemo(() => {
+    if (!isAI || !post.contentHtml) return []
+    // Extract headings from HTML for TOC
+    const headingRegex = /<h[2-3][^>]*>(.*?)<\/h[2-3]> /gi
+    const matches: { heading: string; id: string }[] = []
+    let match
+    while ((match = headingRegex.exec(post.contentHtml)) !== null) {
+      const heading = match[1].replace(/<[^>]+>/g, '').trim()
+      const id = heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      matches.push({ heading, id })
+    }
+    return matches
+  }, [isAI, post])
+
+  // Track active section for TOC highlighting (only for static posts)
   useEffect(() => {
+    if (isAI) return // AI posts don't use structured sections for scroll tracking
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -28,12 +47,14 @@ export default function BlogPostClient({
       },
       { rootMargin: '-80px 0px -70% 0px' }
     )
-    post.content.forEach((_, i) => {
-      const el = document.getElementById(`section-${i}`)
-      if (el) observer.observe(el)
-    })
+    if (!isAI && post.content) {
+      post.content.forEach((_, i) => {
+        const el = document.getElementById(`section-${i}`)
+        if (el) observer.observe(el)
+      })
+    }
     return () => observer.disconnect()
-  }, [post])
+  }, [post, isAI])
 
   const slugify = (s: string) =>
     s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -50,6 +71,24 @@ export default function BlogPostClient({
         day: 'numeric',
       })
     : null
+
+  // For AI posts, add IDs to headings in the HTML content
+  const processedHtml = useMemo(() => {
+    if (!isAI || !post.contentHtml) return ''
+    // Add IDs to h2 and h3 headings for scroll anchoring
+    return post.contentHtml.replace(
+      /<h([2-3])([^>]*)>(.*?)<\/h([2-3])> /gi,
+      (_match, level, attrs, content, _closeLevel) => {
+        const id = content
+          .replace(/<[^>]+>/g, '')
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+        return `<h${level} id="${id}"${attrs}>${content}</h${level}>`
+      }
+    )
+  }, [isAI, post])
 
   return (
     <article className="py-8">
@@ -72,6 +111,14 @@ export default function BlogPostClient({
             >
               {post.category.name}
             </Badge>
+            {isAI && (
+              <Badge
+                variant="outline"
+                className="border-emerald-500/50 text-emerald-400 bg-emerald-500/10"
+              >
+                🤖 AI-Generated
+              </Badge>
+            )}
             <span className="text-muted-foreground flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
               {post.readingTime} min read
@@ -85,8 +132,8 @@ export default function BlogPostClient({
           </p>
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground border-t border-b border-white/10 py-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
-                s
+              <div className={`w-8 h-8 rounded-full ${isAI ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-purple-500 to-indigo-500'} flex items-center justify-center text-white text-xs font-bold`}>
+                {isAI ? 'AI' : 's'}
               </div>
               <div>
                 <div className="font-medium text-foreground">{post.author}</div>
@@ -110,75 +157,114 @@ export default function BlogPostClient({
         </div>
 
         {/* Key takeaways box */}
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 mb-10">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-2">
-            <BookOpen className="w-4 h-4" />
-            Key takeaways
-          </h2>
-          <ul className="space-y-2">
-            {post.keyTakeaways.map((kt, i) => (
-              <li key={i} className="flex items-start gap-2.5">
-                <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span className="text-sm text-foreground/90 leading-relaxed">{kt}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {post.keyTakeaways.length > 0 && (
+          <div className={`rounded-2xl border ${isAI ? 'border-teal-500/30 bg-teal-500/5' : 'border-emerald-500/30 bg-emerald-500/5'} p-6 mb-10`}>
+            <h2 className={`text-sm font-bold uppercase tracking-wider ${isAI ? 'text-teal-400' : 'text-emerald-400'} mb-3 flex items-center gap-2`}>
+              <BookOpen className="w-4 h-4" />
+              Key takeaways
+            </h2>
+            <ul className="space-y-2">
+              {post.keyTakeaways.map((kt, i) => (
+                <li key={i} className="flex items-start gap-2.5">
+                  <Check className={`w-4 h-4 ${isAI ? 'text-teal-400' : 'text-emerald-400'} shrink-0 mt-0.5`} />
+                  <span className="text-sm text-foreground/90 leading-relaxed">{kt}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Table of contents */}
-        <details className="mb-10 rounded-xl border border-white/10 bg-white/5 overflow-hidden group" open>
-          <summary className="px-5 py-3.5 cursor-pointer font-semibold text-sm flex items-center justify-between hover:bg-white/5 transition-colors">
-            <span className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-purple-400" />
-              Table of contents
-            </span>
-            <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
-          </summary>
-          <ol className="px-5 pb-4 space-y-1.5 list-decimal list-inside text-sm">
-            {post.content.map((section, i) => (
-              <li key={i}>
-                <a
-                  href={`#section-${i}`}
-                  className={`hover:text-purple-300 transition-colors ${
-                    activeSection === `section-${i}` ? 'text-purple-300 font-medium' : 'text-muted-foreground'
-                  }`}
-                >
-                  {section.heading}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </details>
-
-        {/* Article body */}
-        <div className="prose prose-invert max-w-none">
-          {post.content.map((section, i) => (
-            <section
-              key={i}
-              id={`section-${i}`}
-              className="mb-10 scroll-mt-24"
-            >
-              <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-foreground">
-                {section.heading}
-              </h2>
-              {section.body.split('\n\n').map((para, pi) => (
-                <p key={pi} className="text-base text-muted-foreground leading-relaxed mb-4">
-                  {para}
-                </p>
+        {(!isAI && post.content && post.content.length > 0) && (
+          <details className="mb-10 rounded-xl border border-white/10 bg-white/5 overflow-hidden group" open>
+            <summary className="px-5 py-3.5 cursor-pointer font-semibold text-sm flex items-center justify-between hover:bg-white/5 transition-colors">
+              <span className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-purple-400" />
+                Table of contents
+              </span>
+              <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
+            </summary>
+            <ol className="px-5 pb-4 space-y-1.5 list-decimal list-inside text-sm">
+              {post.content.map((section, i) => (
+                <li key={i}>
+                  <a
+                    href={`#section-${i}`}
+                    className={`hover:text-purple-300 transition-colors ${
+                      activeSection === `section-${i}` ? 'text-purple-300 font-medium' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {section.heading}
+                  </a>
+                </li>
               ))}
-              {section.bullets && (
-                <ul className="space-y-2 my-4">
-                  {section.bullets.map((b, bi) => (
-                    <li key={bi} className="flex items-start gap-2.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0 mt-2.5" />
-                      <span className="text-base text-muted-foreground leading-relaxed">{b}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          ))}
-        </div>
+            </ol>
+          </details>
+        )}
+
+        {/* AI post TOC */}
+        {isAI && aiSections.length > 0 && (
+          <details className="mb-10 rounded-xl border border-white/10 bg-white/5 overflow-hidden group" open>
+            <summary className="px-5 py-3.5 cursor-pointer font-semibold text-sm flex items-center justify-between hover:bg-white/5 transition-colors">
+              <span className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-teal-400" />
+                Table of contents
+              </span>
+              <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
+            </summary>
+            <ol className="px-5 pb-4 space-y-1.5 list-decimal list-inside text-sm">
+              {aiSections.map((sec, i) => (
+                <li key={i}>
+                  <a
+                    href={`#${sec.id}`}
+                    className="hover:text-teal-300 transition-colors text-muted-foreground"
+                  >
+                    {sec.heading}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
+
+        {/* Article body — Static posts */}
+        {!isAI && post.content && (
+          <div className="prose prose-invert max-w-none">
+            {post.content.map((section, i) => (
+              <section
+                key={i}
+                id={`section-${i}`}
+                className="mb-10 scroll-mt-24"
+              >
+                <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-foreground">
+                  {section.heading}
+                </h2>
+                {section.body.split('\n\n').map((para, pi) => (
+                  <p key={pi} className="text-base text-muted-foreground leading-relaxed mb-4">
+                    {para}
+                  </p>
+                ))}
+                {section.bullets && (
+                  <ul className="space-y-2 my-4">
+                    {section.bullets.map((b, bi) => (
+                      <li key={bi} className="flex items-start gap-2.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0 mt-2.5" />
+                        <span className="text-base text-muted-foreground leading-relaxed">{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))}
+          </div>
+        )}
+
+        {/* Article body — AI posts (HTML content) */}
+        {isAI && processedHtml && (
+          <div
+            className="prose prose-invert max-w-none ai-article-content"
+            dangerouslySetInnerHTML={{ __html: processedHtml }}
+          />
+        )}
 
         {/* Tags */}
         <div className="flex flex-wrap gap-2 mb-8 pt-6 border-t border-white/10">
@@ -191,19 +277,20 @@ export default function BlogPostClient({
 
         {/* Author / share box */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 mb-12 flex flex-col sm:flex-row items-start gap-4">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-lg font-bold shrink-0">
-            s
+          <div className={`w-12 h-12 rounded-full ${isAI ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-purple-500 to-indigo-500'} flex items-center justify-center text-white text-lg font-bold shrink-0`}>
+            {isAI ? 'AI' : 's'}
           </div>
           <div className="flex-1">
             <h3 className="font-semibold mb-1">{post.author}</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              {post.authorRole} at seosights. We build the operating system for AI search — Three
-              Sights, one unified engine.
+              {isAI
+                ? 'seosights AI Content Engine — automatically generated and reviewed by multi-agent AI systems for accuracy, depth, and AI-search optimization.'
+                : `${post.authorRole} at seosights. We build the operating system for AI search — Three Sights, one unified engine.`}
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/#cta"
-                className="text-xs font-medium text-purple-400 hover:text-purple-300 transition-colors"
+                className={`text-xs font-medium ${isAI ? 'text-teal-400 hover:text-teal-300' : 'text-purple-400 hover:text-purple-300'} transition-colors`}
               >
                 Try seosights free →
               </Link>
@@ -232,9 +319,16 @@ export default function BlogPostClient({
                       {rel.heroEmoji}
                     </div>
                     <div className="p-5 flex flex-col flex-1">
-                      <span className={`text-xs font-semibold uppercase tracking-wider ${rel.category.color} mb-1`}>
-                        {rel.category.name}
-                      </span>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-xs font-semibold uppercase tracking-wider ${rel.category.color}`}>
+                          {rel.category.name}
+                        </span>
+                        {isAIPost(rel) && (
+                          <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 bg-emerald-500/10 text-[10px] px-1.5 py-0">
+                            🤖 AI
+                          </Badge>
+                        )}
+                      </div>
                       <h3 className="font-bold text-sm mb-2 group-hover:text-purple-300 transition-colors leading-snug">
                         {rel.title}
                       </h3>
@@ -257,7 +351,7 @@ export default function BlogPostClient({
       {/* Final CTA */}
       <section className="py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-blue-500/10 p-8 backdrop-blur-sm">
+          <div className={`rounded-3xl border border-white/10 ${isAI ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10' : 'bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-blue-500/10'} p-8 backdrop-blur-sm`}>
             <h2 className="text-2xl sm:text-3xl font-bold mb-3">
               Put this into action
             </h2>
@@ -267,7 +361,7 @@ export default function BlogPostClient({
             </p>
             <Link
               href="/#cta"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-lg shadow-[0_0_20px_rgba(139,92,246,0.2)] hover:shadow-[0_0_30px_rgba(139,92,246,0.4)] transition-all duration-300"
+              className={`inline-flex items-center gap-2 px-6 py-3 ${isAI ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]' : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(139,92,246,0.2)] hover:shadow-[0_0_30px_rgba(139,92,246,0.4)]'} text-white font-semibold rounded-lg transition-all duration-300`}
             >
               Start free trial
               <ArrowRight className="w-4 h-4" />
