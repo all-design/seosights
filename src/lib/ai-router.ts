@@ -254,16 +254,16 @@ const MODEL_REGISTRY: Record<string, ModelSpec> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TASK_MODEL_MAP: Record<TaskType, string[]> = {
-  scoring:           ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
-  entity_extraction: ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
-  summarization:     ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
-  long_report:       ['openrouter/glm-5.2', 'openrouter/glm-turbo', 'gemini/pro', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o', 'ollama/llama3', 'zai/default'],
-  strategy:          ['openrouter/glm-5.2', 'openrouter/glm-turbo', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'ollama/llama3', 'zai/default'],
-  code:              ['openrouter/glm-turbo', 'openrouter/deepseek-v3', 'openrouter/glm-5.2', 'gemini/flash', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
-  reasoning:         ['openrouter/glm-5.2', 'openrouter/glm-turbo', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'ollama/llama3', 'zai/default'],
-  classification:    ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openrouter/deepseek-v3', 'ollama/llama3', 'zai/default'],
-  chat:              ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'gemini/flash', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
-  embedding:         ['gemini/flash', 'openrouter/glm-turbo', 'ollama/llama3', 'zai/default'],
+  scoring:           ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'groq/llama-3.1-70b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  entity_extraction: ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'groq/llama-3.1-70b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  summarization:     ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'groq/llama-3.1-70b', 'gemini/flash', 'openrouter/deepseek-v3', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  long_report:       ['groq/llama-3.1-70b', 'openrouter/glm-5.2', 'openrouter/glm-turbo', 'gemini/pro', 'gemini/flash', 'openrouter/deepseek-v3', 'groq/llama-3.1-8b', 'openai/gpt-4o', 'ollama/llama3', 'zai/default'],
+  strategy:          ['groq/llama-3.1-70b', 'openrouter/glm-5.2', 'openrouter/glm-turbo', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'groq/llama-3.1-8b', 'ollama/llama3', 'zai/default'],
+  code:              ['openrouter/glm-turbo', 'openrouter/deepseek-v3', 'openrouter/glm-5.2', 'groq/llama-3.1-70b', 'gemini/flash', 'openai/gpt-4o-mini', 'groq/llama-3.1-8b', 'ollama/llama3', 'zai/default'],
+  reasoning:         ['groq/llama-3.1-70b', 'openrouter/glm-5.2', 'openrouter/glm-turbo', 'openai/gpt-4o', 'gemini/pro', 'openrouter/deepseek-v3', 'groq/llama-3.1-8b', 'ollama/llama3', 'zai/default'],
+  classification:    ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'groq/llama-3.1-70b', 'gemini/flash', 'openrouter/deepseek-v3', 'ollama/llama3', 'zai/default'],
+  chat:              ['openrouter/glm-turbo', 'openrouter/glm-5.2', 'groq/llama-3.1-8b', 'groq/llama-3.1-70b', 'gemini/flash', 'openai/gpt-4o-mini', 'ollama/llama3', 'zai/default'],
+  embedding:         ['gemini/flash', 'openrouter/glm-turbo', 'groq/llama-3.1-8b', 'ollama/llama3', 'zai/default'],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
