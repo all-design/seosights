@@ -271,9 +271,9 @@ const TASK_MODEL_MAP: Record<TaskType, string[]> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TIER_CONSTRAINTS: Record<string, { allowedProviders: ProviderId[]; maxCostPerCall: number; preferFree: boolean }> = {
-  free_trial: { allowedProviders: ['groq', 'gemini', 'openrouter', 'zai', 'ollama'], maxCostPerCall: 0, preferFree: true },
-  starter:    { allowedProviders: ['groq', 'gemini', 'openrouter', 'zai', 'ollama'], maxCostPerCall: 0, preferFree: true },
-  pro:        { allowedProviders: ['groq', 'gemini', 'openrouter', 'openai', 'zai', 'ollama'], maxCostPerCall: 0.05, preferFree: false },
+  free_trial: { allowedProviders: ['groq', 'gemini', 'openrouter', 'zai', 'ollama'], maxCostPerCall: 0.01, preferFree: true },  // Allow ultra-cheap models (GLM costs ~$0.000001/1k)
+  starter:    { allowedProviders: ['groq', 'gemini', 'openrouter', 'zai', 'ollama'], maxCostPerCall: 0.05, preferFree: true },
+  pro:        { allowedProviders: ['groq', 'gemini', 'openrouter', 'openai', 'zai', 'ollama'], maxCostPerCall: 0.10, preferFree: false },
   managed:    { allowedProviders: ['groq', 'gemini', 'openrouter', 'openai', 'zai', 'ollama'], maxCostPerCall: 0.50, preferFree: false },
 }
 
