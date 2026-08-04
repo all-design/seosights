@@ -257,7 +257,7 @@ export async function GET() {
   const systemStatus = {
     components: systemComponents,
     recentFallbacks,
-    overallStatus: Object.values(systemComponents).every(c => c.status === 'operational' || c.status === 'standby')
+    overallStatus: Object.values(systemComponents).every(c => c.status === 'operational' || c.status === 'standby' || c.status === 'degraded')
       ? 'operational'
       : Object.values(systemComponents).some(c => c.status === 'offline')
         ? 'degraded'
