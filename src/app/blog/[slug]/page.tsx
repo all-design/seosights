@@ -6,7 +6,7 @@ import { ChevronRight } from 'lucide-react'
 import BlogPostClient from './blog-post-client'
 import type { AIBlogPost, UnifiedBlogPost } from '@/data/blog-types'
 
-const SITE_URL = 'https://seosights.com'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL ? 'https://seosights.com' : 'http://localhost:3000')
 
 // Allow dynamic params for AI-generated slugs that aren't pre-rendered
 export const dynamicParams = true

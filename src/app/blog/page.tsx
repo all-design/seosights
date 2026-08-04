@@ -6,7 +6,7 @@ import BlogHubClient from './blog-hub-client'
 import NewsletterForm from '@/components/site/NewsletterForm'
 import type { AIBlogPost, UnifiedBlogPost } from '@/data/blog-types'
 
-const SITE_URL = 'https://seosights.com'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL ? 'https://seosights.com' : 'http://localhost:3000')
 
 export const metadata: Metadata = {
   title: 'Blog — AI SEO, AEO & GEO Insights | seosights',
