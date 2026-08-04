@@ -9,10 +9,10 @@
     { "path": "/api/cron/observatory-weekly", "schedule": "0 3 * * 1" },
     { "path": "/api/cron/observatory-monthly", "schedule": "0 4 1 * *" },
     { "path": "/api/cron/digest", "schedule": "30 5 * * *" },
-    { "path": "/api/cron/auto-outreach", "schedule": "0 8 * * 1-5" },
-    { "path": "/api/cron/auto-publish", "schedule": "0 9 * * 1-5" },
+    { "path": "/api/cron/auto-outreach", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/auto-publish", "schedule": "0 9 * * *" },
     { "path": "/api/cron/cluster-map", "schedule": "0 3 * * 0" },
-    { "path": "/api/cron/promote-reports", "schedule": "0 * * * *" }
+    { "path": "/api/cron/promote-reports", "schedule": "0 7 * * *" }
   ],
   "functions": {
     "src/app/api/analyze/route.ts": {
