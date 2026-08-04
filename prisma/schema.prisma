@@ -1951,21 +1951,33 @@ model ClientZeroKPI {
 // ─── Internal Content Queue ─────────────────────────────────────────
 
 model InternalContentQueue {
-  id          String   @id @default(cuid())
-  projectId   String
-  title       String
-  topic       String?
-  keywords    String?   // JSON array of keywords
-  status      String    @default("pending") // pending | in_progress | completed | failed
-  priority    Int       @default(5)         // 1 = highest, 10 = lowest
-  scheduledAt DateTime?
-  publishedAt DateTime?
-  articleUrl  String?   // URL of the published article
-  error       String?   // Error message if failed
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String   @id @default(cuid())
+  projectId       String
+  keywordTarget   String   @default("")
+  suggestedTitle  String   @default("")
+  pillar          String   @default("geo") // seo | aeo | geo | all
+  cluster         String?
+  status          String    @default("pending") // pending | in_progress | completed | failed
+  scheduledFor    DateTime  @default(now())
+  publishedAt     DateTime?
+  articleHtml     String?
+  metaDescription String?
+  wordpressPostId String?
+  postUrl         String?
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Additional fields used by bootstrap/content engine
+  title           String?
+  topic           String?
+  keywords        String?   // JSON array of keywords
+  priority        Int       @default(5)         // 1 = highest, 10 = lowest
+  scheduledAt     DateTime?
+  articleUrl      String?   // URL of the published article
+  error           String?   // Error message if failed
+
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([status])

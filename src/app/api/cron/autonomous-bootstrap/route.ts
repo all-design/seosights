@@ -1125,13 +1125,16 @@ export async function GET(request: NextRequest) {
       const queueEntry = await db.internalContentQueue.create({
         data: {
           projectId: clientZeroProject.id,
+          keywordTarget: entry.keywords?.[0] || entry.topic,
+          suggestedTitle: entry.title,
+          pillar: 'all',
           title: entry.title,
           topic: entry.topic,
           keywords: JSON.stringify(entry.keywords),
-          keywordTarget: entry.keywords?.[0] || entry.topic,
           status: 'pending',
           priority: entry.priority,
           scheduledAt: scheduledDate,
+          scheduledFor: scheduledDate,
         },
       })
       queueRecords.push({ id: queueEntry.id, title: queueEntry.title, scheduledAt: queueEntry.scheduledAt })
