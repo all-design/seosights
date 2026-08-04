@@ -550,11 +550,11 @@ export default function QAEnginePage() {
           {/* 1. Database */}
           <TestSection icon={Database} title="Database Connectivity" status={result.tests.database.status} message={result.tests.database.message} durationMs={result.tests.database.durationMs} defaultOpen={result.tests.database.status !== 'pass'}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {Object.entries(result.tests.database.details.counts).map(([table, count]) => (
+              {Object.entries(result.tests.database.details.counts || {}).map(([table, count]) => (
                 <DetailRow key={table} label={table} value={count as number} mono />
               ))}
             </div>
-            {result.tests.database.details.errors.length > 0 && (
+            {(result.tests.database.details.errors || []).length > 0 && (
               <div className="mt-2">
                 <p className="text-[10px] text-red-400 font-medium mb-1">Errors:</p>
                 {result.tests.database.details.errors.map((err, i) => (
@@ -678,10 +678,10 @@ export default function QAEnginePage() {
               <DetailRow label="Recent Interceptions" value={result.tests.factoryPipeline.details.recentInterceptions} mono />
               <DetailRow label="Recent QA Runs" value={result.tests.factoryPipeline.details.recentQARuns} mono />
             </div>
-            {Object.keys(result.tests.factoryPipeline.details.taskStatuses).length > 0 && (
+            {Object.keys(result.tests.factoryPipeline.details.taskStatuses || {}).length > 0 && (
               <div className="mt-2 space-y-1">
                 <p className="text-[10px] text-slate-500">Task Status Breakdown:</p>
-                {Object.entries(result.tests.factoryPipeline.details.taskStatuses).map(([status, count]) => (
+                {Object.entries(result.tests.factoryPipeline.details.taskStatuses || {}).map(([status, count]) => (
                   <div key={status} className="flex items-center gap-2">
                     <span className="text-[10px] text-slate-400 capitalize">{status}:</span>
                     <span className="text-[10px] text-white font-mono">{count}</span>

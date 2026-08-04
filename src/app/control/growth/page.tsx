@@ -507,7 +507,7 @@ export default function GrowthEnginePage() {
                         </span>
                         <span className="text-[10px] text-slate-600 flex items-center gap-1">
                           <Clock className="w-2.5 h-2.5" />
-                          {new Date(decision.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          {decision.createdAt ? new Date(decision.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}
                         </span>
                       </div>
                     </div>

@@ -143,7 +143,14 @@ export default function AnalyticsPage() {
 
   if (!data) return null
 
-  const { factory, growth, systemStatus, aiCost, entityCounts, techDebt, performance, security } = data
+  const factory = data.factory ?? { counts: { factoryTasks: 0, interceptions: 0, missions: 0, qaRuns: 0, snapshots: 0, memories: 0, changelogs: 0 }, aiProviders: { configured: [], available: [], using: 'fallback' }, scheduleSummary: { totalJobs: 0, completed: 0, running: 0, pending: 0, failed: 0 }, timestamp: '' }
+  const growth = data.growth ?? { snapshot: null, opportunities: [] }
+  const systemStatus = data.systemStatus ?? { components: {}, overallStatus: 'unknown', lastChecked: '' }
+  const aiCost = data.aiCost ?? { totalRecords: 0, monthlySpend: 0, monthlyTokens: { prompt: 0, completion: 0, total: 0 }, monthlyRequests: 0, byModel: [], byAgent: [] }
+  const entityCounts = data.entityCounts ?? { users: 0, projects: 0, analyses: 0 }
+  const techDebt = data.techDebt ?? { apiRoutes: 0, prismaModels: 0, lintErrors: 0, typescriptErrors: 0, technicalDebtScore: 0 }
+  const performance = data.performance ?? { scores: { performance: 0, seo: 0, accessibility: 0 }, lastRun: null }
+  const security = data.security ?? { securityScore: 0, vulnerabilities: { critical: 0, high: 0, medium: 0, low: 0, total: 0 } }
   const { snapshot, opportunities } = growth
 
   // ── System Health KPIs ─────────────────────────────────
@@ -221,7 +228,7 @@ export default function AnalyticsPage() {
           </div>
           <div className="text-right">
             <div className="text-xs text-slate-500 uppercase">Last Checked</div>
-            <div className="text-sm text-slate-300">{new Date(systemStatus.lastChecked).toLocaleTimeString()}</div>
+            <div className="text-sm text-slate-300">{systemStatus.lastChecked ? new Date(systemStatus.lastChecked).toLocaleTimeString() : '—'}</div>
           </div>
         </div>
       </div>
@@ -414,7 +421,7 @@ export default function AnalyticsPage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Data as of: <span className="text-slate-300">{new Date(factory.timestamp).toLocaleString()}</span></span>
+          <span>Data as of: <span className="text-slate-300">{factory.timestamp ? new Date(factory.timestamp).toLocaleString() : '—'}</span></span>
         </div>
         <span className="text-slate-700">|</span>
         <span>AI Mode: <span className="text-emerald-400">{factory.aiProviders.using}</span></span>

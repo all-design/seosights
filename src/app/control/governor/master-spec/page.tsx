@@ -245,8 +245,8 @@ export default function MasterSpecificationPage() {
     {
       id: 'v-3',
       label: 'System Health',
-      value: Object.values(systemHealth).every((s: any) => s === 'operational') ? 'Operational' : 'Degraded',
-      status: Object.values(systemHealth).every((s: any) => s === 'operational') ? 'pass' : 'warn',
+      value: systemHealth && Object.values(systemHealth).every((s: any) => s === 'operational') ? 'Operational' : 'Degraded',
+      status: systemHealth && Object.values(systemHealth).every((s: any) => s === 'operational') ? 'pass' : 'warn',
       detail: `AI Router: ${systemHealth?.aiRouter ?? 'unknown'}, QA: ${systemHealth?.qaEngine ?? 'unknown'}`,
     },
     {

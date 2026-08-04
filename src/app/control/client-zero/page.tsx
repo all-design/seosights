@@ -283,7 +283,7 @@ export default function ClientZeroPage() {
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-slate-300">{delta.action || delta.result || 'Score change'}</div>
                   <div className="text-[10px] text-slate-500">
-                    {new Date(delta.date).toLocaleDateString()} · <span className="capitalize">{delta.engine}</span>
+                    {delta.date ? new Date(delta.date).toLocaleDateString() : '—'} · <span className="capitalize">{delta.engine}</span>
                   </div>
                 </div>
                 <span className={`text-xs font-mono ${delta.scoreDelta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -355,7 +355,7 @@ export default function ClientZeroPage() {
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-800 text-[10px] text-slate-500">
-              KPI date: {new Date(kpi.date).toLocaleDateString()}
+              KPI date: {kpi.date ? new Date(kpi.date).toLocaleDateString() : '—'}
             </div>
           </div>
         </div>

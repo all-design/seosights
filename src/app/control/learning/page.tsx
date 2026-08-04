@@ -85,7 +85,7 @@ export default function LearningEnginePage() {
     ? (() => {
         // Group memories into up to 5 buckets by creation date
         const sorted = [...successMemories].sort((a: any, b: any) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          (a.createdAt ? new Date(a.createdAt).getTime() : 0) - (b.createdAt ? new Date(b.createdAt).getTime() : 0)
         )
         const bucketSize = Math.max(1, Math.ceil(sorted.length / 5))
         const buckets: { label: string; value: number; labelStr: string }[] = []
