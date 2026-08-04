@@ -1128,6 +1128,7 @@ export async function GET(request: NextRequest) {
           title: entry.title,
           topic: entry.topic,
           keywords: JSON.stringify(entry.keywords),
+          keywordTarget: entry.keywords?.[0] || entry.topic,
           status: 'pending',
           priority: entry.priority,
           scheduledAt: scheduledDate,
