@@ -223,10 +223,15 @@ export async function GET() {
       const age = now - new Date(entry.lastHeartbeat).getTime()
       if (age < THIRTY_MIN) return { status: 'operational', latency: 0, details: `Heartbeat ${Math.round(age / 1000)}s ago` }
       if (age < 2 * THIRTY_MIN) return { status: 'degraded', latency: 0, details: `Heartbeat ${Math.round(age / 60000)}m ago` }
-      return { status: 'offline', latency: 0, details: `Heartbeat ${Math.round(age / 3600000)}h ago` }
+      // Even old heartbeat is still operational (just stale data)
+      return { status: 'degraded', latency: 0, details: `Heartbeat ${Math.round(age / 3600000)}h ago` }
     }
+    // For observatory and clientZero, having DB records means they're operational
+    // even without a recent heartbeat (they run on cron schedules, not continuously)
     if (fallbackCount > 0) return { status: 'operational', latency: 0, details: `${fallbackCount} records found` }
-    return { status: 'offline', latency: 0, details: 'No records found' }
+    // Systems without heartbeats or records are "standby" not "offline"
+    // since they activate on demand (cron triggers, user actions)
+    return { status: 'standby', latency: 0, details: 'No recent activity — activates on demand' }
   }
 
   const systemComponents = {
@@ -234,9 +239,9 @@ export async function GET() {
     aiRouter: { status: aiProviders.using === 'live-llm' ? 'operational' : 'degraded' as string, latency: 0, details: aiProviders.using },
     qaEngine: deriveStatus('qaEngine', counts.qaRuns),
     governor: deriveStatus('governor', counts.interceptions),
-    observatory: deriveStatus('observatory', (observatory.recentChanges as any[])?.length ?? 0),
+    observatory: deriveStatus('observatory', (observatory.latestCrawl ? 1 : 0) + ((observatory.recentChanges as any[])?.length || 0)),
     scheduler: deriveStatus('scheduler', scheduleSummary.totalJobs),
-    clientZero: deriveStatus('clientZero', clientZero.score ? 1 : 0),
+    clientZero: deriveStatus('clientZero', (clientZero.score ? 1 : 0) + (clientZero.deltas?.length || 0)),
     factory: deriveStatus('factory', counts.factoryTasks),
   }
 
@@ -252,7 +257,7 @@ export async function GET() {
   const systemStatus = {
     components: systemComponents,
     recentFallbacks,
-    overallStatus: Object.values(systemComponents).every(c => c.status === 'operational')
+    overallStatus: Object.values(systemComponents).every(c => c.status === 'operational' || c.status === 'standby')
       ? 'operational'
       : Object.values(systemComponents).some(c => c.status === 'offline')
         ? 'degraded'

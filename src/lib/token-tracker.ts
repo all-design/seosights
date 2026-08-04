@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 // deepseek-v3:    $0.14/M in,  $0.28/M out   → 0.00000014 / 0.00000028
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   'default':       { input: 0.000005,  output: 0.000015 },     // defaults to gpt-4o pricing
+  'zai/default':   { input: 0.00000006, output: 0.00000006 },  // ZAI SDK — sandbox, near-free
   'gpt-4o':        { input: 0.000005,  output: 0.000015 },     // $5 / $15 per million
   'gpt-4o-mini':   { input: 0.00000015, output: 0.0000006 },   // $0.15 / $0.60 per million
   'claude-3-5-sonnet': { input: 0.000003, output: 0.000015 },  // $3 / $15 per million

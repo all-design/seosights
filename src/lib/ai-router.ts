@@ -446,8 +446,15 @@ async function callZAI(messages: Array<{role: string; content: string}>): Promis
     messages: messages as Array<{role: string; content: string}>,
   })
   const content = (result as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content || ''
-  // ZAI SDK doesn't reliably return token usage data
-  return { content }
+
+  // ZAI SDK doesn't reliably return token usage data, so estimate from text
+  // Using the standard heuristic: 1 token ≈ 4 characters
+  const inputText = messages.map(m => m.content).join('')
+  const estimatedPromptTokens = Math.ceil(inputText.length / 4)
+  const estimatedCompletionTokens = Math.ceil(content.length / 4)
+  const tokensUsed = { prompt: estimatedPromptTokens, completion: estimatedCompletionTokens }
+
+  return { content, tokensUsed }
 }
 
 /** Ollama local client — final fallback */

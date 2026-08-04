@@ -195,21 +195,46 @@ export default function AIRouterPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch AI router status')
-        const json = await res.json()
+        // Fetch both control/data (for status) and ai-router/status (for model details)
+        const [controlRes, routerRes] = await Promise.all([
+          fetch('/api/control/data'),
+          fetch('/api/ai-router/status'),
+        ])
+        if (!controlRes.ok) throw new Error('Failed to fetch control data')
+
+        const json = await controlRes.json()
         // Extract AI router data from unified API response
-        const aiProviders = json.aiProviders || { configured: [], available: [], using: 'rule-based-fallback' }
-        const providers: ProviderStatus[] = aiProviders.configured.map((id: string) => ({
-          id,
-          configured: true,
-          hasEnvVar: null,
-          models: [],
-        }))
+        const aiProviders = json.factory?.aiProviders || json.aiProviders || { configured: [], available: [], using: 'rule-based-fallback' }
+
+        // Try to get richer data from the dedicated AI router status API
+        let routerData: { providers?: ProviderStatus[]; tierConstraints?: any; circuitBreaker?: any } = {}
+        if (routerRes.ok) {
+          routerData = await routerRes.json()
+        }
+
+        // Use dedicated API providers if available, otherwise derive from control data
+        const providers: ProviderStatus[] = routerData.providers && routerData.providers.length > 0
+          ? routerData.providers
+          : aiProviders.configured.map((id: string) => ({
+              id,
+              configured: true,
+              hasEnvVar: null,
+              models: [],
+            }))
+
+        // Derive provider health from circuit breaker data
+        const providerHealth: ProviderHealthItem[] = (routerData.circuitBreaker as any[])?.map((h: any) => ({
+          providerId: h.provider || h.id,
+          state: h.status === 'healthy' ? 'closed' as const : h.status === 'cooldown' ? 'open' as const : 'half-open' as const,
+          failures: h.consecutiveFailures || 0,
+          lastFailure: h.lastFailure?.toISOString?.() || h.lastFailure || null,
+          cooldownUntil: h.cooldownUntil?.toISOString?.() || h.cooldownUntil || null,
+        })) || []
+
         setData({
           providers,
-          tierConstraints: {},
-          providerHealth: [],
+          tierConstraints: routerData.tierConstraints || {},
+          providerHealth,
           summary: {
             configuredCount: aiProviders.configured.length,
             totalProviders: 5,

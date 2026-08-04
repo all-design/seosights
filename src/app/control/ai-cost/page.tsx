@@ -199,9 +199,14 @@ export default function AICostDashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch AI cost data')
-        const json = await res.json()
+        // Fetch both control/data (primary) and admin/tokens (supplementary) in parallel
+        const [controlRes, tokenRes] = await Promise.all([
+          fetch('/api/control/data'),
+          fetch('/api/admin/tokens'),
+        ])
+        if (!controlRes.ok) throw new Error('Failed to fetch AI cost data')
+        const json = await controlRes.json()
+
         // Extract aiCost from unified API response
         const cost = json.aiCost ?? {
           totalRecords: 0,
@@ -213,6 +218,31 @@ export default function AICostDashboardPage() {
           byAgent: [],
           recentUsage: [],
         }
+
+        // If monthly spend is 0 from control/data but admin/tokens has data, merge it
+        if (cost.monthlySpend === 0 && tokenRes.ok) {
+          try {
+            const tokenData = await tokenRes.json()
+            if (tokenData?.summary?.totalCost > 0) {
+              // Enrich cost data from the admin/tokens endpoint
+              cost.monthlySpend = tokenData.summary.totalCost
+              cost.monthlyRequests = tokenData.summary.totalApiCalls || cost.monthlyRequests
+              // Merge agent stats if available
+              if (tokenData.agentStats?.length > 0 && cost.byAgent.length === 0) {
+                cost.byAgent = tokenData.agentStats.map((a: any) => ({
+                  agent: a.agentName || a.agentId,
+                  cost: a.totalCost || 0,
+                  promptTokens: a.totalInputTokens || 0,
+                  completionTokens: a.totalOutputTokens || 0,
+                  requests: a.totalApiCalls || 0,
+                }))
+              }
+            }
+          } catch {
+            // Non-blocking: use control/data as-is
+          }
+        }
+
         setAiCost(cost)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
