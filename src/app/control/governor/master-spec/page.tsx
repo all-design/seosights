@@ -208,7 +208,23 @@ export default function MasterSpecificationPage() {
   const factory = data?.factory || {}
   const counts = factory.counts || {}
   const systemHealth = factory.system || {}
-  const tasks: FactoryTask[] = factory.recentMissions || []
+  // Normalize tasks - recentMissions may have different shape than FactoryTask
+  const rawTasks: any[] = factory.recentMissions || []
+  const tasks: FactoryTask[] = rawTasks.map(t => ({
+    id: t.id || '',
+    type: t.type || t.goal || 'mission',
+    title: t.title || t.goal || 'Untitled Mission',
+    description: t.description || t.strategy || '',
+    status: t.status || 'unknown',
+    priority: t.priority || 'medium',
+    assignee: t.assignee || '',
+    branch: t.branch || '',
+    prUrl: t.prUrl || '',
+    result: t.result || t.outcome || '',
+    parentTaskId: t.parentTaskId || '',
+    createdAt: t.createdAt || '',
+    updatedAt: t.updatedAt || '',
+  }))
   const recentTasks = tasks.slice(0, 5)
 
   // Derive contributors from task assignees
