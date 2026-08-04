@@ -790,57 +790,68 @@ export async function GET(request: NextRequest) {
     // We skip explicit "ObservatorySignal" creation as requested.
 
     // 3c. ObservatoryIndustry records (3 industries)
-    const industries = await db.observatoryIndustry.createMany({
-      data: [
-        {
-          slug: 'seo-tools',
-          name: 'SEO Tools',
-          description: 'Companies providing search engine optimization software and analytics platforms, including both traditional SEO and emerging AI visibility tracking tools.',
-          indexScore: 68,
-          previousScore: 62,
-          trend: 'rising',
-          aiVisibilityAvg: 72,
-          topModelsJson: JSON.stringify({ chatgpt: ['Ahrefs', 'SEMrush', 'seosights'], claude: ['seosights', 'Ahrefs', 'Moz'], perplexity: ['seosights', 'Ahrefs', 'SEMrush'] }),
-          rankingsJson: JSON.stringify([{ name: 'Ahrefs', score: 88 }, { name: 'SEMrush', score: 82 }, { name: 'seosights', score: 75 }, { name: 'Moz', score: 60 }]),
-          benchmarksJson: JSON.stringify({ avgCitationRate: 0.45, avgSentiment: 0.65, avgCrossModelConsistency: 0.55 }),
-          dataPoints: 245,
-          signalsCount: 12,
-          lastUpdated: now,
-        },
-        {
-          slug: 'ai-search',
-          name: 'AI Search',
-          description: 'The emerging industry of AI-powered search engines and answer engines, including ChatGPT, Claude, Gemini, Perplexity, and the ecosystem of tools built around AI visibility.',
-          indexScore: 82,
-          previousScore: 78,
-          trend: 'rising',
-          aiVisibilityAvg: 85,
-          topModelsJson: JSON.stringify({ chatgpt: ['Perplexity', 'seosights', 'Ahrefs'], claude: ['seosights', 'Perplexity'], gemini: ['Perplexity', 'seosights'] }),
-          rankingsJson: JSON.stringify([{ name: 'Perplexity', score: 92 }, { name: 'seosights', score: 80 }, { name: 'ChatGPT Search', score: 75 }]),
-          benchmarksJson: JSON.stringify({ avgCitationRate: 0.62, avgSentiment: 0.78, avgCrossModelConsistency: 0.70 }),
-          dataPoints: 380,
-          signalsCount: 28,
-          lastUpdated: now,
-        },
-        {
-          slug: 'digital-marketing',
-          name: 'Digital Marketing',
-          description: 'The broader digital marketing industry, including agencies, tools, and platforms for online marketing, content creation, and brand visibility management.',
-          indexScore: 55,
-          previousScore: 54,
-          trend: 'stable',
-          aiVisibilityAvg: 48,
-          topModelsJson: JSON.stringify({ chatgpt: ['HubSpot', 'Mailchimp', 'Hootsuite'], claude: ['HubSpot', 'seosights', 'Mailchimp'], perplexity: ['HubSpot', 'SEMrush', 'seosights'] }),
-          rankingsJson: JSON.stringify([{ name: 'HubSpot', score: 90 }, { name: 'Mailchimp', score: 78 }, { name: 'SEMrush', score: 72 }, { name: 'seosights', score: 58 }]),
-          benchmarksJson: JSON.stringify({ avgCitationRate: 0.35, avgSentiment: 0.55, avgCrossModelConsistency: 0.40 }),
-          dataPoints: 520,
-          signalsCount: 8,
-          lastUpdated: now,
-        },
-      ],
-      skipDuplicates: true,
-    })
-    results.observatoryIndustries = industries
+    const industryData = [
+      {
+        slug: 'seo-tools',
+        name: 'SEO Tools',
+        description: 'Companies providing search engine optimization software and analytics platforms, including both traditional SEO and emerging AI visibility tracking tools.',
+        indexScore: 68,
+        previousScore: 62,
+        trend: 'rising',
+        aiVisibilityAvg: 72,
+        topModelsJson: JSON.stringify({ chatgpt: ['Ahrefs', 'SEMrush', 'seosights'], claude: ['seosights', 'Ahrefs', 'Moz'], perplexity: ['seosights', 'Ahrefs', 'SEMrush'] }),
+        rankingsJson: JSON.stringify([{ name: 'Ahrefs', score: 88 }, { name: 'SEMrush', score: 82 }, { name: 'seosights', score: 75 }, { name: 'Moz', score: 60 }]),
+        benchmarksJson: JSON.stringify({ avgCitationRate: 0.45, avgSentiment: 0.65, avgCrossModelConsistency: 0.55 }),
+        dataPoints: 245,
+        signalsCount: 12,
+        lastUpdated: now,
+      },
+      {
+        slug: 'ai-search',
+        name: 'AI Search',
+        description: 'The emerging industry of AI-powered search engines and answer engines, including ChatGPT, Claude, Gemini, Perplexity, and the ecosystem of tools built around AI visibility.',
+        indexScore: 82,
+        previousScore: 78,
+        trend: 'rising',
+        aiVisibilityAvg: 85,
+        topModelsJson: JSON.stringify({ chatgpt: ['Perplexity', 'seosights', 'Ahrefs'], claude: ['seosights', 'Perplexity'], gemini: ['Perplexity', 'seosights'] }),
+        rankingsJson: JSON.stringify([{ name: 'Perplexity', score: 92 }, { name: 'seosights', score: 80 }, { name: 'ChatGPT Search', score: 75 }]),
+        benchmarksJson: JSON.stringify({ avgCitationRate: 0.62, avgSentiment: 0.78, avgCrossModelConsistency: 0.70 }),
+        dataPoints: 380,
+        signalsCount: 28,
+        lastUpdated: now,
+      },
+      {
+        slug: 'digital-marketing',
+        name: 'Digital Marketing',
+        description: 'The broader digital marketing industry, including agencies, tools, and platforms for online marketing, content creation, and brand visibility management.',
+        indexScore: 55,
+        previousScore: 54,
+        trend: 'stable',
+        aiVisibilityAvg: 48,
+        topModelsJson: JSON.stringify({ chatgpt: ['HubSpot', 'Mailchimp', 'Hootsuite'], claude: ['HubSpot', 'seosights', 'Mailchimp'], perplexity: ['HubSpot', 'SEMrush', 'seosights'] }),
+        rankingsJson: JSON.stringify([{ name: 'HubSpot', score: 90 }, { name: 'Mailchimp', score: 78 }, { name: 'SEMrush', score: 72 }, { name: 'seosights', score: 58 }]),
+        benchmarksJson: JSON.stringify({ avgCitationRate: 0.35, avgSentiment: 0.55, avgCrossModelConsistency: 0.40 }),
+        dataPoints: 520,
+        signalsCount: 8,
+        lastUpdated: now,
+      },
+    ]
+    // Use individual upsert calls instead of createMany+skipDuplicates (not supported by Turso/Prisma adapter)
+    let industryCount = 0
+    for (const ind of industryData) {
+      try {
+        await db.observatoryIndustry.upsert({
+          where: { slug: ind.slug },
+          update: ind,
+          create: ind,
+        })
+        industryCount++
+      } catch (e: any) {
+        console.warn(`[bootstrap] Industry upsert failed for ${ind.slug}: ${e?.message}`)
+      }
+    }
+    results.observatoryIndustries = { count: industryCount }
 
     // 3d. ObservatoryWeatherDaily records (7 days, one per day for "overall")
     const weatherRecords = []
