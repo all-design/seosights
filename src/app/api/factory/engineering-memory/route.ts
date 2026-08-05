@@ -107,19 +107,25 @@ export async function POST() {
 
     // Seed initial records
     let created = 0
+    const errors: string[] = []
     for (const mem of SEED_MEMORIES) {
       try {
         await db.engineeringMemory.create({ data: mem })
         created++
       } catch (err) {
-        console.warn('[engineering-memory seed] Failed to create record:', err)
+        const msg = err instanceof Error ? err.message : String(err)
+        errors.push(msg)
+        console.warn('[engineering-memory seed] Failed to create record:', msg)
       }
     }
 
     return NextResponse.json({
-      ok: true,
-      message: `Seeded ${created} engineering memory records.`,
+      ok: created > 0,
+      message: errors.length > 0
+        ? `Seeded ${created} records. ${errors.length} failures: ${errors[0]}`
+        : `Seeded ${created} engineering memory records.`,
       count: created,
+      errors: errors.length > 0 ? errors.slice(0, 3) : undefined,
     })
   } catch (error) {
     console.error('[api/factory/engineering-memory POST] Failed:', error)
