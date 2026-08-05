@@ -126,6 +126,7 @@ export default function EngineeringEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
+        if (!json || typeof json !== 'object') throw new Error('Invalid API response')
         // Unwrap the factory envelope — the API returns { factory: { system, counts, ... }, ... }
         const source = json.factory || json
         setFactoryData({
@@ -136,10 +137,10 @@ export default function EngineeringEnginePage() {
             qaRuns: source.counts?.qaRuns ?? source.counts?.qaRun ?? 0,
             engineeringMemories: source.counts?.memories ?? source.counts?.memory ?? 0,
           },
-          recentActivity: source.recentActivity || [],
+          recentActivity: Array.isArray(source.recentActivity) ? source.recentActivity : [],
           ok: source.ok ?? true,
         })
-        setMemories(source.recentMemories || [])
+        setMemories(Array.isArray(source.recentMemories) ? source.recentMemories : [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -188,7 +189,7 @@ export default function EngineeringEnginePage() {
   // ─── Derived data ─────────────────────────────────────────
   const system = factoryData?.system || {}
   const counts = factoryData?.counts || {}
-  const recentActivity: ActivityItem[] = factoryData?.recentActivity || []
+  const recentActivity: ActivityItem[] = Array.isArray(factoryData?.recentActivity) ? factoryData.recentActivity : []
 
   // Build pipeline steps from system health
   const pipelineSteps: PipelineStep[] = pipelineStepDefs.map(def => {
