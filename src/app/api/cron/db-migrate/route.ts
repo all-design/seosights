@@ -61,6 +61,14 @@ export async function GET(request: NextRequest) {
     { table: 'User', column: 'tier', type: 'TEXT', default: "'free_trial'" },
     { table: 'User', column: 'lastLoginAt', type: 'DATETIME' },
     { table: 'User', column: 'passwordHash', type: 'TEXT' },
+    // EngineeringMemory table - new schema columns (patternType/patternName replace old feature/filesChanged)
+    { table: 'EngineeringMemory', column: 'patternType', type: 'TEXT', default: "'pattern'" },
+    { table: 'EngineeringMemory', column: 'patternName', type: 'TEXT', default: "''" },
+    { table: 'EngineeringMemory', column: 'description', type: 'TEXT' },
+    { table: 'EngineeringMemory', column: 'filePath', type: 'TEXT' },
+    { table: 'EngineeringMemory', column: 'occurrences', type: 'INTEGER', default: '1' },
+    { table: 'EngineeringMemory', column: 'lastSeenAt', type: 'TEXT', default: "datetime('now')" },
+    { table: 'EngineeringMemory', column: 'metadata', type: 'TEXT' },
   ]
 
   for (const migration of migrations) {
@@ -78,6 +86,25 @@ export async function GET(request: NextRequest) {
         results.push({ table: migration.table, column: migration.column, status: 'error' })
         errors.push(`${migration.table}.${migration.column}: ${msg}`)
       }
+    }
+  }
+
+  // Phase 1.5: Make old NOT NULL columns nullable where the Prisma schema marks them optional
+  // SQLite doesn't support ALTER COLUMN, so we recreate the table if needed.
+  // For EngineeringMemory, if the 'feature' column exists and is NOT NULL, we need to make it nullable
+  // so that the new schema (which doesn't have 'feature') can work.
+  // Safest approach: backfill 'feature' with a default for existing rows, then the column
+  // won't block new inserts that use patternName instead.
+  try {
+    // Update existing rows: set feature = patternName where feature is null
+    await db.$executeRawUnsafe(
+      `UPDATE "EngineeringMemory" SET feature = patternName WHERE feature IS NULL AND patternName IS NOT NULL`,
+    )
+    results.push({ table: 'EngineeringMemory', column: 'feature', status: 'backfilled_from_patternName' })
+  } catch (err: any) {
+    const msg = err?.message || String(err)
+    if (!msg.includes('no such column') && !msg.includes('no such table')) {
+      errors.push(`EngineeringMemory.feature backfill: ${msg}`)
     }
   }
 

@@ -2485,6 +2485,17 @@ model EngineeringMemory {
   confidence    Float     @default(0)
   lastSeenAt    DateTime  @default(now())
   metadata      String?   // JSON
+  // Legacy columns from older schema — still required in Turso DB
+  feature       String    @default("")
+  filesChanged  String?   
+  testsAdded    Int       @default(0)
+  testsPassed   Int       @default(0)
+  testsFailed   Int       @default(0)
+  outcome       String?   
+  rollbackNeeded Boolean  @default(false)
+  performanceDelta String? 
+  patternLearned String?  
+  appliedAgain  Int       @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
