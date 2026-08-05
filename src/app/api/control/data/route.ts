@@ -87,7 +87,7 @@ export async function GET() {
   }
 
   // Fetch latest timestamps for recency-based status
-  const [latestSnapshot, latestInterception, latestMission, latestQARun] = await Promise.all([
+  const [recencySnapshot, recencyInterception, recencyMission, recencyQARun] = await Promise.all([
     safe(() => db.codebaseSnapshot.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }), null as any),
     safe(() => db.governorInterception.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }), null as any),
     safe(() => db.dailyMission.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }), null as any),
@@ -95,11 +95,11 @@ export async function GET() {
   ])
 
   const system = {
-    codebaseScanner: statusFromRecency(latestSnapshot?.createdAt),
-    governor: statusFromRecency(latestInterception?.createdAt),
+    codebaseScanner: statusFromRecency(recencySnapshot?.createdAt),
+    governor: statusFromRecency(recencyInterception?.createdAt),
     aiRouter: 'degraded' as string,
-    dailyMissionGenerator: statusFromRecency(latestMission?.createdAt),
-    qaEngine: statusFromRecency(latestQARun?.createdAt),
+    dailyMissionGenerator: statusFromRecency(recencyMission?.createdAt),
+    qaEngine: statusFromRecency(recencyQARun?.createdAt),
   }
 
   // AI providers from env — OpenRouter GLM 5.2/GLM Turbo is DEFAULT primary
