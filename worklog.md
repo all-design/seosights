@@ -305,3 +305,23 @@ Stage Summary:
 - All engines are operational on production
 - API quota is properly configured with 4 LLM providers
 - No engine offline/degraded issues remain
+---
+Task ID: 1
+Agent: main
+Task: Fix "Cannot read properties of undefined (reading 'icon')" error on /control/engineering page
+
+Work Log:
+- Investigated the client-side crash on /control/engineering page
+- Root cause: API route returns activity items with type 'mission', but the engineering page's switch statements only handled 'interception' | 'task' | 'qaRun'
+- feedAccentForType('mission') → undefined, feedIconForType('mission') → undefined, feedAccentColor(undefined) → undefined
+- Then accentColors.icon crashes because accentColors is undefined
+- Fixed all three switch functions to handle 'mission' type and added default cases
+- Updated ActivityItem type to include 'mission'
+- Updated message/detail rendering logic to handle 'mission' type
+- Verified page compiles and returns HTTP 200
+
+Stage Summary:
+- Fixed the TypeError by adding 'mission' case and default fallback to feedAccentForType, feedIconForType, and feedAccentColor
+- Updated ActivityItem type: type: 'interception' | 'task' | 'qaRun' | 'mission'
+- Mission icon uses FilePen (already imported), accent color uses 'violet'
+- Default fallback uses Activity icon and 'slate' accent

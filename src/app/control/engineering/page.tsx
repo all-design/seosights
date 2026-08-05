@@ -39,7 +39,7 @@ interface PipelineStep {
 }
 
 interface ActivityItem {
-  type: 'interception' | 'task' | 'qaRun'
+  type: 'interception' | 'task' | 'qaRun' | 'mission'
   id: string
   engineName?: string
   outcome?: string
@@ -74,6 +74,8 @@ function feedAccentForType(type: ActivityItem['type']): 'violet' | 'emerald' | '
     case 'interception': return 'amber'
     case 'task': return 'violet'
     case 'qaRun': return 'emerald'
+    case 'mission': return 'violet'
+    default: return 'slate'
   }
 }
 
@@ -82,6 +84,8 @@ function feedIconForType(type: ActivityItem['type']): React.ElementType {
     case 'interception': return AlertTriangle
     case 'task': return FilePlus2
     case 'qaRun': return CheckCircle2
+    case 'mission': return FilePen
+    default: return Activity
   }
 }
 
@@ -91,6 +95,7 @@ function feedAccentColor(accent: 'violet' | 'emerald' | 'amber' | 'slate'): { ic
     case 'emerald': return { icon: 'text-emerald-400', dot: 'bg-emerald-400' }
     case 'amber': return { icon: 'text-amber-400', dot: 'bg-amber-400' }
     case 'slate': return { icon: 'text-slate-400', dot: 'bg-slate-400' }
+    default: return { icon: 'text-slate-400', dot: 'bg-slate-400' }
   }
 }
 
@@ -464,9 +469,11 @@ export default function EngineeringEnginePage() {
                 const Icon = feedIconForType(event.type)
                 const accentColors = feedAccentColor(accent)
                 const message = event.type === 'task' ? event.title || 'Task created' :
+                  event.type === 'mission' ? event.title || 'Mission updated' :
                   event.type === 'interception' ? `Governor: ${event.engineName || 'Unknown'}` :
                   `QA Run: ${event.errorCount || 0} errors`
                 const detail = event.type === 'task' ? `Status: ${event.status || 'unknown'}` :
+                  event.type === 'mission' ? event.status || '' :
                   event.type === 'interception' ? event.outcome || '' :
                   event.status || ''
                 return (
