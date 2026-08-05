@@ -325,3 +325,20 @@ Stage Summary:
 - Updated ActivityItem type: type: 'interception' | 'task' | 'qaRun' | 'mission'
 - Mission icon uses FilePen (already imported), accent color uses 'violet'
 - Default fallback uses Activity icon and 'slate' accent
+---
+Task ID: 1
+Agent: main
+Task: Fix "Cannot read properties of undefined (reading 'icon')" error on /control/engineering page (second attempt)
+
+Work Log:
+- Previous fix was correct (added 'mission' case and default fallback to switch functions) but React hydration was broken
+- Root cause of hydration failure: Caddy gateway on port 81 proxies to Next.js on port 3000, but Next.js blocked cross-origin requests for /_next/* assets
+- The browser loaded via gateway (127.0.0.1:81) but the Origin header was 127.0.0.1, which Next.js didn't recognize as allowed
+- Fixed by adding allowedDevOrigins: ["127.0.0.1", "seosights.com"] to next.config.ts
+- Note: allowedDevOrigins values are compared as hostnames, not full URLs (http://... doesn't work, just the hostname)
+- Verified fix by logging in via browser and navigating to /control/engineering - page renders fully with no errors
+
+Stage Summary:
+- Code fix (from previous session): Added 'mission' case and default fallback to feedAccentForType, feedIconForType, feedAccentColor functions
+- Config fix: Added allowedDevOrigins to next.config.ts to allow Caddy gateway origin
+- Both fixes required for the page to work: code fix prevents the TypeError, config fix enables React hydration through the gateway
