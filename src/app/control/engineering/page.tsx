@@ -121,18 +121,20 @@ export default function EngineeringEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
+        // Unwrap the factory envelope — the API returns { factory: { system, counts, ... }, ... }
+        const source = json.factory || json
         setFactoryData({
-          system: json.system || {},
+          system: source.system || {},
           counts: {
-            factoryTasks: json.counts?.factoryTask ?? 0,
-            governorInterceptions: json.counts?.interception ?? 0,
-            qaRuns: json.counts?.qaRun ?? 0,
-            engineeringMemories: json.counts?.memory ?? 0,
+            factoryTasks: source.counts?.factoryTasks ?? source.counts?.factoryTask ?? 0,
+            governorInterceptions: source.counts?.interceptions ?? source.counts?.interception ?? 0,
+            qaRuns: source.counts?.qaRuns ?? source.counts?.qaRun ?? 0,
+            engineeringMemories: source.counts?.memories ?? source.counts?.memory ?? 0,
           },
-          recentActivity: json.recentActivity || [],
-          ok: json.ok ?? true,
+          recentActivity: source.recentActivity || [],
+          ok: source.ok ?? true,
         })
-        setMemories(json.recentMemories || [])
+        setMemories(source.recentMemories || [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {

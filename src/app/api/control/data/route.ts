@@ -71,13 +71,35 @@ export async function GET() {
     () => db.qARun.findFirst({ orderBy: { createdAt: 'desc' } }), null
   )
 
-  // System health from latest records
+  // System health from latest record timestamps (recency-based)
+  //  - any record in last 24h  → 'operational'
+  //  - any record in last 7d   → 'degraded'
+  //  - never / older than 7d   → 'offline'
+  function statusFromRecency(latestAt: Date | null | undefined): string {
+    if (!latestAt) return 'offline'
+    const ageMs = Date.now() - latestAt.getTime()
+    if (Number.isNaN(ageMs)) return 'offline'
+    const ONE_DAY = 24 * 60 * 60 * 1000
+    const SEVEN_DAYS = 7 * ONE_DAY
+    if (ageMs <= ONE_DAY) return 'operational'
+    if (ageMs <= SEVEN_DAYS) return 'degraded'
+    return 'offline'
+  }
+
+  // Fetch latest timestamps for recency-based status
+  const [latestSnapshot, latestInterception, latestMission, latestQARun] = await Promise.all([
+    safe(() => db.codebaseSnapshot.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }), null as any),
+    safe(() => db.governorInterception.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }), null as any),
+    safe(() => db.dailyMission.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }), null as any),
+    safe(() => db.qARun.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }), null as any),
+  ])
+
   const system = {
-    codebaseScanner: counts.snapshots > 0 ? 'operational' : 'offline',
-    governor: counts.interceptions > 0 ? 'operational' : 'offline',
+    codebaseScanner: statusFromRecency(latestSnapshot?.createdAt),
+    governor: statusFromRecency(latestInterception?.createdAt),
     aiRouter: 'degraded' as string,
-    dailyMissionGenerator: counts.missions > 0 ? 'operational' : 'offline',
-    qaEngine: counts.qaRuns > 0 ? 'operational' : 'offline',
+    dailyMissionGenerator: statusFromRecency(latestMission?.createdAt),
+    qaEngine: statusFromRecency(latestQARun?.createdAt),
   }
 
   // AI providers from env — OpenRouter GLM 5.2/GLM Turbo is DEFAULT primary
