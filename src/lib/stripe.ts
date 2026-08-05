@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import { getSetting } from '@/lib/settings'
+import { PLAN_PRICES, PLAN_AMOUNTS } from './pricing-constants'
 
 // ── Lazy Stripe client (reads from DB first, then env var) ────────────────
 
@@ -42,19 +43,8 @@ export async function getPlanPrices() {
   return { starter: starter!, pro: pro!, managed: managed! }
 }
 
-// Price IDs for each plan (env var defaults — use getPlanPrices() for DB overrides)
-export const PLAN_PRICES = {
-  starter: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter_placeholder',
-  pro: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_placeholder',
-  managed: process.env.STRIPE_MANAGED_PRICE_ID || 'price_managed_placeholder',
-}
-
-// Monthly amounts for each plan (in cents, for fallback tier detection)
-export const PLAN_AMOUNTS = {
-  starter: 990,     // $9.90 (launch promo)
-  pro: 7900,        // $79.00
-  managed: 19900,   // $199.00
-} as const
+// Re-export pricing constants from the shared file (safe for server-side use)
+export { PLAN_PRICES, PLAN_AMOUNTS } from './pricing-constants'
 
 // Map Stripe amount to tier
 export function getTierFromAmount(amount: number): string {

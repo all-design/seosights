@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { PLAN_PRICES } from '@/lib/stripe'
+import { PLAN_PRICES } from '@/lib/pricing-constants'
 import {
   Check,
   ArrowRight,
