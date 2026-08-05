@@ -263,3 +263,45 @@ Stage Summary:
 - System status: Database ok, AI Router ok, Email ok, WebSocket ok, CMS ok
 - Remaining degraded items: Redis (using in-memory fallback), Stripe (no webhook secret) — non-critical
 - Production URL: https://seosights.com
+
+---
+Task ID: 1
+Agent: main
+Task: Fix client-side exception on seosights.com
+
+Work Log:
+- Identified root cause: PricingCard.tsx imported PLAN_PRICES from '@/lib/stripe', which at module level imports the Node.js-only `stripe` SDK
+- This caused the entire stripe module to be evaluated in the browser, crashing because `stripe` requires Node.js builtins (crypto, http, net, etc.)
+- Created src/lib/pricing-constants.ts with PLAN_PRICES and PLAN_AMOUNTS (using NEXT_PUBLIC_* env vars)
+- Updated PricingCard.tsx to import from '@/lib/pricing-constants' instead of '@/lib/stripe'
+- Updated stripe.ts to import from './pricing-constants' and re-export for server-side consumers
+- Verified build passes
+- Pushed fix to git (commit 2fdc31c) which triggered Vercel auto-deploy
+- Verified deployment completed (READY state)
+- Verified production site with Agent Browser: page loads, pricing section renders, no console errors
+
+Stage Summary:
+- Fixed: Client-side exception caused by Node.js-only stripe SDK in browser bundle
+- All 4 pricing plan buttons render correctly on production
+- No browser console errors
+- Production site fully operational at seosights.com
+---
+Task ID: 2
+Agent: main
+Task: Verify API quota and engine status on production
+
+Work Log:
+- Checked AI Router status: 4/6 providers configured (OpenRouter, Groq, Gemini, ZAI) - status: "ok"
+- Checked Factory status: all systems operational
+  - Codebase Scanner: operational
+  - Governor: operational  
+  - AI Router: operational
+  - Daily Mission Generator: operational
+  - QA Engine: operational
+- Engineering Memories: 8 records
+- Factory Tasks: 21, Governor Interceptions: 106, Daily Missions: 9
+
+Stage Summary:
+- All engines are operational on production
+- API quota is properly configured with 4 LLM providers
+- No engine offline/degraded issues remain
