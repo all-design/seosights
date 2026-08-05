@@ -355,12 +355,16 @@ export default function ControlLayout({ children }: { children: React.ReactNode 
   )
 }
 
-// Custom hook for clock
+// Custom hook for clock — initializes to empty string to avoid hydration mismatch
+// (server and client produce different times, which breaks React 19 hydration).
+// The actual time is set in useEffect (client-only) on mount.
 function useCurrentTime() {
-  const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-US', { hour12: false }))
+  const [time, setTime] = useState('')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
+    // Set initial time immediately on client
+    setTime(new Date().toLocaleTimeString('en-US', { hour12: false }))
     timerRef.current = setInterval(() => {
       setTime(new Date().toLocaleTimeString('en-US', { hour12: false }))
     }, 1000)

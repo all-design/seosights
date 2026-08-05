@@ -48,18 +48,23 @@ function useCountdown(targetTime: string) {
   const [hours, minutes] = targetTime.split(':').map(Number)
   targetDate.setHours(hours, minutes, 0, 0)
 
-  // If the time is in the past, it's already passed
-  const isPast = targetDate.getTime() < Date.now()
-
-  const [diff, setDiff] = useState(isPast ? 0 : targetDate.getTime() - Date.now())
+  // Initialize diff to 0 to avoid hydration mismatch (Date.now() differs server vs client).
+  // The actual value is computed in useEffect (client-only) on mount.
+  const [diff, setDiff] = useState(0)
+  const [isPast, setIsPast] = useState(true)
 
   useEffect(() => {
-    if (isPast) return
-    const timer = setInterval(() => {
-      setDiff(targetDate.getTime() - Date.now())
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [targetDate, isPast])
+    const now = Date.now()
+    const past = targetDate.getTime() < now
+    setIsPast(past)
+    if (!past) {
+      setDiff(targetDate.getTime() - now)
+      const timer = setInterval(() => {
+        setDiff(targetDate.getTime() - Date.now())
+      }, 1000)
+      return () => clearInterval(timer)
+    }
+  }, [targetDate])
 
   if (diff <= 0 || isPast) return { text: '00:00:00', overdue: true }
 
