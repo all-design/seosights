@@ -342,3 +342,26 @@ Stage Summary:
 - Code fix (from previous session): Added 'mission' case and default fallback to feedAccentForType, feedIconForType, feedAccentColor functions
 - Config fix: Added allowedDevOrigins to next.config.ts to allow Caddy gateway origin
 - Both fixes required for the page to work: code fix prevents the TypeError, config fix enables React hydration through the gateway
+---
+Task ID: 1
+Agent: main
+Task: Fix persistent 'Cannot read properties of undefined (reading icon)' error on /control/engineering
+
+Work Log:
+- Verified code fix is in place (mission case + default fallbacks in all 3 switch functions)
+- Verified ActivityItem type includes 'mission'
+- Verified message/detail rendering handles 'mission' type
+- Found that allowedDevOrigins in next.config.ts was using full URLs instead of hostnames - fixed to ["127.0.0.1", "seosights.com"]
+- Cleared .next cache (static, server, cache) to force fresh compilation with new chunk hashes
+- Restarted dev server - page compiles and serves 200 OK
+- Tested with agent-browser: logged in, navigated to /control/engineering, NO errors
+- Page fully renders: sidebar, pipeline, activity feed, quality gates all working
+- Error boundary NOT triggered (document.body.innerText.includes('Something went wrong') === false)
+- User likely seeing cached old broken JS from before the fix
+
+Stage Summary:
+- Both code fix and config fix are verified and working
+- Code: Added 'mission' case + default fallbacks to feedAccentForType, feedIconForType, feedAccentColor
+- Config: allowedDevOrigins: ["127.0.0.1", "seosights.com"] (hostnames, not URLs)
+- Cache cleared to force new chunk hashes and bust browser cache
+- User may need to hard refresh (Ctrl+Shift+R) to get new JS bundles
