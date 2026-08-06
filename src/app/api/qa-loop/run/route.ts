@@ -264,111 +264,12 @@ async function testDatabase(): Promise<DatabaseTestResult> {
 async function testAIProviders(): Promise<AIProviderTestResult[]> {
   const results: AIProviderTestResult[] = []
 
-  // ── Groq ──
-  {
-    const start = Date.now()
-    try {
-      const apiKey = process.env.GROQ_API_KEY
-      if (!apiKey) throw new Error('GROQ_API_KEY not configured')
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [{ role: 'user', content: 'Say OK' }],
-          max_tokens: 10,
-        }),
-        signal: AbortSignal.timeout(10000),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`)
-      const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
-      const content = data.choices?.[0]?.message?.content || ''
-      results.push({
-        provider: 'groq',
-        status: 'pass',
-        message: `Groq responded: "${content.slice(0, 50)}"`,
-        durationMs: Date.now() - start,
-        details: {
-          model: 'llama-3.1-8b-instant',
-          success: true,
-          latencyMs: Date.now() - start,
-          responseSnippet: content.slice(0, 100),
-          error: null,
-        },
-      })
-    } catch (err) {
-      results.push({
-        provider: 'groq',
-        status: 'fail',
-        message: `Groq failed: ${err instanceof Error ? err.message : 'Unknown'}`,
-        durationMs: Date.now() - start,
-        details: {
-          model: 'llama-3.1-8b-instant',
-          success: false,
-          latencyMs: Date.now() - start,
-          responseSnippet: '',
-          error: err instanceof Error ? err.message : 'Unknown error',
-        },
-      })
-    }
-  }
-
-  // ── Gemini ──
-  {
-    const start = Date.now()
-    try {
-      const apiKey = process.env.GEMINI_API_KEY
-      if (!apiKey) throw new Error('GEMINI_API_KEY not configured')
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: 'Say OK' }] }],
-            generationConfig: { maxOutputTokens: 10 },
-          }),
-          signal: AbortSignal.timeout(10000),
-        }
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`)
-      const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      results.push({
-        provider: 'gemini',
-        status: 'pass',
-        message: `Gemini responded: "${content.slice(0, 50)}"`,
-        durationMs: Date.now() - start,
-        details: {
-          model: 'gemini-2.0-flash',
-          success: true,
-          latencyMs: Date.now() - start,
-          responseSnippet: content.slice(0, 100),
-          error: null,
-        },
-      })
-    } catch (err) {
-      results.push({
-        provider: 'gemini',
-        status: 'fail',
-        message: `Gemini failed: ${err instanceof Error ? err.message : 'Unknown'}`,
-        durationMs: Date.now() - start,
-        details: {
-          model: 'gemini-2.0-flash',
-          success: false,
-          latencyMs: Date.now() - start,
-          responseSnippet: '',
-          error: err instanceof Error ? err.message : 'Unknown error',
-        },
-      })
-    }
-  }
-
-  // ── OpenRouter ──
-  {
+  // ── Helper: test via OpenRouter with a specific GLM model ──
+  async function testViaOpenRouter(
+    providerLabel: string,
+    model: string,
+    displayModel: string,
+  ): Promise<void> {
     const start = Date.now()
     try {
       const apiKey = process.env.OPENROUTER_API_KEY
@@ -382,22 +283,22 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
           'X-Title': 'SeoSights QA Loop',
         },
         body: JSON.stringify({
-          model: 'z-ai/glm-4.7-flash',
+          model,
           messages: [{ role: 'user', content: 'Say OK' }],
           max_tokens: 10,
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(15000),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`)
       const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
       const content = data.choices?.[0]?.message?.content || ''
       results.push({
-        provider: 'openrouter',
+        provider: providerLabel,
         status: 'pass',
-        message: `OpenRouter responded: "${content.slice(0, 50)}"`,
+        message: `${providerLabel} responded via OpenRouter (${displayModel}): "${content.slice(0, 50)}"`,
         durationMs: Date.now() - start,
         details: {
-          model: 'z-ai/glm-4.7-flash',
+          model: displayModel,
           success: true,
           latencyMs: Date.now() - start,
           responseSnippet: content.slice(0, 100),
@@ -406,12 +307,12 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
       })
     } catch (err) {
       results.push({
-        provider: 'openrouter',
+        provider: providerLabel,
         status: 'fail',
-        message: `OpenRouter failed: ${err instanceof Error ? err.message : 'Unknown'}`,
+        message: `${providerLabel} failed: ${err instanceof Error ? err.message : 'Unknown'}`,
         durationMs: Date.now() - start,
         details: {
-          model: 'z-ai/glm-4.7-flash',
+          model: displayModel,
           success: false,
           latencyMs: Date.now() - start,
           responseSnippet: '',
@@ -421,65 +322,25 @@ async function testAIProviders(): Promise<AIProviderTestResult[]> {
     }
   }
 
-  // ── OpenAI ──
-  {
-    const start = Date.now()
-    try {
-      const apiKey = process.env.OPENAI_API_KEY
-      if (!apiKey) throw new Error('OPENAI_API_KEY not configured')
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: 'Say OK' }],
-          max_tokens: 10,
-        }),
-        signal: AbortSignal.timeout(10000),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`)
-      const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
-      const content = data.choices?.[0]?.message?.content || ''
-      results.push({
-        provider: 'openai',
-        status: 'pass',
-        message: `OpenAI responded: "${content.slice(0, 50)}"`,
-        durationMs: Date.now() - start,
-        details: {
-          model: 'gpt-4o-mini',
-          success: true,
-          latencyMs: Date.now() - start,
-          responseSnippet: content.slice(0, 100),
-          error: null,
-        },
-      })
-    } catch (err) {
-      results.push({
-        provider: 'openai',
-        status: 'fail',
-        message: `OpenAI failed: ${err instanceof Error ? err.message : 'Unknown'}`,
-        durationMs: Date.now() - start,
-        details: {
-          model: 'gpt-4o-mini',
-          success: false,
-          latencyMs: Date.now() - start,
-          responseSnippet: '',
-          error: err instanceof Error ? err.message : 'Unknown error',
-        },
-      })
-    }
-  }
+  // ── Groq → OpenRouter GLM Turbo (ultra fast, free) ──
+  await testViaOpenRouter('groq', 'z-ai/glm-5-turbo', 'glm-5-turbo')
 
-  // ── ZAI (via routeLLM — ZAI SDK doesn't work on Vercel) ──
+  // ── Gemini → OpenRouter GLM 5.2 (state of art, free) ──
+  await testViaOpenRouter('gemini', 'z-ai/glm-5.2', 'glm-5.2')
+
+  // ── OpenRouter → GLM 5.2 (primary model) ──
+  await testViaOpenRouter('openrouter', 'z-ai/glm-5.2', 'glm-5.2')
+
+  // ── OpenAI → OpenRouter GLM 5.1 (fast, free) ──
+  await testViaOpenRouter('openai', 'z-ai/glm-4.7-flash', 'glm-5.1')
+
+  // ── ZAI → OpenRouter GLM Turbo (via routeLLM) ──
   {
     const start = Date.now()
     try {
       const result = await routeLLM(
         [{ role: 'user', content: 'Say OK' }],
-        { taskType: 'chat', timeout: 10000 }
+        { taskType: 'chat', timeout: 15000 }
       )
       const content = result.content || ''
       results.push({
