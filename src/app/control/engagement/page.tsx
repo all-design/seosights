@@ -84,6 +84,8 @@ interface EngagementCountdown {
   label: string
   targetTime: string
   isCompleted: boolean
+  remainingHuman?: string
+  remainingMs?: number
 }
 
 interface EngagementMysteryBox {
@@ -158,10 +160,24 @@ export default function EngagementPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch control data')
+        const res = await fetch('/api/engagement/dashboard')
+        if (!res.ok) throw new Error('Failed to fetch engagement dashboard')
         const json = await res.json()
-        setData(json.engagement ?? null)
+        // /api/engagement/dashboard returns: momentum, brief, activeMission, streak,
+        // activitySummary, unreadInboxCount, countdowns, mysteryBox, coach, season, weeklyMission
+        setData({
+          momentum: json.momentum ?? null,
+          brief: json.brief ?? null,
+          activeMission: json.activeMission ?? null,
+          streak: json.streak ?? null,
+          activitySummary: json.activitySummary ?? null,
+          inboxCount: json.unreadInboxCount ?? 0,
+          countdowns: json.countdowns ?? [],
+          mysteryBox: json.mysteryBox ?? null,
+          coach: json.coach ?? null,
+          season: json.season ?? null,
+          weeklyMission: json.weeklyMission ?? null,
+        })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -238,9 +254,10 @@ export default function EngagementPage() {
     { name: 'Notifications', icon: Bell, description: `${inboxCount} unread`, status: inboxCount > 0 ? 'active' : 'idle', items: inboxCount },
   ]
 
-  // Compute remaining time for a countdown
-  function getRemainingHuman(targetTime: string): string {
-    const diff = new Date(targetTime).getTime() - Date.now()
+  // Compute remaining time for a countdown (uses server-provided remainingHuman if available)
+  function getRemainingHuman(countdown: { targetTime: string; remainingHuman?: string }): string {
+    if (countdown.remainingHuman) return countdown.remainingHuman
+    const diff = new Date(countdown.targetTime).getTime() - Date.now()
     if (diff <= 0) return 'Expired'
     const hours = Math.floor(diff / 3600000)
     const mins = Math.floor((diff % 3600000) / 60000)
@@ -379,7 +396,7 @@ export default function EngagementPage() {
                   <span className="text-xs text-slate-300">{countdown.label || countdown.countdownType}</span>
                 </div>
                 <span className="text-xs font-mono text-emerald-400">
-                  {getRemainingHuman(countdown.targetTime)}
+                  {getRemainingHuman(countdown)}
                 </span>
               </div>
             ))}
