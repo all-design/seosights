@@ -310,6 +310,7 @@ function timeAgo(dateStr: string): string {
 
 export default function ControlOverview() {
   const [data, setData] = useState<ControlData | null>(null)
+  const [systemStatus, setSystemStatus] = useState<Record<string, { status: string; latency: number; details: string }> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -325,6 +326,10 @@ export default function ControlOverview() {
           ? { ...json.factory, ok: true }
           : { ...json, ok: json.ok ?? true }
         setData(normalized)
+        // Capture richer systemStatus from top-level response
+        if (json.systemStatus?.components) {
+          setSystemStatus(json.systemStatus.components)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -406,7 +411,32 @@ export default function ControlOverview() {
     let health: number
     let lastAction: string
 
-    if (def.statusKey && data.system?.[def.statusKey]) {
+    // Map card names to systemStatus component keys
+    const statusKeyMap: Record<string, string> = {
+      'Observatory': 'observatory',
+      'QA Engine': 'qaEngine',
+      'AI Router': 'aiRouter',
+      'Merge Engine': 'governor',
+      'Security Engine': 'governor',
+      'Deploy Engine': 'scheduler',
+      'Replay Engine': 'qaEngine',
+      'Client Zero': 'clientZero',
+      'Engineering Engine': 'factory',
+    }
+    const componentKey = statusKeyMap[def.name]
+
+    if (systemStatus && componentKey && systemStatus[componentKey]) {
+      // Use richer systemStatus with heartbeat + count-based logic
+      const comp = systemStatus[componentKey]
+      status = apiStatusToDisplay(comp.status)
+      health = apiStatusToHealth(comp.status)
+      // Standby means on-demand system — show as idle, not degraded
+      if (comp.status === 'standby') {
+        status = 'idle'
+        health = 60
+      }
+      lastAction = comp.details || (status === 'running' ? def.actionLabel || 'Active' : 'Idle')
+    } else if (def.statusKey && data.system?.[def.statusKey]) {
       const apiStatus = data.system[def.statusKey]
       status = apiStatusToDisplay(apiStatus)
       health = apiStatusToHealth(apiStatus)
