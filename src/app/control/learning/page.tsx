@@ -32,11 +32,13 @@ export default function LearningEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
-        setMemoryData({ memories: json.recentMemories || [], count: json.counts?.memory ?? 0 })
+        // API wraps data under json.factory — unwrap the envelope
+        const source = json.factory || json
+        setMemoryData({ memories: source.recentMemories || [], count: source.counts?.memories ?? source.counts?.memory ?? 0 })
         setFactoryData({
-          system: json.system || {},
-          counts: json.counts || {},
-          ok: json.ok ?? true,
+          system: source.system || {},
+          counts: source.counts || {},
+          ok: source.ok ?? true,
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')

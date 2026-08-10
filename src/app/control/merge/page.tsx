@@ -57,15 +57,17 @@ export default function MergeEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
+        // API wraps data under json.factory — unwrap the envelope
+        const source = json.factory || json
         setFactoryData({
-          system: json.system || {},
-          counts: json.counts || {},
-          recentActivity: json.recentActivity || [],
-          ok: json.ok ?? true,
+          system: source.system || {},
+          counts: source.counts || {},
+          recentActivity: source.recentActivity || [],
+          ok: source.ok ?? true,
         })
         setMemoryData({
-          memories: json.recentMemories || [],
-          count: json.counts?.memory ?? 0,
+          memories: source.recentMemories || [],
+          count: source.counts?.memories ?? source.counts?.memory ?? 0,
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -111,20 +113,20 @@ export default function MergeEnginePage() {
     {
       name: 'QA Gate',
       icon: Shield,
-      status: system.qaEngine === 'operational' ? 'PASS' : system.qaEngine === 'degraded' ? 'PENDING' : 'FAIL',
-      detail: system.qaEngine === 'operational' ? 'QA engine running normally' : `QA engine: ${system.qaEngine || 'unknown'}`,
+      status: system.qaEngine === 'operational' ? 'PASS' : (system.qaEngine === 'degraded' || system.qaEngine === 'standby') ? 'PENDING' : 'FAIL',
+      detail: system.qaEngine === 'operational' ? 'QA engine running normally' : system.qaEngine === 'standby' ? 'QA engine on standby — activates on demand' : `QA engine: ${system.qaEngine || 'unknown'}`,
     },
     {
       name: 'Review Gate',
       icon: Eye,
-      status: system.governor === 'operational' ? 'PASS' : system.governor === 'degraded' ? 'PENDING' : 'FAIL',
-      detail: system.governor === 'operational' ? 'Design system + philosophy reviews active' : `Governor: ${system.governor || 'unknown'}`,
+      status: system.governor === 'operational' ? 'PASS' : (system.governor === 'degraded' || system.governor === 'standby') ? 'PENDING' : 'FAIL',
+      detail: system.governor === 'operational' ? 'Design system + philosophy reviews active' : system.governor === 'standby' ? 'Governor on standby — activates on demand' : `Governor: ${system.governor || 'unknown'}`,
     },
     {
       name: 'Architecture Gate',
       icon: Landmark,
-      status: system.codebaseScanner === 'operational' ? 'PASS' : system.codebaseScanner === 'degraded' ? 'PENDING' : 'FAIL',
-      detail: system.codebaseScanner === 'operational' ? 'No feature creep, proper file placement' : `Scanner: ${system.codebaseScanner || 'unknown'}`,
+      status: system.codebaseScanner === 'operational' ? 'PASS' : (system.codebaseScanner === 'degraded' || system.codebaseScanner === 'standby') ? 'PENDING' : 'FAIL',
+      detail: system.codebaseScanner === 'operational' ? 'No feature creep, proper file placement' : system.codebaseScanner === 'standby' ? 'Scanner on standby — activates on demand' : `Scanner: ${system.codebaseScanner || 'unknown'}`,
     },
   ]
   const allGatesPass = gates.every(g => g.status === 'PASS')

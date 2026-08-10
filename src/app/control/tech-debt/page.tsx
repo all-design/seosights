@@ -113,6 +113,8 @@ export default function TechDebtEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
+        // API wraps data under json.factory — unwrap the envelope
+        const source = json.factory || json
         const td = json.techDebt || {}
         const snap = td.snapshot || null
         // Derive scan data from techDebt section of unified response
@@ -134,9 +136,9 @@ export default function TechDebtEnginePage() {
           apiRoutes: [],
           prismaModels: [],
           pages: [],
-          timestamp: json.timestamp,
-          system: json.system || {},
-          counts: json.counts || {},
+          timestamp: source.timestamp || json.timestamp,
+          system: source.system || {},
+          counts: source.counts || {},
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')

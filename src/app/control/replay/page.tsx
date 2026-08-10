@@ -39,12 +39,14 @@ export default function ReplayEnginePage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch control data')
         const json = await res.json()
+        // API wraps data under json.factory — unwrap the envelope
+        const source = json.factory || json
         setFactoryData({
-          system: json.system || {},
-          counts: json.counts || {},
-          ok: json.ok ?? true,
+          system: source.system || {},
+          counts: source.counts || {},
+          ok: source.ok ?? true,
         })
-        const qaRun = json.productQA || json.latestQA
+        const qaRun = json.productQA || source.latestQA
         if (qaRun) {
           setQAData({
             hasData: true,
