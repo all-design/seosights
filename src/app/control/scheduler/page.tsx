@@ -140,8 +140,10 @@ export default function MissionSchedulerPage() {
         const res = await fetch('/api/control/data')
         if (!res.ok) throw new Error('Failed to fetch schedule data')
         const json = await res.json()
-        const jobs = json.scheduleJobs || []
-        const scheduleSummary = json.scheduleSummary || {
+        // API wraps data under json.factory — unwrap the envelope
+        const source = json.factory || json
+        const jobs = source.scheduleJobs || []
+        const scheduleSummary = source.scheduleSummary || {
           totalJobs: jobs.length,
           completed: jobs.filter((j: ScheduleJob) => j.status === 'completed').length,
           running: jobs.filter((j: ScheduleJob) => j.status === 'running').length,
@@ -157,7 +159,7 @@ export default function MissionSchedulerPage() {
           pending: scheduleSummary.pending,
           failed: scheduleSummary.failed,
           generated: jobs.length > 0,
-          timestamp: json.timestamp || new Date().toISOString(),
+          timestamp: source.timestamp || new Date().toISOString(),
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
