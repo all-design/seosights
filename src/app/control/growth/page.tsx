@@ -153,14 +153,15 @@ export default function GrowthEnginePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
+        // Use the dedicated growth dashboard API which provides full pipeline data
+        const res = await fetch('/api/growth/dashboard')
         if (!res.ok) throw new Error('Failed to fetch growth data')
         const json = await res.json()
-        // Extract growth data from unified API response
-        const growthData = json.growth || { snapshot: null, opportunities: [] }
-        const snapshot = growthData.snapshot
-        const opps = growthData.opportunities || []
-        // Build compatible GrowthData from unified API data
+
+        if (json.error) throw new Error(json.error)
+
+        const snapshot = json.snapshot
+        // Build GrowthData from the dedicated dashboard API
         const derivedData: GrowthData | null = snapshot ? {
           snapshot: {
             id: snapshot.id,
@@ -180,18 +181,18 @@ export default function GrowthEnginePage() {
             predictionAccuracy: snapshot.predictionAccuracy ?? 0,
             successfulRate: snapshot.successfulRate ?? 0,
           },
-          opportunityStatusCounts: [],
-          opportunityPriorityCounts: [],
-          assetsByType: [],
-          assetsByReviewStatus: [],
-          assetsByExecutionStatus: [],
-          recentDecisions: [],
-          northStar: {
+          opportunityStatusCounts: json.opportunityStatusCounts || [],
+          opportunityPriorityCounts: json.opportunityPriorityCounts || [],
+          assetsByType: json.assetsByType || [],
+          assetsByReviewStatus: json.assetsByReviewStatus || [],
+          assetsByExecutionStatus: json.assetsByExecutionStatus || [],
+          recentDecisions: json.recentDecisions || [],
+          northStar: json.northStar || {
             platformValue: 0, totalAssets: 0, avgQuality: 0,
             totalTraffic24h: 0, totalImpressions24h: 0, totalClicks24h: 0,
             totalCitations7d: 0, totalConversions7d: 0, totalAiVisibilityDelta: 0,
           },
-          snapshotTrend: [],
+          snapshotTrend: json.snapshotTrend || [],
         } : null
         setData(derivedData)
       } catch (err) {
