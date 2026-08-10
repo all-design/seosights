@@ -137,29 +137,21 @@ export default function MissionSchedulerPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
+        const res = await fetch('/api/ops/schedule')
         if (!res.ok) throw new Error('Failed to fetch schedule data')
         const json = await res.json()
-        // API wraps data under json.factory — unwrap the envelope
-        const source = json.factory || json
-        const jobs = source.scheduleJobs || []
-        const scheduleSummary = source.scheduleSummary || {
-          totalJobs: jobs.length,
-          completed: jobs.filter((j: ScheduleJob) => j.status === 'completed').length,
-          running: jobs.filter((j: ScheduleJob) => j.status === 'running').length,
-          pending: jobs.filter((j: ScheduleJob) => j.status === 'pending').length,
-          failed: jobs.filter((j: ScheduleJob) => j.status === 'failed').length,
-        }
+        // /api/ops/schedule returns { jobs, date, totalJobs, completed, running, pending, failed, ... }
+        const jobs = json.jobs || []
         setData({
           jobs,
-          date: new Date().toISOString().split('T')[0],
-          totalJobs: scheduleSummary.totalJobs,
-          completed: scheduleSummary.completed,
-          running: scheduleSummary.running,
-          pending: scheduleSummary.pending,
-          failed: scheduleSummary.failed,
-          generated: jobs.length > 0,
-          timestamp: source.timestamp || new Date().toISOString(),
+          date: json.date || new Date().toISOString().split('T')[0],
+          totalJobs: json.totalJobs ?? jobs.length,
+          completed: json.completed ?? jobs.filter((j: ScheduleJob) => j.status === 'completed').length,
+          running: json.running ?? jobs.filter((j: ScheduleJob) => j.status === 'running').length,
+          pending: json.pending ?? jobs.filter((j: ScheduleJob) => j.status === 'pending').length,
+          failed: json.failed ?? jobs.filter((j: ScheduleJob) => j.status === 'failed').length,
+          generated: json.generated ?? jobs.length > 0,
+          timestamp: json.timestamp || new Date().toISOString(),
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
