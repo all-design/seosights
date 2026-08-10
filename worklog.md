@@ -503,3 +503,30 @@ Stage Summary:
 - Timeline, upcoming missions, run history, and schedule overview all populated
 - Same pattern: dedicated API with auto-generation > generic control/data with empty tables
 - Deployed to seosights.com
+
+---
+Task ID: ENGAGEMENT-FIX
+Agent: main
+Task: Fix Engagement Intelligence page - expired countdowns and suboptimal data
+
+Work Log:
+- Investigated Engagement page: it fetched from /api/control/data which returns ALL countdowns (including past ones)
+- Past countdowns all showed "Expired" — 5 countdowns all expired
+- Found dedicated /api/engagement/dashboard endpoint that:
+  - Filters countdowns to future-only: `where: { targetTime: { gt: now } }`
+  - Adds `remainingMs` and `remainingHuman` fields for countdown display
+  - Has better query logic: today's brief/mission/summary with date filters
+  - Falls back to most recent brief if today's doesn't exist
+  - Returns `unreadInboxCount` (vs generic `inboxCount`)
+- Updated page to fetch from /api/engagement/dashboard
+- Mapped response fields correctly (unreadInboxCount → inboxCount)
+- Updated EngagementCountdown type to include remainingHuman/remainingMs
+- Updated getRemainingHuman() to accept countdown object and prefer server-provided remainingHuman
+- Committed and pushed to production (commit 267a72b)
+
+Stage Summary:
+- Engagement page now uses dedicated dashboard API with proper date filtering
+- Countdowns filtered to future-only — no more "Expired" entries
+- Server-provided remainingHuman for accurate countdown display
+- Better brief/mission/summary queries with today-first + fallback logic
+- Deployed to seosights.com
