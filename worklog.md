@@ -554,3 +554,26 @@ Stage Summary:
 - Components, API Routes, Pages all populated from actual codebase scan
 - Auto-triggers scan if none exists (first-visit guarantee)
 - Deployed to seosights.com
+
+---
+Task ID: FACTORY-STATUS-FIX
+Agent: main
+Task: Fix Factory overview page status accuracy - use systemStatus with heartbeats
+
+Work Log:
+- Factory page used simple recency-based system status from data.system
+- API also returns systemStatus.components with richer heartbeat + count-based status
+- systemStatus.components includes: database, aiRouter, qaEngine, governor, observatory, scheduler, clientZero, factory
+- Updated page to capture systemStatus from response top-level
+- Added mapping from card names to systemStatus component keys
+- Observatory → observatory, QA Engine → qaEngine, AI Router → aiRouter, etc.
+- Standby systems now show as 'idle' (not degraded) — they activate on demand
+- Shows actual details from systemStatus (e.g. '89 records found')
+- Falls back to deriveStatus() for cards without systemStatus mapping
+- Committed and pushed to production (commit 587f4eb)
+
+Stage Summary:
+- Factory overview now uses heartbeat + count-based status for 9 cards
+- More accurate status display: operational vs degraded vs standby
+- Standby systems show as "idle" instead of "degraded" (on-demand is not broken)
+- Deployed to seosights.com
