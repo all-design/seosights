@@ -110,35 +110,42 @@ export default function TechDebtEnginePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch control data')
-        const json = await res.json()
-        // API wraps data under json.factory — unwrap the envelope
-        const source = json.factory || json
-        const td = json.techDebt || {}
-        const snap = td.snapshot || null
-        // Derive scan data from techDebt section of unified response
+        // Fetch codebase scan for rich snapshot data (auto-triggers scan if none exists)
+        const [scanRes, controlRes] = await Promise.all([
+          fetch('/api/factory/scan'),
+          fetch('/api/control/data'),
+        ])
+        if (!scanRes.ok) throw new Error('Failed to fetch scan data')
+
+        const scanJson = await scanRes.json()
+        const controlJson = controlRes.ok ? await controlRes.json() : {}
+        const td = controlJson.techDebt || {}
+
+        // /api/factory/scan returns: stats{}, components[], apiRoutes[], prismaModels[], pages[], timestamp
+        const scanStats = scanJson.stats || {}
+        const snapshot = scanJson
+
         setScanData({
           stats: {
-            totalComponents: snap?.components ?? 0,
-            totalAPIRoutes: td.apiRoutes ?? 0,
-            totalPrismaModels: td.prismaModels ?? 0,
-            totalPages: snap?.pages ?? 0,
-            totalHooks: 0,
-            totalLibs: 0,
-            lintErrors: td.lintErrors ?? 0,
-            lintWarnings: td.lintWarnings ?? 0,
-            typescriptErrors: td.typescriptErrors ?? 0,
+            totalComponents: scanStats.totalComponents ?? 0,
+            totalAPIRoutes: scanStats.totalAPIRoutes ?? 0,
+            totalPrismaModels: scanStats.totalPrismaModels ?? 0,
+            totalPages: scanStats.totalPages ?? 0,
+            totalHooks: scanStats.totalHooks ?? 0,
+            totalLibs: scanStats.totalLibs ?? 0,
+            lintErrors: scanStats.lintErrors ?? td.lintErrors ?? 0,
+            lintWarnings: scanStats.lintWarnings ?? td.lintWarnings ?? 0,
+            typescriptErrors: scanStats.typescriptErrors ?? td.typescriptErrors ?? 0,
           },
           techDebt: td,
-          snapshot: snap,
-          components: [],
-          apiRoutes: [],
-          prismaModels: [],
-          pages: [],
-          timestamp: source.timestamp || json.timestamp,
-          system: source.system || {},
-          counts: source.counts || {},
+          snapshot,
+          components: scanJson.components || [],
+          apiRoutes: scanJson.apiRoutes || [],
+          prismaModels: scanJson.prismaModels || [],
+          pages: scanJson.pages || [],
+          timestamp: scanJson.timestamp || td.snapshotDate,
+          system: {},
+          counts: {},
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
