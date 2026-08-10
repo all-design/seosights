@@ -1,4 +1,23 @@
 ---
+Task ID: GROWTH-FIX
+Agent: main
+Task: Fix Growth Engine page showing all zeros / empty pipeline
+
+Work Log:
+- Investigated growth page: it fetched from /api/control/data which only provides minimal growth data (snapshot + 5 opportunities)
+- Found dedicated /api/growth/dashboard endpoint that provides full data: opportunity counts, governor decisions, north star metrics, pipeline status, 7-day trend
+- Updated page to fetch from /api/growth/dashboard instead of /api/control/data
+- Verified production API returns rich data: 77 opportunities, 10 governor decisions, $2041 platform value, 24 assets, 53.5 avg quality
+- Committed and pushed to production (commit 70021fa)
+
+Stage Summary:
+- Growth page now shows real pipeline data instead of all zeros
+- Pipeline stages will show item counts from opportunity status grouping
+- Governor decisions section will show recent decisions
+- North Star will show real metrics (24 assets, $2041 value, etc.)
+- Deployed to seosights.com
+
+---
 Task ID: MERGE-FIX
 Agent: main
 Task: Fix "Failed to load merge data" / "Failed to fetch control data" on /control/merge page (production)
