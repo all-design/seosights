@@ -9,6 +9,37 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   try {
+    // ── Auto-seed: If AI Model Registry is empty, seed it automatically ──────
+    // This fixes the cold start problem where "No models registered yet" shows
+    // forever because nobody manually called POST /api/observatory/seed
+    const existingModels = await db.aIModelRegistry.count()
+    if (existingModels === 0) {
+      console.log('[observatory/status] No AI models in registry → auto-seeding')
+      const MODEL_SEED = [
+        { modelId: 'chatgpt', displayName: 'ChatGPT', provider: 'openai', version: 'GPT-4o', capabilities: JSON.stringify({ web_access: true, citation: true, reasoning: true, multimodal: true }) },
+        { modelId: 'claude', displayName: 'Claude', provider: 'anthropic', version: 'Claude 3.5 Sonnet', capabilities: JSON.stringify({ web_access: true, citation: false, reasoning: true, multimodal: true }) },
+        { modelId: 'gemini', displayName: 'Gemini', provider: 'google', version: 'Gemini 2.0', capabilities: JSON.stringify({ web_access: true, citation: true, reasoning: true, multimodal: true }) },
+        { modelId: 'perplexity', displayName: 'Perplexity', provider: 'perplexity', version: 'Sonar Large', capabilities: JSON.stringify({ web_access: true, citation: true, reasoning: false, multimodal: false }) },
+        { modelId: 'grok', displayName: 'Grok', provider: 'xai', version: 'Grok-2', capabilities: JSON.stringify({ web_access: true, citation: false, reasoning: true, multimodal: false }) },
+        { modelId: 'deepseek', displayName: 'DeepSeek', provider: 'deepseek', version: 'DeepSeek-V3', capabilities: JSON.stringify({ web_access: false, citation: false, reasoning: true, multimodal: false }) },
+      ]
+      for (const model of MODEL_SEED) {
+        await db.aIModelRegistry.create({
+          data: {
+            modelId: model.modelId,
+            displayName: model.displayName,
+            provider: model.provider,
+            version: model.version,
+            capabilities: model.capabilities,
+            isActive: true,
+            totalResponses: 0,
+            knownChanges: 0,
+          },
+        })
+      }
+      console.log(`[observatory/status] Seeded ${MODEL_SEED.length} AI models into registry`)
+    }
+
     // ─── Core Counts ───────────────────────────────────────────────
     const [
       totalCrawls,

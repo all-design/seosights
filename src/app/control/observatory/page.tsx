@@ -93,55 +93,28 @@ export default function ObservatoryControlPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch observatory data')
+        // Use dedicated Observatory status API (not the sparse /api/control/data)
+        // This returns full pipeline data: counts, model registry, reports, queue, etc.
+        const res = await fetch('/api/observatory/status')
+        if (!res.ok) throw new Error('Failed to fetch observatory status')
         const json = await res.json()
-        // Extract observatory data from unified API response
-        const obs = json.observatory || { latestCrawl: null, recentChanges: [] }
-        // Build compatible ObservatoryData from unified API data
-        const derivedData: ObservatoryData = {
-          overview: {
-            totalCrawls: obs.latestCrawl ? 1 : 0,
-            totalResponses: (obs.latestCrawl as any)?.responseCount ?? 0,
-            totalChanges: obs.recentChanges?.length ?? 0,
-            totalSignals: obs.recentChanges?.filter((c: any) => c.isSignal).length ?? 0,
-            totalReports: 0,
-            totalPublications: 0,
-            totalLearnings: 0,
-            totalIndustries: 0,
-            signalRate: obs.recentChanges?.length > 0
-              ? `${Math.round((obs.recentChanges.filter((c: any) => c.isSignal).length / obs.recentChanges.length) * 100)}%`
-              : '0%',
+        if (json.error) throw new Error(json.error)
+
+        // The API returns the exact ObservatoryData shape — use it directly
+        const obsData: ObservatoryData = {
+          overview: json.overview ?? {
+            totalCrawls: 0, totalResponses: 0, totalChanges: 0,
+            totalSignals: 0, totalReports: 0, totalPublications: 0,
+            totalLearnings: 0, totalIndustries: 0, signalRate: '0%',
           },
-          latestCrawl: obs.latestCrawl ? {
-            id: obs.latestCrawl.id,
-            type: obs.latestCrawl.type || 'full',
-            status: obs.latestCrawl.status || 'completed',
-            modelsQueried: obs.latestCrawl.modelsQueried ?? 0,
-            promptsTotal: obs.latestCrawl.promptsTotal ?? 0,
-            promptsCompleted: obs.latestCrawl.promptsCompleted ?? 0,
-            durationMs: obs.latestCrawl.durationMs ?? null,
-            responseCount: obs.latestCrawl.responseCount ?? 0,
-            changeCount: obs.latestCrawl.changeCount ?? 0,
-            startedAt: obs.latestCrawl.startedAt instanceof Date ? obs.latestCrawl.startedAt.toISOString() : String(obs.latestCrawl.startedAt ?? ''),
-            completedAt: obs.latestCrawl.completedAt instanceof Date ? obs.latestCrawl.completedAt.toISOString() : obs.latestCrawl.completedAt ? String(obs.latestCrawl.completedAt) : null,
-          } : null,
-          latestChanges: (obs.recentChanges || []).map((c: any) => ({
-            id: c.id,
-            aiModel: c.aiModel || 'unknown',
-            changeType: c.changeType || 'change',
-            category: c.category || 'general',
-            significanceScore: c.significanceScore ?? 0,
-            isSignal: c.isSignal ?? false,
-            signalReason: c.signalReason ?? null,
-            createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
-          })),
-          recentReports: [],
-          modelRegistry: [],
-          pipeline: { reportByStatus: [], changesByType: [], responsesByModel: [] },
-          queue: { unprocessedChanges: 0, proposedReports: 0 },
+          latestCrawl: json.latestCrawl ?? null,
+          latestChanges: json.latestChanges ?? [],
+          recentReports: json.recentReports ?? [],
+          modelRegistry: json.modelRegistry ?? [],
+          pipeline: json.pipeline ?? { reportByStatus: [], changesByType: [], responsesByModel: [] },
+          queue: json.queue ?? { unprocessedChanges: 0, proposedReports: 0 },
         }
-        setData(derivedData)
+        setData(obsData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
