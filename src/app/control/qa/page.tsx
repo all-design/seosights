@@ -51,6 +51,7 @@ interface ScannerTestResult extends BaseTestResult {
     totalHooks: number
     totalLibs: number
     latencyMs: number
+    source: 'live' | 'snapshot' | 'seed'
   }
 }
 
@@ -62,6 +63,8 @@ interface GovernorTestResult extends BaseTestResult {
     ruleApplied: string | null
     rejectionReason: string | null
     latencyMs: number
+    totalIntercepted: number
+    approvalRate: number
   }
 }
 
@@ -119,6 +122,7 @@ interface GrowthEngineTestResult extends BaseTestResult {
     evidenceCount: number
     sprintCount: number
     recentActivity: boolean
+    source: 'live' | 'seed'
   }
 }
 
@@ -622,6 +626,11 @@ export default function QAEnginePage() {
               <DetailRow label="Hooks" value={result.tests.codebaseScanner.details.totalHooks} mono />
               <DetailRow label="Libs" value={result.tests.codebaseScanner.details.totalLibs} mono />
             </div>
+            {result.tests.codebaseScanner.details.source !== 'live' && (
+              <div className="mt-2 p-2 rounded bg-amber-500/5 border border-amber-500/10">
+                <p className="text-[10px] text-amber-400">Data source: <span className="font-mono">{result.tests.codebaseScanner.details.source}</span> {result.tests.codebaseScanner.details.source === 'snapshot' ? '(DB snapshot — live scan incomplete on serverless)' : '(estimated from component count)'}</p>
+              </div>
+            )}
           </TestSection>
 
           {/* 5. AI Governor */}
@@ -630,6 +639,10 @@ export default function QAEnginePage() {
               <DetailRow label="Decision" value={result.tests.aiGovernor.details.approved ? 'APPROVED' : 'REJECTED'} />
               <DetailRow label="Confidence" value={result.tests.aiGovernor.details.confidence.toFixed(2)} />
               <DetailRow label="Impact Score" value={`${result.tests.aiGovernor.details.impactScore}/10`} />
+              <DetailRow label="Approval Rate" value={`${(result.tests.aiGovernor.details.approvalRate * 100).toFixed(0)}%`} />
+            </div>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <DetailRow label="Total Intercepted" value={result.tests.aiGovernor.details.totalIntercepted} mono />
               <DetailRow label="Latency" value={formatDuration(result.tests.aiGovernor.details.latencyMs)} />
             </div>
             {result.tests.aiGovernor.details.ruleApplied && (
@@ -724,6 +737,11 @@ export default function QAEnginePage() {
                 <DetailRow label="Evidence" value={result.tests.growthEngine.details.evidenceCount} mono />
                 <DetailRow label="Sprints" value={result.tests.growthEngine.details.sprintCount} mono />
               </div>
+              {result.tests.growthEngine.details.source === 'seed' && (
+                <div className="mt-2 p-2 rounded bg-emerald-500/5 border border-emerald-500/10">
+                  <p className="text-[10px] text-emerald-400">Cold-start: seeded initial growth data from platform knowledge</p>
+                </div>
+              )}
             </TestSection>
 
             {/* Engagement */}
