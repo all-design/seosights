@@ -135,24 +135,19 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
 // ─── Main Component ──────────────────────────────────────
 
 export default function ArchitectureEnginePage() {
-  const [factoryData, setFactoryData] = useState<any>(null)
-  const [memData, setMemData] = useState<any>(null)
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch control data')
+        // Fetch from dedicated architecture API which provides
+        // decisions, feature creep alerts, dependency graph, and score
+        const res = await fetch('/api/control/architecture')
+        if (!res.ok) throw new Error('Failed to fetch architecture data')
         const json = await res.json()
-        setFactoryData({
-          system: json.factory?.system || {},
-          counts: json.factory?.counts || {},
-          recentActivity: json.factory?.recentActivity || [],
-          ok: json.ok ?? true,
-        })
-        setMemData({ memories: json.factory?.recentMemories || [], count: json.factory?.counts?.memories ?? 0 })
+        setData(json)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -192,81 +187,21 @@ export default function ArchitectureEnginePage() {
     )
   }
 
-  // ─── Derived data ───────────────────────────────────────
-  const system = factoryData?.system || {}
-  const counts = factoryData?.counts || {}
-  const memories = memData?.memories || []
+  // ─── Data from API ──────────────────────────────────────
+  if (!data) return null
 
-  // Calculate architecture score from system health
-  const systemEntries = Object.entries(system) as [string, string][]
-  const operationalCount = systemEntries.filter(([, s]) => s === 'operational').length
-  const OVERALL_SCORE = systemEntries.length > 0
-    ? Math.round((operationalCount / systemEntries.length) * 100)
-    : 0
-
-  // Build architecture decisions from engineering memories
-  const architectureDecisions: ArchitectureDecision[] = memories.map((mem: any) => {
-    // Determine type from memory data
-    let type: DecisionType = 'modify'
-    if (mem.patternLearned && mem.patternLearned.toLowerCase().includes('reuse')) type = 'reuse'
-    else if (mem.patternLearned && mem.patternLearned.toLowerCase().includes('new')) type = 'new'
-    else if (mem.outcome === 'rolled_back') type = 'cleanup'
-    else if (mem.rollbackNeeded) type = 'cleanup'
-    else if (mem.feature && mem.feature.toLowerCase().includes('schema')) type = 'schema'
-    else if (mem.outcome === 'success') type = 'reuse'
-
-    return {
-      id: mem.id,
-      title: mem.feature || 'Architecture decision',
-      type,
-      path: mem.filesChanged || '/unknown',
-      confidence: Math.round((mem.confidence || 0) * 100),
-      reasoning: mem.patternLearned || `Outcome: ${mem.outcome || 'unknown'}`,
-      timestamp: mem.createdAt,
-    }
-  })
-
-  // Build feature creep alerts from rolled-back/failed memories
-  const featureCreepAlerts: FeatureCreepAlert[] = memories
-    .filter((m: any) => m.rollbackNeeded || m.outcome === 'rolled_back' || m.outcome === 'failed')
-    .map((m: any) => ({
-      id: m.id,
-      originalSuggestion: m.feature || 'Unknown suggestion',
-      architectureResponse: m.rollbackNeeded
-        ? 'This change required a rollback due to issues detected.'
-        : m.patternLearned || 'The architecture engine identified issues with this approach.',
-      recommendedAlternative: m.patternLearned || 'Consider a more incremental approach.',
-      status: m.outcome === 'rolled_back' ? 'blocked' as const : 'diverted' as const,
-    }))
-
-  // Build dependency graph from system component relationships
-  const systemComponents = Object.keys(system)
-  const dependencyRelations: DependencyRelation[] = []
-  // Create derived relationships from system components
-  if (system.aiRouter) {
-    dependencyRelations.push({ from: 'AI Router', to: 'Engineering Engine', health: system.aiRouter === 'operational' ? 'healthy' : 'coupled', description: 'Routes AI tasks to engineering pipeline' })
-  }
-  if (system.governor) {
-    dependencyRelations.push({ from: 'Governor', to: 'Architecture Engine', health: system.governor === 'operational' ? 'healthy' : 'coupled', description: 'Intercepts proposals for architecture review' })
-  }
-  if (system.qaEngine) {
-    dependencyRelations.push({ from: 'QA Engine', to: 'Engineering Engine', health: system.qaEngine === 'operational' ? 'healthy' : 'coupled', description: 'Validates engineering outputs' })
-  }
-  if (system.codebaseScanner) {
-    dependencyRelations.push({ from: 'Codebase Scanner', to: 'Architecture Engine', health: system.codebaseScanner === 'operational' ? 'healthy' : 'coupled', description: 'Provides codebase structure data' })
-  }
-  if (system.dailyMissionGenerator) {
-    dependencyRelations.push({ from: 'Mission Generator', to: 'Engineering Engine', health: system.dailyMissionGenerator === 'operational' ? 'healthy' : 'coupled', description: 'Generates daily task missions' })
-  }
-  if (system.aiRouter && system.governor) {
-    dependencyRelations.push({ from: 'AI Router', to: 'Governor', health: 'healthy', description: 'Sends proposals through governor for approval' })
-  }
-
-  // Stats
-  const soundDecisions = architectureDecisions.filter(d => d.type === 'reuse' || d.type === 'modify').length
-  const refactorSuggestions = architectureDecisions.filter(d => d.type === 'schema').length
-  const featureCreepBlocked = featureCreepAlerts.filter(a => a.status === 'blocked').length
-  const reuseOpportunities = architectureDecisions.filter(d => d.type === 'reuse').length
+  const OVERALL_SCORE = data.architectureScore ?? 0
+  const architectureDecisions: ArchitectureDecision[] = data.decisions ?? []
+  const featureCreepAlerts: FeatureCreepAlert[] = data.featureCreep?.alerts ?? []
+  const dependencyRelations: DependencyRelation[] = data.dependencyGraph ?? []
+  const soundDecisions = data.summary?.soundDecisions ?? 0
+  const refactorSuggestions = data.summary?.refactorSuggestions ?? 0
+  const featureCreepBlocked = data.summary?.featureCreepBlocked ?? 0
+  const reuseOpportunities = data.summary?.reuseOpportunities ?? 0
+  const operationalCount = data.summary?.operational ?? 0
+  const systemEntriesCount = data.summary?.systemComponents ?? 0
+  const memoryRecordsCount = data.summary?.memoryRecords ?? 0
+  const reuseRate = data.summary?.reuseRate ?? 0
 
   return (
     <div className="space-y-6">
@@ -573,17 +508,17 @@ export default function ArchitectureEnginePage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-cyan-400" />
-          <span>System components: <span className="text-slate-300">{systemEntries.length}</span></span>
+          <span>System components: <span className="text-slate-300">{systemEntriesCount}</span></span>
         </div>
         <span className="text-slate-700">|</span>
         <span>Operational: <span className="text-emerald-400">{operationalCount}</span></span>
         <span className="text-slate-700">|</span>
         <div className="flex items-center gap-1.5">
           <Scan className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Memory records: <span className="text-slate-300">{memories.length}</span></span>
+          <span>Memory records: <span className="text-slate-300">{memoryRecordsCount}</span></span>
         </div>
         <span className="text-slate-700">|</span>
-        <span>Reuse rate: <span className="text-cyan-400">{architectureDecisions.length > 0 ? Math.round(reuseOpportunities / architectureDecisions.length * 100) : 0}%</span></span>
+        <span>Reuse rate: <span className="text-cyan-400">{reuseRate}%</span></span>
       </div>
 
     </div>
