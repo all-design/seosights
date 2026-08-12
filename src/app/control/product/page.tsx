@@ -165,33 +165,34 @@ export default function ProductEnginePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
+        // Fetch from the dedicated product engine API which provides
+        // feature adoption, validation, decisions, and AI insights
+        const res = await fetch('/api/superadmin/product')
         if (!res.ok) throw new Error('Failed to fetch product data')
         const json = await res.json()
-        const qaRun = json.productQA || json.factory?.latestQA || null
-        // Derive product data from unified response
+
         const derived: ProductData = {
           qa: {
-            score: qaRun?.productScore ?? 0,
-            warnings: qaRun?.majorCount ?? 0,
-            degraded: qaRun?.mediumCount ?? 0,
-            critical: qaRun?.criticalCount ?? 0,
-            passRate: qaRun?.productScore ?? 0,
-            totalTests: (qaRun?.criticalCount ?? 0) + (qaRun?.majorCount ?? 0) + (qaRun?.mediumCount ?? 0) + (qaRun?.minorCount ?? 0),
-            passed: (qaRun?.mediumCount ?? 0) + (qaRun?.minorCount ?? 0),
-            lastRun: qaRun?.completedAt ?? qaRun?.createdAt ?? null,
+            score: json.qa?.score ?? 0,
+            warnings: json.qa?.warnings ?? 0,
+            degraded: json.qa?.degraded ?? 0,
+            critical: json.qa?.critical ?? 0,
+            passRate: json.qa?.passRate ?? 0,
+            totalTests: json.qa?.totalTests ?? 0,
+            passed: json.qa?.passed ?? 0,
+            lastRun: json.qa?.lastRun ?? null,
           },
-          featureAdoption: [],
-          featureValidation: [],
-          recentDecisions: [],
-          topInsights: [],
+          featureAdoption: json.featureAdoption ?? [],
+          featureValidation: json.featureValidation ?? [],
+          recentDecisions: json.recentDecisions ?? [],
+          topInsights: json.topInsights ?? [],
           summary: {
-            adoptedCount: 0,
-            atRiskCount: 0,
-            lowAdoptionCount: 0,
-            keepCount: 0,
-            reviewCount: 0,
-            killCount: 0,
+            adoptedCount: json.summary?.adoptedCount ?? 0,
+            atRiskCount: json.summary?.atRiskCount ?? 0,
+            lowAdoptionCount: json.summary?.lowAdoptionCount ?? 0,
+            keepCount: json.summary?.keepCount ?? 0,
+            reviewCount: json.summary?.reviewCount ?? 0,
+            killCount: json.summary?.killCount ?? 0,
           },
         }
         setData(derived)

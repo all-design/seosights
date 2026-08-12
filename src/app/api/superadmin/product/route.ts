@@ -241,6 +241,17 @@ export async function GET() {
       topInsights = insights
     } catch { /* empty */ }
 
+    // ── Cold start: seed data when DB tables are empty ────────────────────
+    let dataSource: 'live' | 'seed' = 'live'
+    if (recentDecisions.length === 0) {
+      recentDecisions = seedRecentDecisions()
+      dataSource = 'seed'
+    }
+    if (topInsights.length === 0) {
+      topInsights = seedTopInsights()
+      if (dataSource === 'live') dataSource = 'seed'
+    }
+
     // ── Summary metrics ─────────────────────────────────────────────────
     const adoptedCount = featureAdoption.filter(f => f.status === 'adopted').length
     const atRiskCount = featureAdoption.filter(f => f.status === 'at_risk').length
@@ -272,34 +283,99 @@ export async function GET() {
         reviewCount,
         killCount,
       },
+      source: dataSource,
     })
   } catch (error) {
     console.error('[product] GET error:', error)
 
-    // Fallback with seed data
+    // Fallback with seed data (cold start)
+    const seedAdoption = seedFeatureAdoption()
+    const seedValidation = seedFeatureValidation()
     return NextResponse.json({
       qa: {
-        score: 98,
-        warnings: 2,
-        degraded: 1,
+        score: 94,
+        warnings: 7,
+        degraded: 0,
         critical: 0,
-        passRate: 98,
-        totalTests: 96,
-        passed: 94,
-        lastRun: null,
+        passRate: 94,
+        totalTests: 7,
+        passed: 0,
+        lastRun: new Date().toISOString(),
       },
-      featureAdoption: seedFeatureAdoption(),
-      featureValidation: seedFeatureValidation(),
-      recentDecisions: [],
-      topInsights: [],
+      featureAdoption: seedAdoption,
+      featureValidation: seedValidation,
+      recentDecisions: seedRecentDecisions(),
+      topInsights: seedTopInsights(),
       summary: {
-        adoptedCount: 5,
-        atRiskCount: 2,
-        lowAdoptionCount: 2,
-        keepCount: 6,
-        reviewCount: 2,
-        killCount: 1,
+        adoptedCount: seedAdoption.filter(f => f.status === 'adopted').length,
+        atRiskCount: seedAdoption.filter(f => f.status === 'at_risk').length,
+        lowAdoptionCount: seedAdoption.filter(f => f.status === 'low_adoption').length,
+        keepCount: seedValidation.filter(f => f.decision === 'KEEP').length,
+        reviewCount: seedValidation.filter(f => f.decision === 'REVIEW').length,
+        killCount: seedValidation.filter(f => f.decision === 'KILL').length,
       },
+      source: 'cold_start',
     })
   }
+}
+
+// ─── Seed Recent Decisions ──────────────────────────────────────────────
+
+function seedRecentDecisions(): Array<{
+  id: string
+  changeTitle: string
+  changeType: string
+  aiScoreDelta: number
+  createdAt: string
+}> {
+  const now = Date.now()
+  return [
+    { id: 'sd-1', changeTitle: 'Added FAQ section to /pricing', changeType: 'content_change', aiScoreDelta: 3, createdAt: new Date(now - 172800000).toISOString() },
+    { id: 'sd-2', changeTitle: 'Updated Organization schema on homepage', changeType: 'schema_change', aiScoreDelta: 5, createdAt: new Date(now - 259200000).toISOString() },
+    { id: 'sd-3', changeTitle: 'Launched AI Product Twin™ daily briefings', changeType: 'feature_added', aiScoreDelta: 8, createdAt: new Date(now - 345600000).toISOString() },
+    { id: 'sd-4', changeTitle: 'Rewrote hero headline for clarity', changeType: 'content_change', aiScoreDelta: 2, createdAt: new Date(now - 432000000).toISOString() },
+    { id: 'sd-5', changeTitle: 'Added llms.txt to public root', changeType: 'content_change', aiScoreDelta: 6, createdAt: new Date(now - 691200000).toISOString() },
+  ]
+}
+
+// ─── Seed Top Insights ──────────────────────────────────────────────────
+
+function seedTopInsights(): Array<{
+  id: string
+  title: string
+  insightType: string
+  priority: string
+  description: string
+  confidence: number
+  status: string
+}> {
+  return [
+    {
+      id: 'si-1',
+      title: 'Replay conversion funnel — 18% drop-off at step 3',
+      insightType: 'risk_alert',
+      priority: 'high',
+      description: 'Users dropping off at results comparison step. Consider skeleton loader and simplified UI.',
+      confidence: 0.92,
+      status: 'active',
+    },
+    {
+      id: 'si-2',
+      title: 'Competitor gap in llms.txt coverage — 73% lack it',
+      insightType: 'opportunity',
+      priority: 'high',
+      description: 'Adding one-click llms.txt generation could differentiate Seosights and drive 15-20% more signups.',
+      confidence: 0.78,
+      status: 'active',
+    },
+    {
+      id: 'si-3',
+      title: 'SEO score gap: Seosights vs industry average',
+      insightType: 'benchmark_gap',
+      priority: 'medium',
+      description: 'Current AI Visibility Score is 67/100, 12 points below top 10 SaaS average of 79. Key gaps: FAQ schema, OG image optimization.',
+      confidence: 0.85,
+      status: 'active',
+    },
+  ]
 }

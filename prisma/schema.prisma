@@ -2631,3 +2631,113 @@ model ClientZeroVisibilityDataset {
   createdAt     DateTime  @default(now())
 }
 
+// ─── Product Engine Models ────────────────────────────────────────────
+
+model QASuiteRun {
+  id              String    @id @default(cuid())
+  passRate        Int       @default(0)
+  totalTests      Int       @default(0)
+  passed          Int       @default(0)
+  warnings        Int       @default(0)
+  degraded        Int       @default(0)
+  critical        Int       @default(0)
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model FeatureAdoptionMetric {
+  id              String    @id @default(cuid())
+  featureKey      String
+  date            DateTime  @default(now())
+  activeUsers     Int       @default(0)
+  adoptionRate    Float     @default(0)
+  retention7d     Float     @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model FeatureValidation {
+  id              String    @id @default(cuid())
+  featureKey      String    @unique
+  featureName     String
+  status          String    @default("experimental")  // experimental | validating | validated
+  usageCount      Int       @default(0)
+  avgScoreGain    Float     @default(0)
+  dogfoodStartAt  DateTime?
+  validatedAt     DateTime?
+  lastUsedAt      DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model DecisionLog {
+  id                String    @id @default(cuid())
+  changeType        String    // content_change | schema_change | feature_added | config_change | design_change | deploy | rollback
+  changeTitle       String
+  changeDescription String?
+  changeCategory    String    // content | technical | infrastructure | design | marketing
+  beforeState       String?   // JSON
+  afterState        String?   // JSON
+  author            String    @default("superadmin")
+  source            String    @default("manual")  // manual | auto_execute | ai_twin | deploy
+  tags              String?   // JSON array
+  aiScoreDelta      Int       @default(0)
+  signupDelta       Float     @default(0)
+  conversionDelta   Float     @default(0)
+  revenueDelta      Float     @default(0)
+  citationDelta     Int       @default(0)
+  verified          Boolean   @default(false)
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model AITwinInsight {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  insightType     String    // daily_priority | risk_alert | opportunity | benchmark_gap | weekly_review
+  priority        String    @default("medium")  // critical | high | medium | low
+  title           String
+  description     String?
+  recommendations String?   // JSON
+  dataSources     String?   // JSON
+  confidence      Float     @default(0)
+  status          String    @default("active")  // active | implemented | dismissed
+  implementedAt   DateTime?
+  impactMeasured  Boolean   @default(false)
+  impactResult    String?   // JSON
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([date, insightType, title])
+}
+
+model ProductEvent {
+  id            String    @id @default(cuid())
+  event         String
+  userId        String?
+  companyId     String?
+  plan          String?
+  sessionId     String?
+  correlationId String?
+  metadata      String?   // JSON
+  createdAt     DateTime  @default(now())
+}
+
+model ChurnSignal {
+  id            String    @id @default(cuid())
+  userId        String?
+  userEmail     String?
+  userName      String?
+  churnRisk     String    @default("low")  // low | medium | high | critical
+  signalType    String    // usage_drop | support_ticket | payment_failed | plan_downgrade | login_gap
+  signalDetail  String?
+  confidence    Float     @default(0)
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
