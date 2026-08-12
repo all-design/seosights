@@ -645,3 +645,31 @@ Stage Summary:
 - Reuse rate: 60% (6 reuse out of 10 decisions)
 - All data flows from /api/control/architecture with seed fallback on cold start
 - Deployed to seosights.com
+---
+Task ID: ENGINEERING-ENGINE-FIX
+Agent: main
+Task: Fix Engineering Engine pipeline mapping and data flow
+
+Work Log:
+- Investigated Engineering Engine page: fetches from /api/control/data, derives pipeline from fragile logic
+- Root cause #1: GovernorInterception.count() (225) mapped to "Generate PR" — confusing, these are governor reviews not PRs
+- Root cause #2: Human Review hardcoded to 0 — always shows 0 regardless of pending tasks
+- Root cause #3: Write Code uses min(FactoryTask, 3) — arbitrary cap
+- Created dedicated /api/control/engineering endpoint with proper pipeline mapping:
+  - branch → total FactoryTasks
+  - code → in_progress tasks (real count, not min hack)
+  - tests → completed tasks or QARun count
+  - qa → failed/blocked tasks or QARun count
+  - pr → approved tasks (not governor interceptions)
+  - review → pending tasks + governor count (no more hardcoded 0)
+- Added QA run activity to recent activity feed
+- Seed fallback: 8 memories, 5 activity items, pipeline counts
+- Updated page to fetch from /api/control/engineering
+- Committed (e1fdf16) and pushed to production
+
+Stage Summary:
+- Pipeline mapping now makes sense: approved tasks → PR, pending → Review
+- Human Review shows real count instead of hardcoded 0
+- No more confusing "225 Generate PR" from governor interceptions
+- Activity feed includes QA runs in addition to missions and governor
+- Deployed to seosights.com
