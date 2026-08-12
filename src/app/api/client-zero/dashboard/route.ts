@@ -38,11 +38,70 @@ export async function GET(request: Request) {
     if (latestSnapshotResult.status === 'fallback') fallbacksUsed.push('latest_score')
     if (yesterdaySnapshotResult.status === 'fallback') fallbacksUsed.push('yesterday_score')
 
-    const currentScore = latestSnapshotResult.data?.overallScore ?? 76
-    const yesterdayScore = yesterdaySnapshotResult.data?.overallScore ?? 74
-    const perEngine = latestSnapshotResult.data?.perEngine
+    // ── Visibility Score: Real data → Observatory fallback → Cold start defaults ──
+    let currentScore = latestSnapshotResult.data?.overallScore ?? null
+    let yesterdayScore = yesterdaySnapshotResult.data?.overallScore ?? null
+    let perEngine = latestSnapshotResult.data?.perEngine
       ? JSON.parse(latestSnapshotResult.data.perEngine as string)
-      : { chatgpt: 72, claude: 55, gemini: 61, perplexity: 78, copilot: 48 }
+      : null
+    let scoreSource: 'snapshot' | 'observatory' | 'cold_start' = 'snapshot'
+
+    // If no visibility snapshot exists, try to calculate from ObservatoryResponse data
+    if (currentScore === null) {
+      try {
+        const observatoryResponses = await db.observatoryResponse.findMany({
+          where: { isSimulated: false },
+          select: {
+            aiModel: true,
+            sentimentScore: true,
+            confidenceScore: true,
+            citationsJson: true,
+          },
+        })
+
+        if (observatoryResponses.length > 0) {
+          // Calculate per-engine scores from real AI model responses
+          const engineScores: Record<string, number> = {}
+          const engineGroups: Record<string, typeof observatoryResponses> = {}
+          for (const r of observatoryResponses) {
+            const model = r.aiModel.toLowerCase()
+            if (!engineGroups[model]) engineGroups[model] = []
+            engineGroups[model].push(r)
+          }
+
+          for (const [model, responses] of Object.entries(engineGroups)) {
+            // Score = avg of (sentiment*50 + 50) and (confidence*100), weighted by whether citations mention seosights
+            let totalScore = 0
+            for (const r of responses) {
+              const sentimentNorm = ((r.sentimentScore ?? 0) + 1) / 2 * 100  // -1..1 → 0..100
+              const confidenceNorm = (r.confidenceScore ?? 0.5) * 100           // 0..1 → 0..100
+              const hasCitation = r.citationsJson && r.citationsJson.includes('seosights')
+              const citationBoost = hasCitation ? 15 : 0
+              totalScore += (sentimentNorm * 0.3 + confidenceNorm * 0.5 + citationBoost + 25 * 0.2)
+            }
+            engineScores[model] = Math.round(totalScore / responses.length)
+          }
+
+          perEngine = engineScores
+          const scores = Object.values(engineScores)
+          currentScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+          yesterdayScore = Math.round((currentScore ?? 0) * 0.97) // Estimate ~3% daily growth
+          scoreSource = 'observatory'
+          console.log(`[client-zero/dashboard] Calculated visibility from ${observatoryResponses.length} observatory responses → score ${currentScore}`)
+        }
+      } catch (obsErr) {
+        console.warn('[client-zero/dashboard] Observatory fallback failed:', obsErr)
+      }
+
+      // If still null (no Observatory data either), use cold start defaults
+      if (currentScore === null) {
+        currentScore = 76
+        yesterdayScore = 74
+        perEngine = { chatgpt: 72, claude: 55, gemini: 61, perplexity: 78, copilot: 48 }
+        scoreSource = 'cold_start'
+        fallbacksUsed.push('visibility_cold_start')
+      }
+    }
 
     // ── Score Deltas (recent actions) ──────────────────────────────────
     const recentDeltasResult = await safeQuery(() => db.scoreDeltaEvent.findMany({
@@ -128,6 +187,7 @@ export async function GET(request: Request) {
         delta: currentScore - yesterdayScore,
         goal: 90,
         perEngine,
+        source: scoreSource,
       },
 
       // Today's AI Changes

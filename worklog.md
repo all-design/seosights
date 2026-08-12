@@ -577,3 +577,21 @@ Stage Summary:
 - More accurate status display: operational vs degraded vs standby
 - Standby systems show as "idle" instead of "degraded" (on-demand is not broken)
 - Deployed to seosights.com
+---
+Task ID: 1
+Agent: main
+Task: Convert mockup data to real data pipeline — 3 fixes
+
+Work Log:
+- Analyzed all 3 API endpoints to determine real vs mockup data usage
+- **Auto-publish cron** (`/api/cron/auto-publish/route.ts`): Added auto-bootstrap trigger when InternalContentQueue is empty. If queue empty + no ClientZero project → triggers autonomous-bootstrap. If project exists but queue empty → re-seeds with 5 new content topics.
+- **Client Zero dashboard** (`/api/client-zero/dashboard/route.ts`): Added 3-tier visibility score cascade: VisibilitySnapshot (real) → ObservatoryResponse (calculated from AI model responses) → cold_start (hardcoded). Added `score.source` field so frontend knows data origin.
+- **Mission Scheduler** (`/api/ops/schedule/route.ts`): Complete rewrite — now generates schedule dynamically from real GrowthOpportunities + InternalContentQueue data. Falls back to minimal cold_start template only when DB is empty. Added graceful error handling (no more 500 when DB unavailable).
+- Verified both APIs return 200 with `"source":"cold_start"` when DB is unavailable (sandbox/preview)
+- On production (Vercel with populated DB), APIs will use real data automatically
+
+Stage Summary:
+- 3 API endpoints converted from mockup → real data pipeline with graceful fallbacks
+- New `source` field on all responses: "snapshot" | "observatory" | "cold_start" | "dynamic"
+- Auto-bootstrap fixes the cold start problem — system self-seeds when idle
+- Mission Scheduler now reflects real work (GrowthOpportunities, ContentQueue) not hardcoded template

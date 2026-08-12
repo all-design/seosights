@@ -104,6 +104,90 @@ export async function POST(request: NextRequest) {
     })
 
     if (dueEntries.length === 0) {
+      // ── AUTO-BOOTSTRAP: If queue is empty, seed it automatically ────────
+      // This fixes the "cold start" problem — the system should never sit
+      // idle when there's nothing to publish. Trigger bootstrap once so the
+      // content pipeline has material to work with.
+      try {
+        const totalQueueCount = await db.internalContentQueue.count()
+        const projectExists = await db.project.findFirst({
+          where: { isInternalAutopilot: true },
+        })
+
+        if (totalQueueCount === 0 && !projectExists) {
+          console.log('[Auto-Publish] Queue empty + no ClientZero project → triggering auto-bootstrap')
+
+          // Call bootstrap internally (same process, no HTTP overhead)
+          const { GET: bootstrapGet } = await import('@/app/api/cron/autonomous-bootstrap/route')
+          const bootstrapReq = new NextRequest('https://localhost/api/cron/autonomous-bootstrap', {
+            headers: { 'Content-Type': 'application/json' },
+          })
+          await bootstrapGet(bootstrapReq)
+
+          console.log('[Auto-Publish] Auto-bootstrap completed — queue should now have entries')
+          return NextResponse.json({
+            message: 'Auto-bootstrap triggered — queue seeded with content entries',
+            bootstrapTriggered: true,
+            published: 0,
+            failed: 0,
+          })
+        }
+
+        // Queue has entries but none are due yet — normal state
+        if (totalQueueCount > 0) {
+          return NextResponse.json({
+            message: `${totalQueueCount} entries in queue, none due yet`,
+            published: 0,
+            failed: 0,
+          })
+        }
+
+        // Project exists but queue is empty — re-seed content queue
+        if (projectExists && totalQueueCount === 0) {
+          console.log('[Auto-Publish] ClientZero exists but queue empty → re-seeding content queue')
+          const now = new Date()
+
+          const RESEED_TOPICS = [
+            { title: 'AI Search Visibility Trends This Week', pillar: 'all', cluster: 'ai-visibility-fundamentals', keywords: 'AI visibility trends, AI search updates' },
+            { title: 'New AI Model Updates and Their Impact on SEO', pillar: 'aeo', cluster: 'ai-model-behavior', keywords: 'AI model updates, ChatGPT SEO impact' },
+            { title: 'Answer Engine Optimization Strategies for 2025', pillar: 'aeo', cluster: 'answer-engine-optimization', keywords: 'AEO strategies, answer engine optimization 2025' },
+            { title: 'How Perplexity and Claude Choose Sources to Cite', pillar: 'geo', cluster: 'generative-engine-optimization', keywords: 'Perplexity sources, Claude citations' },
+            { title: 'Measuring Your AI Search Performance: A Practical Guide', pillar: 'all', cluster: 'search-visibility-pillars', keywords: 'AI search performance, visibility measurement' },
+          ]
+
+          for (let i = 0; i < RESEED_TOPICS.length; i++) {
+            const topic = RESEED_TOPICS[i]
+            const scheduledFor = new Date(now)
+            scheduledFor.setDate(scheduledFor.getDate() + i)
+
+            await db.internalContentQueue.create({
+              data: {
+                projectId: projectExists.id,
+                suggestedTitle: topic.title,
+                title: topic.title,
+                keywordTarget: topic.keywords,
+                pillar: topic.pillar,
+                cluster: topic.cluster,
+                status: 'pending',
+                scheduledFor,
+                scheduledAt: now,
+                priority: 5 + i,
+              },
+            })
+          }
+
+          return NextResponse.json({
+            message: `Re-seeded ${RESEED_TOPICS.length} content entries into queue`,
+            reseeded: true,
+            published: 0,
+            failed: 0,
+          })
+        }
+      } catch (bootstrapErr) {
+        console.error('[Auto-Publish] Auto-bootstrap/re-seed failed:', bootstrapErr)
+        // Don't fail the whole request — just log and return
+      }
+
       return NextResponse.json({
         message: 'No pending content due for publishing',
         published: 0,
