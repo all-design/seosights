@@ -115,32 +115,20 @@ function timeAgo(dateStr: string): string {
 // ─── Main Component ───────────────────────────────────────
 
 export default function EngineeringEnginePage() {
-  const [factoryData, setFactoryData] = useState<any>(null)
-  const [memories, setMemories] = useState<any[]>([])
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch control data')
+        // Fetch from dedicated engineering API which provides
+        // pipeline steps, memories, activity, and quality gates
+        const res = await fetch('/api/control/engineering')
+        if (!res.ok) throw new Error('Failed to fetch engineering data')
         const json = await res.json()
         if (!json || typeof json !== 'object') throw new Error('Invalid API response')
-        // Unwrap the factory envelope — the API returns { factory: { system, counts, ... }, ... }
-        const source = json.factory || json
-        setFactoryData({
-          system: source.system || {},
-          counts: {
-            factoryTasks: source.counts?.factoryTasks ?? source.counts?.factoryTask ?? 0,
-            governorInterceptions: source.counts?.interceptions ?? source.counts?.interception ?? 0,
-            qaRuns: source.counts?.qaRuns ?? source.counts?.qaRun ?? 0,
-            engineeringMemories: source.counts?.memories ?? source.counts?.memory ?? 0,
-          },
-          recentActivity: Array.isArray(source.recentActivity) ? source.recentActivity : [],
-          ok: source.ok ?? true,
-        })
-        setMemories(Array.isArray(source.recentMemories) ? source.recentMemories : [])
+        setData(json)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -186,55 +174,14 @@ export default function EngineeringEnginePage() {
     )
   }
 
-  // ─── Derived data ─────────────────────────────────────────
-  const system = factoryData?.system || {}
-  const counts = factoryData?.counts || {}
-  const recentActivity: ActivityItem[] = Array.isArray(factoryData?.recentActivity) ? factoryData.recentActivity : []
+  // ─── Data from API ─────────────────────────────────────────
+  if (!data) return null
 
-  // Build pipeline steps from system health
-  const pipelineSteps: PipelineStep[] = pipelineStepDefs.map(def => {
-    let isActive = false
-    let count = 0
-    switch (def.id) {
-      case 'branch':
-        isActive = system.codebaseScanner === 'operational'
-        count = counts.factoryTasks || 0
-        break
-      case 'code':
-        isActive = system.codebaseScanner === 'operational'
-        count = Math.min(counts.factoryTasks || 0, 3)
-        break
-      case 'tests':
-        isActive = system.qaEngine === 'operational'
-        count = counts.qaRuns || 0
-        break
-      case 'qa':
-        isActive = system.qaEngine === 'operational'
-        count = counts.qaRuns || 0
-        break
-      case 'pr':
-        isActive = system.governor === 'operational'
-        count = counts.governorInterceptions || 0
-        break
-      case 'review':
-        isActive = system.governor === 'operational'
-        count = 0
-        break
-    }
-    return { ...def, count, status: isActive ? 'active' : 'idle' }
-  })
-
-  // Build quality gates from system health
-  const qualityGates: QualityGate[] = [
-    { label: 'Codebase Scanner', status: system.codebaseScanner === 'operational' ? 'pass' : 'warn', detail: system.codebaseScanner === 'operational' ? 'Operational' : system.codebaseScanner || 'Offline' },
-    { label: 'Governor', status: system.governor === 'operational' ? 'pass' : 'warn', detail: system.governor === 'operational' ? 'Operational' : system.governor || 'Offline' },
-    { label: 'AI Router', status: system.aiRouter === 'operational' ? 'pass' : 'warn', detail: system.aiRouter === 'operational' ? 'Operational' : system.aiRouter || 'Degraded' },
-    { label: 'QA Engine', status: system.qaEngine === 'operational' ? 'pass' : 'warn', detail: system.qaEngine === 'operational' ? 'Operational' : system.qaEngine || 'Offline' },
-    { label: 'Mission Generator', status: system.dailyMissionGenerator === 'operational' ? 'pass' : 'warn', detail: system.dailyMissionGenerator === 'operational' ? 'Operational' : system.dailyMissionGenerator || 'Offline' },
-    { label: 'Engineering Memory', status: (counts.engineeringMemories || 0) > 0 ? 'pass' : 'warn', detail: `${counts.engineeringMemories || 0} records` },
-  ]
-
-  const hasActiveSystem = Object.values(system).some((s: any) => s === 'operational')
+  const pipelineSteps: PipelineStep[] = data.pipeline ?? []
+  const memories: any[] = data.memories ?? []
+  const recentActivity: ActivityItem[] = data.recentActivity ?? []
+  const qualityGates: QualityGate[] = data.qualityGates ?? []
+  const hasActiveSystem = pipelineSteps.some((p: any) => p.status === 'active')
 
   return (
     <div className="space-y-6">
@@ -577,28 +524,28 @@ export default function EngineeringEnginePage() {
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <GitBranch className="w-4 h-4 text-violet-400" />
-              <span className="text-2xl font-bold text-white">{counts.factoryTasks || 0}</span>
+              <span className="text-2xl font-bold text-white">{data.summary?.factoryTasks ?? 0}</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">Factory Tasks</div>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <GitPullRequest className="w-4 h-4 text-violet-400" />
-              <span className="text-2xl font-bold text-white">{counts.governorInterceptions || 0}</span>
+              <span className="text-2xl font-bold text-white">{data.summary?.governorReviews ?? 0}</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">Governor Reviews</div>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <BarChart3 className="w-4 h-4 text-violet-400" />
-              <span className="text-2xl font-bold text-white">{counts.qaRuns || 0}</span>
+              <span className="text-2xl font-bold text-white">{data.summary?.qaRuns ?? 0}</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">QA Runs</div>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Users className="w-4 h-4 text-emerald-400" />
-              <span className="text-2xl font-bold text-emerald-400">100%</span>
+              <span className="text-2xl font-bold text-emerald-400">{data.summary?.humanApprovalRate ?? 100}%</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">Human Approval Rate</div>
           </div>
