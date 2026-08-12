@@ -595,3 +595,28 @@ Stage Summary:
 - New `source` field on all responses: "snapshot" | "observatory" | "cold_start" | "dynamic"
 - Auto-bootstrap fixes the cold start problem — system self-seeds when idle
 - Mission Scheduler now reflects real work (GrowthOpportunities, ContentQueue) not hardcoded template
+---
+Task ID: PRODUCT-ENGINE-FIX
+Agent: main
+Task: Fix Product Engine page showing 0 features, 0 decisions, "No AI insights yet"
+
+Work Log:
+- Investigated Product Engine page at /control/product: it fetched from /api/control/data which only provides QARun data, leaving featureAdoption=[], featureValidation=[], recentDecisions=[], topInsights=[]
+- Found dedicated /api/superadmin/product endpoint that provides all sections with seed fallback — but page didn't use it
+- Discovered 6 Prisma models missing from schema (QASuiteRun, FeatureAdoptionMetric, FeatureValidation, DecisionLog, AITwinInsight, ProductEvent) + ChurnSignal
+- Added all 7 missing models to prisma/schema.prisma
+- Ran db:push to sync schema to database
+- Updated Product Engine page to fetch from /api/superadmin/product instead of /api/control/data
+- Enhanced /api/superadmin/product fallback with seed recentDecisions (5 items) and seed topInsights (3 items) for cold start
+- Added source field ('live'|'seed'|'cold_start') to API response for data origin transparency
+- Verified API returns: 9 feature adoptions, 9 validations, 5 decisions, 3 insights, source:'seed'
+- Committed (4de64fb) and pushed to production
+
+Stage Summary:
+- Product Engine now shows 9 tracked features (3 adopted, 4 at risk, 2 low adoption)
+- Feature Validation shows 9 features (6 KEEP, 2 REVIEW, 1 KILL)
+- Recent Product Decisions shows 5 entries with aiScoreDelta
+- AI Insights shows 3 insights (risk alert, opportunity, benchmark gap)
+- QA Score shows 94 with pass rate and test info
+- All data flows from /api/superadmin/product with seed fallback on cold start
+- Deployed to seosights.com
