@@ -24,6 +24,50 @@ import {
 type ReviewResult = 'approved' | 'revision' | 'warning'
 type CheckType = 'palette' | 'spacing' | 'typography' | 'copy' | 'animation'
 
+interface DesignReview {
+  id: string
+  component: string
+  checkType: CheckType
+  result: ReviewResult
+  note: string
+  timestamp: string
+}
+
+interface RecentRevision {
+  id: string
+  component: string
+  reason: string
+  codeRef: string
+  suggestion: string
+  priority: 'high' | 'medium' | 'low'
+  requestedAgo: string
+}
+
+interface PhilosophyCheck {
+  id: string
+  principle: string
+  question: string
+  result: 'pass' | 'warning' | 'fail'
+  note: string
+}
+
+interface ReviewData {
+  reviewScore: number
+  approved: number
+  revisionsNeeded: number
+  philosophyViolations: number
+  brandScore: number
+  designReviews: DesignReview[]
+  recentRevisions: RecentRevision[]
+  philosophyChecks: PhilosophyCheck[]
+  summary: {
+    totalReviews: number
+    philosophyPassing: number
+    philosophyTotal: number
+    source: 'live' | 'seed'
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────
 
 function checkTypeIcon(type: CheckType) {
@@ -113,21 +157,10 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
   )
 }
 
-// ─── Philosophy checks (static product principles) ───────
-
-const PHILOSOPHY_PRINCIPLES = [
-  { id: 'pc-1', principle: 'Measure don\'t guess', question: 'Does this respect "Measure don\'t guess"?' },
-  { id: 'pc-2', principle: 'Customer-first', question: 'Is this "Customer-first"?' },
-  { id: 'pc-3', principle: 'Simplicity over complexity', question: 'Does this add complexity without value?' },
-  { id: 'pc-4', principle: 'Empowering tone', question: 'Is the copy empowering or fear-based?' },
-  { id: 'pc-5', principle: 'Transparency', question: 'Is pricing/messaging transparent?' },
-]
-
 // ─── Main Component ──────────────────────────────────────
 
 export default function ReviewEnginePage() {
-  const [factoryData, setFactoryData] = useState<any>(null)
-  const [qaData, setQAData] = useState<any>(null)
+  const [data, setData] = useState<ReviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [animatingScore, setAnimatingScore] = useState(0)
@@ -136,31 +169,11 @@ export default function ReviewEnginePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch control data')
+        const res = await fetch('/api/control/review')
+        if (!res.ok) throw new Error('Failed to fetch review data')
         const json = await res.json()
-        setFactoryData({
-          system: json.factory?.system || {},
-          counts: json.factory?.counts || {},
-          ok: json.ok ?? true,
-        })
-        const qaRun = json.productQA || json.factory?.latestQA
-        if (qaRun) {
-          setQAData({
-            hasData: true,
-            run: qaRun,
-            healthScore: qaRun.productScore ?? 0,
-            issueCounts: {
-              critical: qaRun.criticalCount ?? 0,
-              major: qaRun.majorCount ?? 0,
-              medium: qaRun.mediumCount ?? 0,
-              minor: qaRun.minorCount ?? 0,
-              total: (qaRun.criticalCount ?? 0) + (qaRun.majorCount ?? 0) + (qaRun.mediumCount ?? 0) + (qaRun.minorCount ?? 0),
-            },
-            recentIssues: [],
-            openCriticalMajor: (qaRun.criticalCount ?? 0) + (qaRun.majorCount ?? 0),
-          })
-        }
+        if (json.error) throw new Error(json.error)
+        setData(json)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -172,8 +185,8 @@ export default function ReviewEnginePage() {
 
   // Animate score when data loads
   useEffect(() => {
-    if (!qaData || animationStarted.current) return
-    const target = qaData.hasData ? qaData.healthScore : 0
+    if (!data || animationStarted.current) return
+    const target = data.reviewScore
     animationStarted.current = true
     let current = 0
     const step = Math.ceil(target / 40)
@@ -186,7 +199,7 @@ export default function ReviewEnginePage() {
       setAnimatingScore(current)
     }, 25)
     return () => clearInterval(timer)
-  }, [qaData])
+  }, [data])
 
   if (loading) {
     return (
@@ -200,12 +213,12 @@ export default function ReviewEnginePage() {
     )
   }
 
-  if (error) {
+  if (error || !data) {
     return (
       <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8 text-center">
         <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
         <h2 className="text-lg font-semibold text-red-400 mb-1">Failed to load review data</h2>
-        <p className="text-sm text-slate-400 mb-4">{error}</p>
+        <p className="text-sm text-slate-400 mb-4">{error || 'No data available'}</p>
         <button
           onClick={() => window.location.reload()}
           className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white transition-colors"
@@ -217,92 +230,17 @@ export default function ReviewEnginePage() {
     )
   }
 
-  // ─── Derive review data from API responses ──────────────
-
-  const reviewScore = qaData?.hasData ? qaData.healthScore : 0
-  const approved = qaData?.hasData
-    ? (qaData.issueCounts?.total ?? 0) - (qaData.issueCounts?.critical ?? 0) - (qaData.issueCounts?.major ?? 0)
-    : 0
-  const revisionsNeeded = qaData?.hasData
-    ? (qaData.issueCounts?.critical ?? 0) + (qaData.issueCounts?.major ?? 0)
-    : 0
-  const philosophyViolations = qaData?.hasData
-    ? qaData.openCriticalMajor ?? 0
-    : 0
-  const brandScore = qaData?.hasData
-    ? qaData.run?.uxScore ?? 0
-    : 0
-
-  // Derive design reviews from QA issues
-  const designReviews = qaData?.hasData && qaData.recentIssues?.length > 0
-    ? qaData.recentIssues.slice(0, 6).map((issue: any, i: number) => {
-        const checkTypes: CheckType[] = ['palette', 'spacing', 'typography', 'copy', 'animation']
-        const isRevision = issue.severity === 'critical' || issue.severity === 'major'
-        return {
-          id: issue.id || `dr-${i}`,
-          component: issue.title || issue.category || 'Unknown',
-          checkType: checkTypes[i % checkTypes.length],
-          result: (isRevision ? 'revision' : issue.severity === 'medium' ? 'warning' : 'approved') as ReviewResult,
-          note: issue.description || issue.findings?.substring(0, 80) || 'No details',
-          timestamp: issue.createdAt ? new Date(issue.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A',
-        }
-      })
-    : []
-
-  // Derive philosophy checks from system health
-  const philosophyChecks = PHILOSOPHY_PRINCIPLES.map((p, i) => {
-    let result: 'pass' | 'warning' | 'fail' = 'pass'
-    let note = 'All checks passing'
-    if (factoryData) {
-      const system = factoryData.system || {}
-      const hasDegraded = Object.values(system).some((s: any) => s === 'degraded')
-      const hasOffline = Object.values(system).some((s: any) => s === 'offline')
-      if (hasOffline && i === 0) {
-        result = 'fail'
-        note = 'Some systems offline — cannot verify data-driven decisions'
-      } else if (hasDegraded && i === 2) {
-        result = 'warning'
-        note = 'Degraded systems may indicate unnecessary complexity'
-      } else if (p.principle === 'Empowering tone' && qaData?.hasData) {
-        result = 'pass'
-        note = 'Copy follows brand voice guidelines'
-      } else if (p.principle === 'Transparency') {
-        result = 'pass'
-        note = 'Pricing and messaging are clear and honest'
-      } else if (p.principle === 'Customer-first' && qaData?.hasData) {
-        result = qaData.healthScore >= 70 ? 'pass' : 'warning'
-        note = qaData.healthScore >= 70 ? 'Product decisions reflect user needs' : 'Some customer experience concerns detected'
-      }
-    }
-    return { ...p, result, note }
-  })
-
-  // Derive revisions from QA critical/major issues
-  const recentRevisions = qaData?.hasData && qaData.recentIssues?.length > 0
-    ? qaData.recentIssues
-        .filter((issue: any) => issue.severity === 'critical' || issue.severity === 'major')
-        .slice(0, 4)
-        .map((issue: any) => ({
-          id: issue.id,
-          component: issue.title || issue.category || 'Component',
-          reason: issue.findings || issue.description || 'Issue detected during review',
-          codeRef: issue.pageUrl || issue.reproduction || 'N/A',
-          suggestion: issue.fixSuggestion || 'Review and fix the identified issue',
-          priority: (issue.severity === 'critical' ? 'high' : 'medium') as 'high' | 'medium' | 'low',
-          requestedAgo: issue.createdAt
-            ? (() => {
-                const diff = Date.now() - new Date(issue.createdAt).getTime()
-                const mins = Math.floor(diff / 60000)
-                if (mins < 60) return `${mins}m ago`
-                const hrs = Math.floor(mins / 60)
-                if (hrs < 24) return `${hrs}h ago`
-                return `${Math.floor(hrs / 24)}d ago`
-              })()
-            : 'N/A',
-        }))
-    : []
-
-  const totalReviews = approved + revisionsNeeded + philosophyViolations
+  const {
+    reviewScore,
+    approved,
+    revisionsNeeded,
+    philosophyViolations,
+    brandScore,
+    designReviews,
+    recentRevisions,
+    philosophyChecks,
+    summary,
+  } = data
 
   return (
     <div className="space-y-6">
@@ -378,7 +316,7 @@ export default function ReviewEnginePage() {
             </div>
             {/* Rows */}
             <div className="divide-y divide-slate-800/60">
-              {designReviews.map((review: any) => {
+              {designReviews.map((review) => {
                 const TypeIcon = checkTypeIcon(review.checkType)
                 const ResultIcon = resultIcon(review.result)
                 return (
@@ -410,6 +348,11 @@ export default function ReviewEnginePage() {
                 )
               })}
             </div>
+            {summary.source === 'seed' && (
+              <div className="px-5 py-2.5 border-t border-slate-800 bg-emerald-500/5">
+                <p className="text-[10px] text-emerald-400">Cold-start: seeded design review data from platform knowledge</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
@@ -476,7 +419,7 @@ export default function ReviewEnginePage() {
         </h2>
         {recentRevisions.length > 0 ? (
           <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-1">
-            {recentRevisions.map((rev: any) => (
+            {recentRevisions.map((rev) => (
               <div
                 key={rev.id}
                 className={`bg-slate-900 border rounded-xl p-4 hover:border-slate-700 transition-colors ${
@@ -521,12 +464,18 @@ export default function ReviewEnginePage() {
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Eye className="w-3.5 h-3.5 text-amber-400" />
-          <span>Reviews today: <span className="text-slate-300">{totalReviews}</span></span>
+          <span>Reviews today: <span className="text-slate-300">{summary.totalReviews}</span></span>
         </div>
         <span className="text-slate-700">|</span>
         <span>Philosophy alignment: <span className={philosophyChecks.every(c => c.result === 'pass') ? 'text-emerald-400' : 'text-amber-400'}>
-          {philosophyChecks.filter(c => c.result === 'pass').length}/{philosophyChecks.length} passing
+          {summary.philosophyPassing}/{summary.philosophyTotal} passing
         </span></span>
+        {summary.source === 'seed' && (
+          <>
+            <span className="text-slate-700">|</span>
+            <span className="text-emerald-400/60">Data: seeded</span>
+          </>
+        )}
       </div>
     </div>
   )
