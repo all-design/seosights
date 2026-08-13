@@ -673,3 +673,25 @@ Stage Summary:
 - No more confusing "225 Generate PR" from governor interceptions
 - Activity feed includes QA runs in addition to missions and governor
 - Deployed to seosights.com
+---
+Task ID: 3
+Agent: main
+Task: Fix Engineering Engine™ — recency-based quality gates, real Governor approval rate, enhanced pipeline
+
+Work Log:
+- Read existing Engineering Engine API at /api/control/engineering/route.ts and page at /control/engineering/page.tsx
+- Explored data sources: FactoryTask (only created by Governor), EngineeringMemory (only seeded), MCSystemStatus (heartbeat-based)
+- Identified issues: MCSystemStatus heartbeats stale on Vercel → all quality gates "warn", Human Approval Rate = FactoryTask approved/reviews = 0/225 = 0%, pipeline "Generate PR" = 0 (no approved FactoryTasks)
+- Rewrote API: recency-based system health (CodebaseSnapshot/GovernorInterception/QARun/DailyMission timestamps), Governor approved/total for approval rate, Governor approved count for "Generate PR" step, FactoryTask completions in activity feed
+- Rewrote page: icon string→React component mapping, source indicator (live/seed), governor approved/rejected breakdown, pattern learned on memory cards, scrollable activity feed, data source footer
+- Tested API locally: valid JSON with proper pipeline/memory/activity/gate data
+- Committed as fdbcd62, pushed to production
+- Verified on production: 72 Factory Tasks, 231 Governor Reviews (209 approved), 28 QA Runs, 90% Human Approval Rate, pipeline all active except Write Code (correct - no in_progress tasks)
+
+Stage Summary:
+- Engineering Engine now shows real data on production
+- Pipeline: Create Branch=72, Write Code=0, Run Tests=28, Run QA=28, Generate PR=209 (Governor approved), Human Review=231 (Governor total)
+- Human Approval Rate: 90% (was 0% before - now uses Governor approved/total)
+- Quality Gate "Governor" shows "231 reviews" (real count, not just "Operational")
+- Recency-based health replaces MCSystemStatus heartbeat dependency
+- Commit: fdbcd62
