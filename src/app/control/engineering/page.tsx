@@ -15,7 +15,6 @@ import {
   FilePlus2,
   CheckCircle2,
   AlertTriangle,
-  Trash2,
   GitCommitHorizontal,
   Activity,
   Cpu,
@@ -24,6 +23,7 @@ import {
   BarChart3,
   ArrowRight,
   RefreshCw,
+  TestTube,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────
@@ -46,7 +46,6 @@ interface ActivityItem {
   title?: string
   status?: string
   errorCount?: number
-  timestamp?: string
   createdAt: string
 }
 
@@ -56,16 +55,27 @@ interface QualityGate {
   detail: string
 }
 
-// ─── Static pipeline definitions ──────────────────────────
+interface EngineeringSummary {
+  factoryTasks: number
+  governorReviews: number
+  qaRuns: number
+  engineeringMemories: number
+  avgConfidence: number
+  humanApprovalRate: number
+  governorApproved: number
+  governorRejected: number
+}
 
-const pipelineStepDefs: { id: PipelineStepId; name: string; icon: React.ElementType }[] = [
-  { id: 'branch', name: 'Create Branch', icon: GitBranch },
-  { id: 'code', name: 'Write Code', icon: FileCode2 },
-  { id: 'tests', name: 'Run Tests', icon: FlaskConical },
-  { id: 'qa', name: 'Run QA', icon: ShieldCheck },
-  { id: 'pr', name: 'Generate PR', icon: GitPullRequest },
-  { id: 'review', name: 'Human Review', icon: UserCheck },
-]
+// ─── Icon mapping from API string names to Lucide components ────
+
+const ICON_MAP: Record<string, React.ElementType> = {
+  GitBranch,
+  Code: FileCode2,
+  TestTube: FlaskConical,
+  ShieldCheck,
+  GitPullRequest,
+  UserCheck,
+}
 
 // ─── Helpers ──────────────────────────────────────────────
 
@@ -122,8 +132,6 @@ export default function EngineeringEnginePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        // Fetch from dedicated engineering API which provides
-        // pipeline steps, memories, activity, and quality gates
         const res = await fetch('/api/control/engineering')
         if (!res.ok) throw new Error('Failed to fetch engineering data')
         const json = await res.json()
@@ -177,11 +185,22 @@ export default function EngineeringEnginePage() {
   // ─── Data from API ─────────────────────────────────────────
   if (!data) return null
 
-  const pipelineSteps: PipelineStep[] = data.pipeline ?? []
+  // Map API pipeline steps to local PipelineStep with real React icons
+  const pipelineSteps: PipelineStep[] = (data.pipeline ?? []).map((step: any) => ({
+    id: step.id,
+    name: step.label || step.name || step.id,
+    icon: ICON_MAP[step.icon] || Activity,
+    count: step.count || 0,
+    status: step.status || 'idle',
+  }))
+
   const memories: any[] = data.memories ?? []
   const recentActivity: ActivityItem[] = data.recentActivity ?? []
   const qualityGates: QualityGate[] = data.qualityGates ?? []
-  const hasActiveSystem = pipelineSteps.some((p: any) => p.status === 'active')
+  const summary: EngineeringSummary = data.summary ?? {}
+  const source: string = data.source ?? 'live'
+  const hasActiveSystem = pipelineSteps.some(p => p.status === 'active')
+  const isSeeded = source === 'seed' || source === 'cold_start'
 
   return (
     <div className="space-y-6">
@@ -197,6 +216,15 @@ export default function EngineeringEnginePage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Source indicator */}
+          {isSeeded && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              <span className="text-[10px] font-medium text-amber-400">
+                Cold-start: {source === 'cold_start' ? 'fallback data' : 'seeded data'}
+              </span>
+            </div>
+          )}
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
             hasActiveSystem
               ? 'bg-emerald-500/10 border-emerald-500/20'
@@ -335,6 +363,11 @@ export default function EngineeringEnginePage() {
           <span className="ml-1 text-[10px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">
             {memories.length} records
           </span>
+          {source === 'seed' && (
+            <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+              seeded
+            </span>
+          )}
         </h2>
         {memories.length === 0 ? (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center gap-3">
@@ -353,7 +386,7 @@ export default function EngineeringEnginePage() {
                   <div className="flex items-center gap-2 min-w-0">
                     <GitCommitHorizontal className="w-4 h-4 text-violet-400 flex-shrink-0" />
                     <span className="text-xs font-mono font-semibold text-white truncate">
-                      {mem.feature || 'Unknown'}
+                      {mem.feature || mem.patternName || 'Unknown'}
                     </span>
                   </div>
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border flex-shrink-0 ml-2 ${
@@ -380,11 +413,15 @@ export default function EngineeringEnginePage() {
                     />
                   </div>
                 </div>
+                {/* Pattern learned */}
+                {mem.patternLearned && (
+                  <p className="text-[10px] text-slate-500 mb-3 line-clamp-2">{mem.patternLearned}</p>
+                )}
                 {/* Meta row */}
                 <div className="flex items-center gap-3 text-[10px] text-slate-500">
                   <span className="flex items-center gap-1">
                     <FileCode2 className="w-3 h-3" />
-                    {mem.testsPassed || 0}/{(mem.testsPassed || 0) + (mem.testsFailed || 0)} tests
+                    {mem.testsPassed || 0}/{mem.totalTests || (mem.testsPassed || 0)} tests
                   </span>
                   <span className="flex items-center gap-1 ml-auto">
                     <Clock className="w-3 h-3" />
@@ -403,7 +440,7 @@ export default function EngineeringEnginePage() {
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <Zap className="w-4 h-4 text-violet-400" />
             Code Activity Feed
-            <span className="ml-auto text-[10px] text-slate-500">Live</span>
+            <span className="ml-auto text-[10px] text-slate-500">{recentActivity.length} events</span>
           </h2>
           {recentActivity.length === 0 ? (
             <div className="flex items-center gap-3 py-6 justify-center">
@@ -411,7 +448,7 @@ export default function EngineeringEnginePage() {
               <span className="text-sm text-slate-500">No recent activity</span>
             </div>
           ) : (
-            <div className="space-y-0">
+            <div className="space-y-0 max-h-80 overflow-y-auto custom-scrollbar">
               {recentActivity.map((event, i) => {
                 const accent = feedAccentForType(event.type)
                 const Icon = feedIconForType(event.type)
@@ -419,14 +456,14 @@ export default function EngineeringEnginePage() {
                 const message = event.type === 'task' ? event.title || 'Task created' :
                   event.type === 'mission' ? event.title || 'Mission updated' :
                   event.type === 'interception' ? `Governor: ${event.engineName || 'Unknown'}` :
-                  `QA Run: ${event.errorCount || 0} errors`
+                  `QA Run: ${event.errorCount || 0} issues`
                 const detail = event.type === 'task' ? `Status: ${event.status || 'unknown'}` :
                   event.type === 'mission' ? event.status || '' :
                   event.type === 'interception' ? event.outcome || '' :
                   event.status || ''
                 return (
                   <div
-                    key={event.id}
+                    key={event.id || i}
                     className="flex items-start gap-3 py-3 group hover:bg-slate-800/30 -mx-2 px-2 rounded-lg transition-colors"
                   >
                     <div className="flex flex-col items-center flex-shrink-0">
@@ -524,30 +561,55 @@ export default function EngineeringEnginePage() {
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <GitBranch className="w-4 h-4 text-violet-400" />
-              <span className="text-2xl font-bold text-white">{data.summary?.factoryTasks ?? 0}</span>
+              <span className="text-2xl font-bold text-white">{summary.factoryTasks ?? 0}</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">Factory Tasks</div>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <GitPullRequest className="w-4 h-4 text-violet-400" />
-              <span className="text-2xl font-bold text-white">{data.summary?.governorReviews ?? 0}</span>
+              <span className="text-2xl font-bold text-white">{summary.governorReviews ?? 0}</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">Governor Reviews</div>
+            {(summary.governorApproved > 0 || summary.governorRejected > 0) && (
+              <div className="text-[9px] text-slate-600 mt-0.5">
+                {summary.governorApproved} approved · {summary.governorRejected} rejected
+              </div>
+            )}
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <BarChart3 className="w-4 h-4 text-violet-400" />
-              <span className="text-2xl font-bold text-white">{data.summary?.qaRuns ?? 0}</span>
+              <span className="text-2xl font-bold text-white">{summary.qaRuns ?? 0}</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">QA Runs</div>
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Users className="w-4 h-4 text-emerald-400" />
-              <span className="text-2xl font-bold text-emerald-400">{data.summary?.humanApprovalRate ?? 100}%</span>
+              <span className="text-2xl font-bold text-emerald-400">{summary.humanApprovalRate ?? 100}%</span>
             </div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">Human Approval Rate</div>
+            {summary.avgConfidence > 0 && (
+              <div className="text-[9px] text-slate-600 mt-0.5">
+                Avg confidence: {summary.avgConfidence}%
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Source footer */}
+        <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-[10px] text-slate-500">
+            <span>Memories: {summary.engineeringMemories ?? 0}</span>
+            <span className="text-slate-700">|</span>
+            <span>Avg confidence: {summary.avgConfidence ?? 0}%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${source === 'live' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <span className={`text-[10px] font-medium ${source === 'live' ? 'text-emerald-400' : 'text-amber-400'}`}>
+              Data: {source}
+            </span>
           </div>
         </div>
       </div>
