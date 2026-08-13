@@ -286,8 +286,9 @@ export default function ReviewEnginePage() {
               <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Revisions Needed</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-red-400">{philosophyViolations}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Philosophy Violations</div>
+              <div className="text-2xl font-bold text-emerald-400">{philosophyViolations}</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Violations Blocked</div>
+              <div className="text-[9px] text-slate-600 mt-0.5">Governor rejections</div>
             </div>
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4 text-center">
               <div className="text-2xl font-bold text-amber-400">{brandScore}%</div>
