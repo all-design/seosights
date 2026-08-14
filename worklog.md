@@ -695,3 +695,31 @@ Stage Summary:
 - Quality Gate "Governor" shows "231 reviews" (real count, not just "Operational")
 - Recency-based health replaces MCSystemStatus heartbeat dependency
 - Commit: fdbcd62
+---
+Task ID: 4
+Agent: main
+Task: Fix Security Engine™ — dedicated API, recency-based health, cold-start seeding, source indicator
+
+Work Log:
+- Found Security Engine page at /control/security/page.tsx fetching from generic /api/control/data
+- Explored data sources: security = QAIssue category='security' + QARun.securityScore, systemStatus = MCSystemStatus heartbeats + fallback counts
+- Created dedicated /api/control/security endpoint with:
+  + Recency-based system health (CodebaseSnapshot/GovernorInterception/QARun/DailyMission timestamps)
+  + MCSystemStatus heartbeat as supplementary signal when < 30min fresh
+  + Real vulnerability data from QAIssue category='security'
+  + Cold-start seeding: 5 security QAIssues when none exist
+  + Security score estimation from vulnerability counts
+  + Governor blocked actions for recent fallbacks
+  + Source transparency (live/seed/cold_start)
+- Updated page to fetch from /api/control/security instead of /api/control/data
+- Added source indicator (cold-start badge + footer data source)
+- Committed as b1a028b, pushed to production
+- Verified on production: 0 Critical, 0 High, 0 Medium, 2 Low (from real QAIssue data), Code Security: Completed, 8 components checked
+
+Stage Summary:
+- Security Engine now uses dedicated API with real data
+- Vulnerability data from real QAIssue records (not just hardcoded seed)
+- Recency-based health replaces pure MCSystemStatus heartbeat dependency
+- Cold-start seeding creates security issues when DB is empty
+- Source indicator shows data origin (live/seed)
+- Commit: b1a028b
