@@ -139,6 +139,8 @@ export default function PerformanceEnginePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [auditing, setAuditing] = useState(false)
+  const [auditResult, setAuditResult] = useState<any>(null)
+  const [auditError, setAuditError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadData() {
@@ -347,9 +349,46 @@ export default function PerformanceEnginePage() {
   // ─── Empty state ────────────────────────────────────────
   const hasNoData = !hasQA && !perfScores && Object.keys(components).length === 0
 
-  const handleAudit = () => {
+  const handleAudit = async () => {
     setAuditing(true)
-    setTimeout(() => setAuditing(false), 3000)
+    setAuditError(null)
+    try {
+      const res = await fetch('/api/control/performance/audit', { method: 'POST' })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || errData.details || `Audit failed (${res.status})`)
+      }
+      const data = await res.json()
+      if (data.success && data.audit) {
+        setAuditResult(data.audit)
+        // Refresh the main data to pick up new scores
+        const controlRes = await fetch('/api/control/data')
+        if (controlRes.ok) {
+          const json = await controlRes.json()
+          if (json.systemStatus) setSystemData(json.systemStatus)
+          if (json.performance) setPerfData(json.performance)
+          const qaRun = json.productQA || json.factory?.latestQA
+          if (qaRun) {
+            setQaData({
+              hasData: true,
+              run: qaRun,
+              healthScore: qaRun.productScore ?? 0,
+              issueCounts: {
+                critical: qaRun.criticalCount ?? 0,
+                major: qaRun.majorCount ?? 0,
+                medium: qaRun.mediumCount ?? 0,
+                minor: qaRun.minorCount ?? 0,
+                total: (qaRun.criticalCount ?? 0) + (qaRun.majorCount ?? 0) + (qaRun.mediumCount ?? 0) + (qaRun.minorCount ?? 0),
+              },
+            })
+          }
+        }
+      }
+    } catch (err) {
+      setAuditError(err instanceof Error ? err.message : 'Audit failed')
+    } finally {
+      setAuditing(false)
+    }
   }
 
   return (
@@ -382,7 +421,7 @@ export default function PerformanceEnginePage() {
             ) : (
               <Zap className="w-3.5 h-3.5" />
             )}
-            {auditing ? 'Auditing...' : 'Run Audit'}
+            {auditing ? 'Running Lighthouse...' : 'Run Audit'}
           </button>
         </div>
       </div>
@@ -622,7 +661,192 @@ export default function PerformanceEnginePage() {
             </div>
           )}
 
-          {/* ─── 7. Recent Optimizations ─────────────────────────── */}
+          {/* ─── 7. Audit Results (Real Lighthouse Data) ───────── */}
+          {auditResult && (
+            <div>
+              <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <Gauge className="w-4 h-4 text-orange-400" />
+                Real Audit Results
+                {auditResult.lighthouse && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Lighthouse
+                  </span>
+                )}
+              </h2>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
+                {/* Lighthouse Scores */}
+                {auditResult.lighthouse && (
+                  <div>
+                    <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Lighthouse Scores</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {[
+                        { label: 'Performance', value: auditResult.lighthouse.performance },
+                        { label: 'Accessibility', value: auditResult.lighthouse.accessibility },
+                        { label: 'Best Practices', value: auditResult.lighthouse.bestPractices },
+                        { label: 'SEO', value: auditResult.lighthouse.seo },
+                        { label: 'FCP', value: `${auditResult.lighthouse.fcp}s`, raw: auditResult.lighthouse.fcp, isTime: true },
+                      ].map(item => {
+                        const numVal = item.isTime ? (item.raw! <= 1.8 ? 95 : item.raw! <= 3 ? 60 : 30) : (item.value as number)
+                        const status = numVal >= 90 ? 'good' : numVal >= 50 ? 'needs-improvement' : 'poor'
+                        return (
+                          <div key={item.label} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+                            <div className="text-[10px] text-slate-500 uppercase">{item.label}</div>
+                            <div className={`text-lg font-bold mt-1 ${status === 'good' ? 'text-emerald-400' : status === 'needs-improvement' ? 'text-amber-400' : 'text-red-400'}`}>
+                              {item.value}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Core Web Vitals from Audit */}
+                {auditResult.coreVitals && (
+                  <div>
+                    <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Core Web Vitals (Measured)</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: 'LCP', value: auditResult.coreVitals.lcp, unit: 's', good: 2.5, ni: 4 },
+                        { label: 'FCP', value: auditResult.coreVitals.fcp, unit: 's', good: 1.8, ni: 3 },
+                        { label: 'CLS', value: auditResult.coreVitals.cls, unit: '', good: 0.1, ni: 0.25 },
+                        { label: 'TTFB', value: auditResult.coreVitals.ttfb, unit: 'ms', good: 800, ni: 1800 },
+                      ].filter(v => v.value !== null).map(vital => {
+                        const val = vital.value!
+                        const status = val <= vital.good ? 'good' : val <= vital.ni ? 'needs-improvement' : 'poor'
+                        return (
+                          <div key={vital.label} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+                            <div className="text-[10px] text-slate-500 uppercase">{vital.label}</div>
+                            <div className={`text-lg font-bold mt-1 ${status === 'good' ? 'text-emerald-400' : status === 'needs-improvement' ? 'text-amber-400' : 'text-red-400'}`}>
+                              {typeof val === 'number' ? (vital.unit === 'ms' ? `${Math.round(val)}${vital.unit}` : `${val.toFixed(vital.unit === 's' ? 1 : 3)}${vital.unit}`) : '—'}
+                            </div>
+                            <div className="text-[10px] text-slate-600 mt-0.5">
+                              {status === 'good' ? 'Good' : status === 'needs-improvement' ? 'Needs Improvement' : 'Poor'}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Resource Sizes */}
+                {auditResult.lighthouse && (
+                  <div>
+                    <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Resource Sizes</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {[
+                        { label: 'JavaScript', value: auditResult.lighthouse.jsSize, unit: 'KB' },
+                        { label: 'CSS', value: auditResult.lighthouse.cssSize, unit: 'KB' },
+                        { label: 'Images', value: auditResult.lighthouse.imageSize, unit: 'KB' },
+                        { label: 'Fonts', value: auditResult.lighthouse.fontSize, unit: 'KB' },
+                        { label: 'Total', value: auditResult.lighthouse.totalSize, unit: 'KB' },
+                      ].map(item => (
+                        <div key={item.label} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 text-center">
+                          <div className="text-[10px] text-slate-500 uppercase">{item.label}</div>
+                          <div className="text-lg font-bold text-white mt-1">{item.value}<span className="text-xs text-slate-500 ml-0.5">{item.unit}</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* API Endpoint Timings */}
+                {auditResult.endpointTimings && auditResult.endpointTimings.length > 0 && (
+                  <div>
+                    <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">API Endpoint Latency (Measured)</div>
+                    <div className="space-y-2">
+                      {auditResult.endpointTimings.map((ep: any) => (
+                        <div key={ep.route} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/30">
+                          <code className="text-xs font-mono text-slate-300">{ep.route}</code>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs font-semibold ${ep.ttfb > 500 ? 'text-red-400' : ep.ttfb > 200 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                              {ep.ttfb}ms
+                            </span>
+                            <span className="text-[10px] text-slate-500">TTFB</span>
+                            {ep.error && <span className="text-[10px] text-red-400">{ep.error}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Audit Issues */}
+                {auditResult.issues && auditResult.issues.length > 0 && (
+                  <div>
+                    <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Issues Found ({auditResult.issues.length})</div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {auditResult.issues.map((issue: any, idx: number) => {
+                        const sevColor = issue.severity === 'critical' ? 'text-red-400' : issue.severity === 'major' ? 'text-orange-400' : issue.severity === 'medium' ? 'text-amber-400' : 'text-slate-400'
+                        return (
+                          <div key={idx} className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                            <div className="flex items-start gap-2">
+                              <span className={`text-[10px] font-medium uppercase ${sevColor} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-slate-200 leading-relaxed">{issue.title}</p>
+                                {issue.fixSuggestion && <p className="text-[10px] text-slate-500 mt-1">{issue.fixSuggestion}</p>}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Timestamp */}
+                <div className="flex items-center justify-between text-[10px] text-slate-600 pt-2 border-t border-slate-800">
+                  <span>Audit completed: {new Date(auditResult.timestamp).toLocaleString()}</span>
+                  <span>Duration: {(auditResult.durationMs / 1000).toFixed(1)}s</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Audit Error */}
+          {auditError && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-red-300 font-medium">Audit Error</p>
+                <p className="text-xs text-red-400/80 mt-1">{auditError}</p>
+                <p className="text-[10px] text-slate-500 mt-2">Lighthouse requires Chrome. If Chrome is not available, the audit falls back to API timing measurements only.</p>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Performance Issues from DB ──────────────────────── */}
+          {perfData?.issues && perfData.issues.length > 0 && !auditResult && (
+            <div>
+              <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-400" />
+                Performance Issues ({perfData.issues.length})
+              </h2>
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {perfData.issues.map((issue: any) => {
+                    const sevColor = issue.severity === 'critical' ? 'text-red-400' : issue.severity === 'major' ? 'text-orange-400' : issue.severity === 'medium' ? 'text-amber-400' : 'text-slate-400'
+                    const sevBg = issue.severity === 'critical' ? 'bg-red-500/10 border-red-500/20' : issue.severity === 'major' ? 'bg-orange-500/10 border-orange-500/20' : issue.severity === 'medium' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-slate-800/30 border-slate-700/30'
+                    return (
+                      <div key={issue.id} className={`p-3 rounded-lg border ${sevBg}`}>
+                        <div className="flex items-start gap-2">
+                          <span className={`text-[10px] font-medium uppercase ${sevColor} flex-shrink-0 mt-0.5`}>{issue.severity}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-slate-200 leading-relaxed">{issue.title}</p>
+                            {issue.fixSuggestion && <p className="text-[10px] text-slate-500 mt-1">💡 {issue.fixSuggestion}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── 7b. Recent Optimizations ─────────────────────────── */}
           {recentOptimizations.length > 0 && (
             <div>
               <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">

@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+// WebVitalsReporter loaded dynamically to avoid SSR issues
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

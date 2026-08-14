@@ -487,7 +487,7 @@ export async function GET() {
   }
 
   // ─── performance ──────────────────────────────────────────────────────
-  // Performance data from QARun scores & QAPageTest
+  // Performance data from QARun scores, QAPageTest, and QAIssue (real audit data)
 
   const latestPerfRun = await safe(
     () => db.qARun.findFirst({
@@ -503,6 +503,22 @@ export async function GET() {
       return db.qAPageTest.findMany({
         where: { runId: latestPerfRun.id },
         orderBy: { loadTime: 'desc' },
+      })
+    },
+    [] as any[]
+  )
+
+  // Fetch real performance issues from the latest run
+  const perfIssues = await safe(
+    async () => {
+      if (!latestPerfRun) return []
+      return db.qAIssue.findMany({
+        where: {
+          runId: latestPerfRun.id,
+          category: { startsWith: 'performance' },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
       })
     },
     [] as any[]
@@ -531,6 +547,16 @@ export async function GET() {
           pagesWithErrors: pageTests.filter((p: any) => p.hasErrors).length,
         }
       : null,
+    issues: perfIssues.map((i: any) => ({
+      id: i.id,
+      title: i.title,
+      severity: i.severity,
+      category: i.category,
+      page: i.page,
+      evidence: i.evidence,
+      fixSuggestion: i.fixSuggestion,
+      createdAt: i.createdAt,
+    })),
     lastRun: latestPerfRun
       ? {
           id: latestPerfRun.id,
