@@ -232,6 +232,7 @@ function CircularGauge({ score, size = 160 }: { score: number; size?: number }) 
 export default function SecurityEnginePage() {
   const [systemStatus, setSystemStatus] = useState<SystemStatusData | null>(null)
   const [security, setSecurity] = useState<SecurityData | null>(null)
+  const [dataSource, setDataSource] = useState<string>('live')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [animatingScore, setAnimatingScore] = useState(0)
@@ -240,16 +241,19 @@ export default function SecurityEnginePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch('/api/control/data')
-        if (!res.ok) throw new Error('Failed to fetch control data')
+        const res = await fetch('/api/control/security')
+        if (!res.ok) throw new Error('Failed to fetch security data')
         const json = await res.json()
 
-        // Extract both systemStatus and security from the unified response
+        // Extract both systemStatus and security from the dedicated security API
         if (json.systemStatus) {
           setSystemStatus(json.systemStatus)
         }
         if (json.security) {
           setSecurity(json.security)
+        }
+        if (json.source) {
+          setDataSource(json.source)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -374,6 +378,14 @@ export default function SecurityEnginePage() {
               {overallStatus === 'operational' ? 'All Clear' : 'Issues Detected'}
             </span>
           </div>
+          {(dataSource === 'seed' || dataSource === 'cold_start') && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              <span className="text-[10px] font-medium text-amber-400">
+                Cold-start: seeded data
+              </span>
+            </div>
+          )}
           <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-red-500/30 transition-colors text-xs">
             <RefreshCw className="w-3.5 h-3.5" />
             Run Full Scan
@@ -816,6 +828,11 @@ export default function SecurityEnginePage() {
         <span>Components: <span className="text-slate-300">{componentEntries.length} scanned</span></span>
         <span className="text-slate-700">|</span>
         <span>Code Scan: <span className={codeScanStatus === 'completed' ? 'text-emerald-400' : 'text-amber-400'}>{codeScanStatus}</span></span>
+        <span className="text-slate-700">|</span>
+        <span className="flex items-center gap-1.5">
+          <div className={`w-1.5 h-1.5 rounded-full ${dataSource === 'live' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+          Data: <span className={dataSource === 'live' ? 'text-emerald-400' : 'text-amber-400'}>{dataSource}</span>
+        </span>
       </div>
     </div>
   )
