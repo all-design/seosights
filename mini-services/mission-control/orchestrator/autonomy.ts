@@ -32,15 +32,26 @@ export async function calculateAutonomy(state: MCState) {
     let failed = 0
 
     if (sys === 'ai_router') {
-      // AI Router is always-on — estimate based on typical daily volume
-      planned = 6214
-      completed = 6208
-      failed = 6
+      // AI Router — use real TokenUsageLog data for today
+      // Each logged entry represents a completed LLM API call.
+      // TokenUsageLog only records successful calls (token counts exist),
+      // so failed = 0 and planned = completed.
+      try {
+        completed = await db.tokenUsageLog.count({
+          where: { createdAt: { gte: today } },
+        })
+      } catch (e) {
+        console.error('[Autonomy] Failed to query TokenUsageLog for ai_router:', e)
+        completed = 0
+      }
+      failed = 0 // No failure tracking in TokenUsageLog schema
+      planned = completed + failed
     } else {
+      // Other systems — use real schedule job data only, no fake fallbacks
       const sysJobs = todayJobs.filter(j => j.systemName === sys)
-      planned = sysJobs.length || Math.floor(Math.random() * 20) + 10
-      completed = sysJobs.filter(j => j.status === 'completed').length || Math.floor(planned * 0.9)
-      failed = sysJobs.filter(j => j.status === 'failed').length || Math.max(0, planned - completed - 1)
+      planned = sysJobs.length
+      completed = sysJobs.filter(j => j.status === 'completed').length
+      failed = sysJobs.filter(j => j.status === 'failed').length
     }
 
     const rate = planned > 0 ? completed / planned : 0
@@ -49,21 +60,38 @@ export async function calculateAutonomy(state: MCState) {
     totalCompleted += completed
     totalFailed += failed
 
+    // Log per-system metrics (MCAutonomyMetric model does not exist in schema,
+    // so we update MCSystemStatus for each system and log to console)
+    console.log(
+      `[Autonomy] ${sys}: planned=${planned}, completed=${completed}, failed=${failed}, rate=${(rate * 100).toFixed(1)}%`
+    )
+
     try {
-      await db.mCAutonomyMetric.upsert({
-        where: { date_systemName: { date: today, systemName: sys } },
-        update: { planned, completed, failed, rate },
-        create: { date: today, systemName: sys, planned, completed, failed, rate },
+      await db.mCSystemStatus.upsert({
+        where: { systemName: sys },
+        update: {
+          todayTotal: planned,
+          todayCompleted: completed,
+          todayFailed: failed,
+        },
+        create: {
+          systemName: sys,
+          displayName: sys.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          status: planned > 0 ? 'running' : 'idle',
+          todayTotal: planned,
+          todayCompleted: completed,
+          todayFailed: failed,
+        },
       })
     } catch (e) {
-      console.error(`[Autonomy] Failed to update ${sys}:`, e)
+      console.error(`[Autonomy] Failed to update MCSystemStatus for ${sys}:`, e)
     }
   }
 
   const overallRate = totalPlanned > 0 ? totalCompleted / totalPlanned : 0
   console.log(`[Autonomy] Platform Autonomy™: ${(overallRate * 100).toFixed(1)}% (${totalCompleted}/${totalPlanned})`)
 
-  // Also update Mission Control system status with today's stats
+  // Also update Mission Control system status with today's totals
   try {
     await db.mCSystemStatus.upsert({
       where: { systemName: 'mission_control' },

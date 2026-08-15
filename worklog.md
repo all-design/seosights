@@ -787,3 +787,291 @@ Stage Summary:
 - Performance issues are generated from real audit results, not static strings
 - All data flows: Lighthouse → Database → API → UI (real, not circular mock)
 - Server stability note: dev server has memory pressure during webpack compilation (pre-existing issue)
+
+---
+Task ID: 6
+Agent: autonomy-fix
+Task: Fix Autonomy calculator — remove hardcoded AI Router stats, remove Math.random() fallbacks, fix non-existent MCAutonomyMetric model
+
+Work Log:
+- Inspected Prisma schema to verify model existence:
+  - `MCAutonomyMetric` — DOES NOT EXIST (upsert was always failing silently)
+  - `TokenUsageLog` — EXISTS (has id, agentName, modelUsed, promptTokens, completionTokens, costUsd, createdAt)
+  - `MCSystemStatus` — EXISTS (has todayTotal, todayCompleted, todayFailed)
+  - `MCScheduleJob` — EXISTS
+- Fix 1: AI Router — replaced hardcoded 6214/6208/6 with real `db.tokenUsageLog.count({ where: { createdAt: { gte: today } } })`. Since TokenUsageLog only records successful calls (no failure field), failed=0 and planned=completed.
+- Fix 2: Other systems — removed all `Math.random()` fallbacks. If no schedule jobs exist for a system, it now honestly reports 0/0/0 instead of fabricating fake numbers.
+- Fix 3: MCAutonomyMetric — replaced the upsert (which targeted a non-existent model) with per-system `MCSystemStatus.upsert` updates + console logging. Each system now gets its todayTotal/todayCompleted/todayFailed persisted via MCSystemStatus.
+
+File Changed: /home/z/my-project/mini-services/mission-control/orchestrator/autonomy.ts
+
+Summary:
+- AI Router stats now come from real TokenUsageLog data (today's LLM API call count)
+- No more fabricated random data — systems with no jobs report 0/0/0 honestly
+- Per-system metrics persisted via MCSystemStatus (which actually exists) instead of MCAutonomyMetric (which didn't)
+
+---
+Task ID: 3
+Agent: scoring-fix
+Task: Fix Scoring Engine — remove random noise, add deterministic data-quality-driven scoring
+
+Work Log:
+- Analyzed original scoring.ts: found two sources of non-determinism
+  - `Math.floor(Math.random() * 10) - 5` added ±5 random noise to growthScore
+  - `Math.random() * 0.1` added random 0–0.1 noise to confidence
+- Kept typeBonus and sourceBonus heuristics (they are real, proven signals)
+- Added `isPopulatedJson()` helper to check if sourceDetails/data fields have meaningful content
+- Added `extractDomains()` helper to pull domain-like strings from targetEntities for DB queries
+- Added `extractKeywords()` helper to pull keyword strings from targetKeywords for fallback citation matching
+- Added real data quality signals:
+  1. sourceDetails populated → +3 to dataQualityBonus, +0.02 to confidence increment
+  2. data field populated → +3 to dataQualityBonus, +0.02 to confidence increment
+  3. CitationRecord count for opportunity's domains → +2 per citation (capped at +6), +0.03 to confidence
+  4. VisibilitySnapshot count for opportunity's domains → +2 per snapshot (capped at +4), +0.03 to confidence
+  5. Fallback: if no domain-specific citations, try matching opportunity type to promptCategory (capped at 3)
+- Growth score is now fully deterministic: opp.growthScore + bonus + dataQualityBonus
+- Confidence increment is now fully deterministic: base 0.05 + signal increments (max ~0.15)
+
+File Changed: /home/z/my-project/mini-services/growth-engine/engines/scoring.ts
+
+Summary:
+- Scoring engine is now fully deterministic — no Math.random() calls remain
+- Scores reflect real data quality: opportunities backed by citations and visibility data score higher
+- Confidence increments are proportional to the amount of supporting data, not random noise
+- Maximum dataQualityBonus: 3 (sourceDetails) + 3 (data) + 6 (3 citations) + 4 (2 snapshots) = 16 points
+- Maximum confidence increment: 0.05 (base) + 0.02 + 0.02 + 0.03 + 0.03 = 0.15
+
+---
+Task ID: 2
+Agent: measurement-fix
+Task: Replace Math.random() in measurement.ts with real DB data sources
+
+Work Log:
+- Read current measurement.ts file — confirmed all 7 Math.random() calls producing fake data
+- Read Prisma schema for VisibilitySnapshot, CitationEvent, CitationRecord, GrowthAsset, GrowthLearning, MCSystemStatus models
+- Implemented extractDomain() helper to parse hostname from publishedUrl
+- Implemented computeVisibilityDelta() — queries 2 most recent VisibilitySnapshot for real score change
+- Implemented countCitationEvents() — counts 'cited'/'rank_up'/'first_mention' events from CitationEvent
+- Implemented countCitationRecords() — counts CitationRecord entries by citedDomain
+- Implemented getLatestVisibilityScore() — gets current visibility score for estimation formulas
+- Replaced Math.random() traffic/impressions/clicks with documented heuristic estimations from real citation+visibility data
+- Added estimateTraffic24h(), estimateImpressions24h(), estimateClicks24h(), estimateConversions7d() with clear JSDoc explaining these are estimates (no GA API)
+- Implemented computePredictionError() using MAPE to compare predicted vs actual values
+- Updated GrowthLearning.create() to include actualTraffic, actualCitations, actualVisibility, actualValue fields
+- Added predictionError and errorDirection computed from real measurement vs prediction comparison
+- Added lessonLearned string summarizing which predictions were off by >30%
+- Added isUnderperforming() with configurable thresholds (7-day min age, traffic/citations/visibility checks)
+- Falls back to zero values when no domain or no data — never Math.random()
+
+Stage Summary:
+- measurement.ts now uses real DB data instead of Math.random()
+- Traffic/impressions are estimated from citations+visibility (clearly documented as estimates)
+- Zero fallback when no data available (no more random noise)
+- GrowthLearning records now contain actual measured values and prediction error metrics
+- isUnderperforming flag set based on real thresholds after 7+ days
+
+---
+Task ID: 8
+Agent: editorial-gate
+Task: Add editorial gate to auto-promote cron at /api/cron/promote-reports
+
+Work Log:
+- Read existing promote-reports route: it auto-promoted ObservatoryReport (proposed→published with hardcoded editorialScore=80) and ContentArticle (draft/review→published with no quality check)
+- Reviewed Prisma schema for ObservatoryReport, ContentArticle, ObservatoryResponse, ObservatoryChange, ObservatoryCrawl models
+- Rewrote the route with proper editorial gates:
+
+  ObservatoryReport gates:
+  - 1-hour minimum wait preserved (allows human review window)
+  - isSimulated=false check (never auto-publish seed/dev data)
+  - evidenceScore > 0 (must have real evidence backing)
+  - sampleSize > 0 (must have actual data points)
+  - Backing ObservatoryResponse records check (traces relatedChanges → crawls → non-simulated responses)
+  - editorialScore computed from weighted blend: evidence(40%) + confidence(30%) + freshness(30%), normalized to 0-1
+  - editorialReason stored with full gate metrics for audit trail
+
+  ContentArticle gates:
+  - 1-hour minimum wait preserved
+  - ONLY 'review' status eligible — drafts are NEVER auto-promoted (must go through human review first)
+  - Content length >= 50 chars (not just a title)
+  - wordCount > 0 (sanity check)
+  - Computed qualityScore (average of non-zero seoScore/aeoScore/geoScore) >= 60 threshold
+
+  Safety: Max 5 promotions per run (MAX_PROMOTIONS_PER_RUN) to prevent mass-publishing
+
+  Logging: Every promoted and skipped item logged with type, id, title, and reason
+
+- Lint passes clean on the modified file
+- Pre-existing lint errors in other files (scheduler, EngagementShell) are unrelated
+
+Stage Summary:
+- Auto-promote cron now has real quality gates instead of blindly publishing content
+- ObservatoryReports need actual evidence, data points, and backing responses to be promoted
+- ContentArticles must be in 'review' status with qualityScore >= 60 and substantive content
+- Safety limit of 5 promotions per run prevents mass-publishing incidents
+- Full audit trail via promoted/skipped details in API response and console logs
+
+---
+Task ID: 7
+Agent: qa-seed-fix
+Task: Fix QA Seed route to use real audit scores instead of hardcoded values
+
+Work Log:
+- Read the full /src/app/api/qa/seed/route.ts file (1201 lines) and the Prisma schema for QARun model
+- Added query at start of POST handler: checks for real QARun records (triggeredBy != 'seed_demo' AND status = 'completed'), includes reviewerResults
+- If real runs exist, extracts scores and reviewer findings from the latest run into maps (realReviewerScores, realReviewerFindings)
+- If no real runs exist, sets isDemoData = true
+- Modified QARun.create to use spread runScores (from real or demo) with triggeredBy: 'seed_demo' when demo, 'seed_from_real' when real
+- Added summary field: "DEMO DATA - Run a real audit for actual scores" for demo, "Seeded from latest real audit run" for real
+- Modified reviewer score lookup: uses realReviewerScores[reviewer] ?? REVIEWER_SCORES[reviewer]
+- Added summary field to QAReviewerResult model: prefixed with "[DEMO DATA]" when isDemoData, uses real findings summary when available
+- Modified findings JSON: summary is prefixed with "[DEMO DATA]" when demo, includes isDemoData boolean in the JSON
+- Historical QARuns also marked with triggeredBy and summary (seed_demo or seed_from_real)
+- Added isDemoData flag to the POST response JSON
+- Updated response message to indicate demo vs real data source
+
+Stage Summary:
+- POST /api/qa/seed now queries for real QARun records before seeding
+- When real audit data exists, the seeded run uses actual scores from the latest real run
+- When no real data exists, seeded runs are clearly marked with triggeredBy='seed_demo' and summary='DEMO DATA - Run a real audit for actual scores'
+- Frontend can distinguish real vs demo data via the isDemoData flag in the response
+- Reviewer summaries are marked with [DEMO DATA] prefix when not from real audits
+- All historical runs are also properly tagged with triggeredBy and summary
+
+---
+Task ID: 5
+Agent: observatory-reviewer-fix
+Task: Fix Observatory Reviewer — replace hardcoded values with real DB queries
+
+Work Log:
+- Read the existing `/home/z/my-project/mini-services/qa-engine/reviewers/observatory.ts` — found hardcoded `score = 95`, static list of 4 issues, and hardcoded details like `methodologyAccuracy: '85%'`, `falsePositiveRate: '23%'`
+- Read Prisma schema for all relevant models: ObservatoryReport, ObservatoryResponse, ObservatoryChange, CitationRecord, AIModelRegistry, ObservatoryCrawl, QAIssue
+- Rewrote the entire reviewer with real DB-backed logic:
+
+  **Score calculation (was: hardcoded 95, now: 0-100 from real data):**
+  - Component A — Data coverage (0-25): logarithmic scaling of totalReports, totalResponses, totalCitations
+  - Component B — Model coverage (0-25): activeModelCount / max(totalModelCount, 6) * 25
+  - Component C — Recency (0-25): full marks if latest response < 7 days old, decay to 0 over 90 days
+  - Component D — Evidence quality (0-25): weighted blend of avg evidenceScore, confidenceScore, freshnessScore from published reports (fallback to citation confidence)
+  - If NO data exists at all, score = 0 (not 95!)
+
+  **Dynamic issues (was: always 4 hardcoded issues, now: generated from real findings):**
+  - Stale AI models: checks AIModelRegistry.lastCrawledAt > 7 days → creates issue with model names and days stale
+  - Simulated data: checks ObservatoryResponse.isSimulated = true → creates critical issue
+  - Low-data prompt categories: counts responses per promptCategory, flags categories < 20 responses
+  - Low-confidence citations: checks CitationRecord.confidence < 0.5 → creates issue with affected models
+  - High false positive rate: checks ObservatoryChange where isSignal=true but significanceScore < 0.4 → computes real FP rate
+  - No data at all: creates critical issue if DB is empty
+
+  **Details from real data (was: all hardcoded, now: computed from DB):**
+  - `modelCoverage`: activeModelCount from AIModelRegistry
+  - `documentedModelCoverage`: same (matches modelCoverage)
+  - `dataQualityScore`: blend of avgReportEvidenceScore, avgReportFreshness, avgCitationConfidence
+  - `citationAccuracy`: average CitationRecord confidence * 100
+  - `falsePositiveRate`: lowSignificanceSignals / totalSignals from ObservatoryChange
+  - `breakingAlertAccuracy`: 1 - falsePositiveRate
+  - `staleModelCount`, `staleSourceCount`, `simulatedResponseCount` all from real queries
+  - Added `scoreBreakdown` showing all 4 components
+  - Added data volume: totalReports, totalResponses, totalChanges, totalCitations
+  - Added `lastResponseAt`, `lastCrawlAt` timestamps
+
+  **Summary and recommendations (was: hardcoded text, now: dynamic):**
+  - Summary built from real data volumes, score breakdown, and issue findings
+  - Recommendations generated per-issue-type; fallback if no issues found
+
+- Fixed TypeScript `Set`/`Map` iteration errors: replaced spread syntax `[...new Set()]` with `Array.from(new Set())` for TS target compatibility
+- Fixed bug: `hasAnyData` referenced `totalCitations` twice instead of `totalChanges`
+- Verified: zero type errors in the rewritten file
+
+Stage Summary:
+- Observatory reviewer now computes score, issues, and details entirely from real DB data
+- Score is 0 when no data exists (was hardcoded 95)
+- Issues are dynamic and reflect actual data quality problems
+- All QAIssue creation logic preserved but now uses dynamically generated issues
+- File passes TypeScript type checking with no errors
+
+---
+Task ID: 9
+Agent: benchmark-labels-fix
+Task: Fix Landing Page benchmark components that show fabricated competitor data
+
+Work Log:
+- Read CommunityLeaderboard.tsx and PublicBenchmarksSection.tsx
+- CommunityLeaderboard.tsx changes:
+  - Added "Illustrative Examples" badge (amber/orange styling with Sparkles icon) next to "The Leaderboard" badge, both wrapped in an inline-flex div
+  - Added disclaimer paragraph below the leaderboard table: "These scores are illustrative examples for demonstration purposes. Real AI Visibility Scores are computed from live citation data across AI models. Sign up to see real benchmark data for your industry."
+  - Preserved original "Scores updated every Monday" footer text below the disclaimer
+- PublicBenchmarksSection.tsx changes:
+  - Added "Illustrative Examples" badge (orange styling with BarChart3 icon) next to "AI Visibility Index™" badge, both wrapped in an inline-flex div
+  - Added disclaimer paragraph between the benchmark table card and the Bottom CTAs: "These scores are illustrative examples for demonstration purposes. Real AI Visibility Scores are computed from live citation data across AI models. Sign up to see real benchmark data for your industry."
+- Fixed JSX closing tag error: `</p>` → `</motion.p>` for the disclaimer motion.p in CommunityLeaderboard
+- Verified lint passes for the two edited files (remaining errors are pre-existing in other files)
+- Did NOT change any of the hardcoded benchmark data, animations, or existing styling
+
+Stage Summary:
+- Both benchmark sections now clearly display "Illustrative Examples" badges prominently next to their section headers
+- Both sections include disclaimer text below their tables clarifying the data is illustrative
+- All existing UI, animations, and styling preserved — only additive changes made
+
+---
+Task ID: 4
+Agent: performance-page-fix
+Task: Fix QA PerformancePage component to use real data instead of hardcoded mock data
+
+Work Log:
+- Read existing PerformancePage.tsx — confirmed all data (performance score, FCP/LCP/CLS, bundle sizes, image issues, TTFB, core web vitals) is hardcoded mock
+- Investigated existing API infrastructure:
+  - /api/control/performance/audit (POST triggers real Lighthouse audit, GET returns latest results from DB)
+  - /api/control/performance/vitals (POST receives RUM web-vitals, GET returns aggregated RUM data)
+  - Both store results in QARun, QAIssue, QAPageTest Prisma models
+- Created new API route /api/qa/performance-data/route.ts:
+  - Queries latest QARun with performanceScore > 0
+  - Queries performance-related QAIssues from that run
+  - Queries QAPageTest entries for route-level TTFB/load-time data
+  - Checks for RUM vitals data (triggeredBy: 'rum_vitals')
+  - Extracts core web vitals from issue evidence JSON
+  - Builds bundle data, image issues, TTFB by route, core web vitals from real DB records
+  - Returns { hasRealData: true, ... } with real data, or { hasRealData: false } when no audit exists
+- Updated PerformancePage.tsx:
+  - Added useEffect + useState to fetch from /api/qa/performance-data on mount
+  - When real data available: displays it with green "Live Data" badge and last audit timestamp
+  - When no real data: shows demo data with orange "Demo Data" badge and hint text "Run a real Lighthouse audit for actual measurements"
+  - Added "Run Audit" button linking to /control/performance
+  - Preserved all existing UI layout (cards, charts, gauges, grid structure, animations)
+  - Added loading spinner state
+  - Made core web vital value color dynamic (green for pass, red for fail)
+  - Added max-h-96 overflow-y-auto to TTFB list for long route lists
+- Lint passes clean on both modified files (no new errors introduced)
+
+Stage Summary:
+- PerformancePage no longer uses hardcoded mock data — it fetches from /api/qa/performance-data
+- When a real Lighthouse audit has been run, all metrics come from the database
+- When no audit exists, demo data is shown with a clear orange "Demo Data" badge
+- "Run Audit" button links to /control/performance for triggering a real audit
+- All existing UI, animations, and styling preserved
+
+---
+Task ID: REAL-DATA-INTEGRATION
+Agent: main
+Task: Replace all mock/hardcoded/random data with real data sources across the entire platform
+
+Work Log:
+- Diagnosed 7+ files with Math.random(), hardcoded scores, and fabricated data
+- Fixed measurement.ts: replaced 7 Math.random() calls with real VisibilitySnapshot, CitationEvent, CitationRecord queries
+- Fixed scoring.ts: removed Math.random() noise, added deterministic data-quality signals from CitationRecord and VisibilitySnapshot
+- Fixed autonomy.ts: replaced hardcoded AI Router stats (6214/6208/6) with real TokenUsageLog queries, removed Math.random() fallbacks
+- Fixed observatory.ts reviewer: replaced hardcoded score=95 with real DB-based scoring (0-100 from data coverage, model coverage, recency, evidence quality)
+- Fixed PerformancePage.tsx: added data-source indicator (Live Data vs Demo Data badge), fetches from new /api/qa/performance-data endpoint
+- Created /api/qa/performance-data route: queries real QARun, QAIssue, QAPageTest for actual Lighthouse/RUM data
+- Fixed QA seed route: added isDemoData flag, marks seeded data as [DEMO DATA], uses real audit scores when available
+- Fixed promote-reports cron: added editorial gate (no auto-promote from draft, requires review status + qualityScore >= 60, max 5 per run, checks isSimulated)
+- Fixed CommunityLeaderboard.tsx and PublicBenchmarksSection.tsx: added "Illustrative Examples" badges and disclaimers
+- Fixed TypeScript errors in scoring.ts and qa/seed/route.ts
+- Verified: TypeScript compiles, dev server starts, homepage returns 200, API returns correct response
+
+Stage Summary:
+- 7 files with Math.random() → 0 remaining Math.random() calls in data engines
+- Hardcoded scores (95, 92, 94, 88, etc.) → dynamic scores from real DB queries
+- Auto-publish without review → editorial gate with quality thresholds
+- Landing benchmarks presented as real → clearly labeled as "Illustrative Examples"
+- New API endpoint /api/qa/performance-data for real performance data
+- System now honestly reports "no data" (0) instead of fabricating random numbers

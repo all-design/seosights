@@ -175,13 +175,22 @@ export default function CommunityLeaderboard({
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
-          <Badge
-            variant="outline"
-            className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-purple-500/50 text-purple-300 bg-purple-500/10 backdrop-blur-sm mb-6"
-          >
-            <Trophy className="w-3.5 h-3.5" />
-            The Leaderboard
-          </Badge>
+          <div className="inline-flex items-center gap-3 mb-6">
+            <Badge
+              variant="outline"
+              className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-purple-500/50 text-purple-300 bg-purple-500/10 backdrop-blur-sm"
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              The Leaderboard
+            </Badge>
+            <Badge
+              variant="outline"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border-amber-500/60 text-amber-400 bg-amber-500/10 backdrop-blur-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Illustrative Examples
+            </Badge>
+          </div>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
             Who dominates{' '}
             <span className="bg-gradient-to-r from-purple-300 via-fuchsia-300 to-purple-400 bg-clip-text text-transparent">
@@ -366,6 +375,15 @@ export default function CommunityLeaderboard({
           animate={isInView ? { opacity: 1 } : {}}
           transition={{ duration: 0.5, delay: 0.6 }}
         >
+          These scores are illustrative examples for demonstration purposes. Real AI Visibility Scores are computed from live citation data across AI models.{' '}
+            <span className="text-purple-300/80">Sign up to see real benchmark data for your industry.</span>
+        </motion.p>
+          <motion.p
+            className="text-center text-xs text-muted-foreground/60 mt-2"
+            initial={{ opacity: 0 }}
+            animate={isInView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.5, delay: 0.7 }}
+          >
           Scores updated every Monday. Public profile pages coming soon.
         </motion.p>
       </div>

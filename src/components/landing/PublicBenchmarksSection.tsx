@@ -100,13 +100,22 @@ export default function PublicBenchmarksSection() {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
         >
-          <Badge
-            variant="outline"
-            className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-amber-500/50 text-amber-400 bg-amber-500/10 backdrop-blur-sm mb-6"
-          >
-            <Trophy className="w-3.5 h-3.5" />
-            AI Visibility Index™ — Public Benchmark Data
-          </Badge>
+          <div className="inline-flex items-center gap-3 mb-6">
+            <Badge
+              variant="outline"
+              className="inline-flex items-center gap-2 px-4 py-1.5 text-sm border-amber-500/50 text-amber-400 bg-amber-500/10 backdrop-blur-sm"
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              AI Visibility Index™ — Public Benchmark Data
+            </Badge>
+            <Badge
+              variant="outline"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border-orange-500/60 text-orange-400 bg-orange-500/10 backdrop-blur-sm"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              Illustrative Examples
+            </Badge>
+          </div>
           <h2 className="text-4xl sm:text-5xl font-bold mb-4">
             Top 100{' '}
             <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400 bg-clip-text text-transparent">
@@ -210,6 +219,17 @@ export default function PublicBenchmarksSection() {
             ))}
           </Card>
         </motion.div>
+
+        {/* Disclaimer */}
+        <motion.p
+          className="text-center text-xs text-muted-foreground/70 max-w-2xl mx-auto mt-6"
+          initial={{ opacity: 0, y: 10 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.9 }}
+        >
+          These scores are illustrative examples for demonstration purposes. Real AI Visibility Scores are computed from live citation data across AI models.{' '}
+          <span className="text-amber-400/80">Sign up to see real benchmark data for your industry.</span>
+        </motion.p>
 
         {/* Bottom CTAs */}
         <motion.div

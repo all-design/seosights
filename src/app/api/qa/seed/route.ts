@@ -815,38 +815,90 @@ export async function POST() {
   try {
     const results: Record<string, number> = {}
 
+    // ── 0. Check for real QARun data ────────────────────────────────────────
+    const realRuns = await db.qARun.findMany({
+      where: {
+        triggeredBy: { not: 'seed_demo' },
+        status: 'completed',
+      },
+      orderBy: { completedAt: 'desc' },
+      take: 1,
+      include: {
+        reviewerResults: true,
+      },
+    })
+    const latestRealRun = realRuns[0] ?? null
+    const isDemoData = !latestRealRun
+
+    // Build a map of real reviewer scores if available
+    const realReviewerScores: Record<string, number> = {}
+    const realReviewerFindings: Record<string, string> = {}
+    if (latestRealRun) {
+      for (const rr of latestRealRun.reviewerResults) {
+        realReviewerScores[rr.reviewer] = rr.score
+        if (rr.findings) realReviewerFindings[rr.reviewer] = rr.findings
+      }
+    }
+
     // ── 1. QARun ─────────────────────────────────────────────────────────
     const now = new Date()
     const startedAt = new Date(now.getTime() - 147000) // 2m 27s ago
+
+    // Use real scores if available, otherwise fall back to demo scores
+    const runScores = latestRealRun
+      ? {
+          productScore: latestRealRun.productScore,
+          uxScore: latestRealRun.uxScore,
+          engineeringScore: latestRealRun.engineeringScore,
+          conversionScore: latestRealRun.conversionScore,
+          accessibilityScore: latestRealRun.accessibilityScore,
+          securityScore: latestRealRun.securityScore,
+          performanceScore: latestRealRun.performanceScore,
+          seoScore: latestRealRun.seoScore,
+          customerDelight: latestRealRun.customerDelight,
+          criticalCount: latestRealRun.criticalCount,
+          majorCount: latestRealRun.majorCount,
+          mediumCount: latestRealRun.mediumCount,
+          minorCount: latestRealRun.minorCount,
+          technicalDebt: latestRealRun.technicalDebt,
+        }
+      : {
+          productScore: 92,
+          uxScore: 88,
+          engineeringScore: 91,
+          conversionScore: 81,
+          accessibilityScore: 83,
+          securityScore: 97,
+          performanceScore: 92,
+          seoScore: 89,
+          customerDelight: 87,
+          criticalCount: 2,
+          majorCount: 8,
+          mediumCount: 14,
+          minorCount: 37,
+          technicalDebt: 22,
+        }
 
     const run = await db.qARun.create({
       data: {
         startedAt,
         completedAt: now,
         durationMs: 147000,
-        productScore: 92,
-        uxScore: 88,
-        engineeringScore: 91,
-        conversionScore: 81,
-        accessibilityScore: 83,
-        securityScore: 97,
-        performanceScore: 92,
-        seoScore: 89,
-        customerDelight: 87,
-        criticalCount: 2,
-        majorCount: 8,
-        mediumCount: 14,
-        minorCount: 37,
-        technicalDebt: 22,
+        ...runScores,
         status: 'completed',
+        triggeredBy: isDemoData ? 'seed_demo' : 'seed_from_real',
+        summary: isDemoData
+          ? 'DEMO DATA - Run a real audit for actual scores'
+          : 'Seeded from latest real audit run',
       },
     })
     results.qaRun = 1
 
     // ── 2. QAReviewerResult (10 reviewers) ───────────────────────────────
-    const reviewerResults = []
+    const reviewerResults: any[] = []
     for (const reviewer of REVIEWERS) {
-      const score = REVIEWER_SCORES[reviewer]
+      // Use real reviewer score if available, otherwise fall back to demo score
+      const score = realReviewerScores[reviewer] ?? REVIEWER_SCORES[reviewer]
       const issueCount = reviewer === 'functional_qa' ? 5
         : reviewer === 'ux_reviewer' ? 6
         : reviewer === 'accessibility_reviewer' ? 4
@@ -890,11 +942,21 @@ export async function POST() {
           reviewer,
           score,
           status: 'completed',
+          summary: isDemoData
+            ? `[DEMO DATA] ${REVIEWER_SUMMARIES[reviewer]}`
+            : (realReviewerFindings[reviewer]
+                ? (JSON.parse(realReviewerFindings[reviewer]).summary ?? REVIEWER_SUMMARIES[reviewer])
+                : REVIEWER_SUMMARIES[reviewer]),
           findings: JSON.stringify({
             issues: issueCount,
             details: details[reviewer] || [],
-            summary: REVIEWER_SUMMARIES[reviewer],
+            summary: isDemoData
+              ? `[DEMO DATA] ${REVIEWER_SUMMARIES[reviewer]}`
+              : (realReviewerFindings[reviewer]
+                  ? JSON.parse(realReviewerFindings[reviewer]).summary ?? REVIEWER_SUMMARIES[reviewer]
+                  : REVIEWER_SUMMARIES[reviewer]),
             recommendations: recommendations[reviewer] || [],
+            isDemoData,
           }),
         },
       })
@@ -903,7 +965,7 @@ export async function POST() {
     results.reviewerResults = reviewerResults.length
 
     // ── 3. QAExecutivePerspective (9 roles) ──────────────────────────────
-    const perspectives = []
+    const perspectives: any[] = []
     for (const role of ROLES) {
       const data = PERSPECTIVES[role]
       const perspective = await db.qAExecutivePerspective.create({
@@ -982,7 +1044,7 @@ With the critical fixes deployed, we project a product score of 94-95 within 7 d
 
     // ── 5. QAIssue (~50 issues) ──────────────────────────────────────────
     const allIssues = [...ISSUE_TEMPLATES, ...ADDITIONAL_MINOR_ISSUES]
-    const issues = []
+    const issues: any[] = []
 
     for (const tmpl of allIssues) {
       const issue = await db.qAIssue.create({
@@ -1015,7 +1077,7 @@ With the critical fixes deployed, we project a product score of 94-95 within 7 d
     results.issues = issues.length
 
     // ── 6. QAPageTest (~20 pages) ────────────────────────────────────────
-    const pageTests = []
+    const pageTests: any[] = []
     for (let i = 0; i < PAGES.length; i++) {
       const page = PAGES[i]
       const isBilling = page.route === '/dashboard/billing'
@@ -1063,7 +1125,7 @@ With the critical fixes deployed, we project a product score of 94-95 within 7 d
     results.pageTests = pageTests.length
 
     // ── 7. Historical QARuns for trend data (past 6 days) ────────────────
-    const historicalRuns = []
+    const historicalRuns: any[] = []
     const baseScores = [88, 89, 90, 91, 90, 91] // 6 days of trend
 
     for (let i = 6; i >= 1; i--) {
@@ -1092,6 +1154,8 @@ With the critical fixes deployed, we project a product score of 94-95 within 7 d
           minorCount: randomInt(25, 45),
           technicalDebt: randomInt(18, 28),
           status: 'completed',
+          triggeredBy: isDemoData ? 'seed_demo' : 'seed_from_real',
+          summary: isDemoData ? 'DEMO DATA - Run a real audit for actual scores' : 'Historical run (seeded from real data)',
         },
       })
       historicalRuns.push(historicalRun)
@@ -1119,9 +1183,12 @@ With the critical fixes deployed, we project a product score of 94-95 within 7 d
 
     return NextResponse.json({
       success: true,
-      message: 'AI QA Center database seeded successfully',
+      message: isDemoData
+        ? 'AI QA Center database seeded with DEMO data — run a real audit for actual scores'
+        : 'AI QA Center database seeded successfully (using real audit scores)',
       results,
       runId: run.id,
+      isDemoData,
     })
   } catch (error) {
     console.error('[QA Seed] POST error:', error)
