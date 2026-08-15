@@ -26,6 +26,7 @@ export interface AIBlogPost {
   keywords: string[]
   heroGradient: string // tailwind gradient classes
   heroEmoji: string
+  heroImage?: string // path to hero image
   /** AI articles store content as HTML string (markdown rendered) */
   contentHtml?: string
   /** Structured sections are not used for AI articles */

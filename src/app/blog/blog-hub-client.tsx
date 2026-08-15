@@ -73,8 +73,12 @@ export default function BlogHubClient({
                   <Link href={`/blog/${post.slug}`} className="block h-full group">
                     <div className={`rounded-2xl border ${ai ? 'border-emerald-500/20 hover:border-emerald-500/40' : 'border-white/10 hover:border-white/25'} bg-white/5 hover:-translate-y-1 transition-all duration-300 overflow-hidden h-full flex flex-col`}>
                       {/* Hero gradient header */}
-                      <div className={`h-32 bg-gradient-to-br ${post.heroGradient} flex items-center justify-center text-5xl`}>
-                        {post.heroEmoji}
+                      <div className={`h-32 bg-gradient-to-br ${post.heroGradient} flex items-center justify-center text-5xl overflow-hidden relative`}>
+                        {post.heroImage ? (
+                          <img src={post.heroImage} alt={post.title} className="absolute inset-0 w-full h-full object-cover opacity-70" />
+                        ) : (
+                          post.heroEmoji
+                        )}
                       </div>
                       {/* Body */}
                       <div className="p-5 flex flex-col flex-1">

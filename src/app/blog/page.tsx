@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { blogPosts, blogCategories } from '@/data/blog-posts'
 import { ArrowRight, BookOpen, Clock } from 'lucide-react'
 import BlogHubClient from './blog-hub-client'

@@ -8,6 +8,78 @@ import { Clock, ChevronRight, ArrowRight, BookOpen, Check, Mail } from 'lucide-r
 import type { UnifiedBlogPost, AIBlogPost } from '@/data/blog-types'
 import { isAIPost } from '@/data/blog-types'
 
+/**
+ * Render rich text with:
+ * - Internal links: [text](/blog/slug) → <Link>
+ * - Bold: **text** → <strong>
+ * - Inline code: `text` → <code>
+ */
+function renderRichText(text: string): React.ReactNode[] {
+  // Split on markdown-style patterns: [text](url), **bold**, `code`
+  const parts: React.ReactNode[] = []
+  let remaining = text
+  let key = 0
+
+  while (remaining.length > 0) {
+    // Try matching internal link [text](url)
+    const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/)
+    // Try matching bold **text**
+    const boldMatch = remaining.match(/\*\*([^*]+)\*\*/)
+    // Try matching inline code `text`
+    const codeMatch = remaining.match(/`([^`]+)`/)
+
+    // Find the earliest match
+    const matches: { index: number; length: number; node: React.ReactNode }[] = []
+
+    if (linkMatch && linkMatch.index !== undefined) {
+      const href = linkMatch[2]
+      const isInternal = href.startsWith('/') || href.startsWith('/blog')
+      matches.push({
+        index: linkMatch.index,
+        length: linkMatch[0].length,
+        node: isInternal
+          ? <Link key={`l${key++}`} href={href} className="text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors">{linkMatch[1]}</Link>
+          : <a key={`l${key++}`} href={href} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors">{linkMatch[1]}</a>,
+      })
+    }
+    if (boldMatch && boldMatch.index !== undefined) {
+      matches.push({
+        index: boldMatch.index,
+        length: boldMatch[0].length,
+        node: <strong key={`b${key++}`} className="text-foreground font-semibold">{boldMatch[1]}</strong>,
+      })
+    }
+    if (codeMatch && codeMatch.index !== undefined) {
+      matches.push({
+        index: codeMatch.index,
+        length: codeMatch[0].length,
+        node: <code key={`c${key++}`} className="bg-white/10 text-emerald-400 px-1.5 py-0.5 rounded text-sm font-mono">{codeMatch[1]}</code>,
+      })
+    }
+
+    if (matches.length === 0) {
+      parts.push(remaining)
+      break
+    }
+
+    // Pick the earliest match
+    const earliest = matches.sort((a, b) => a.index - b.index)[0]
+
+    // Add text before the match
+    if (earliest.index > 0) {
+      parts.push(remaining.substring(0, earliest.index))
+    }
+
+    // Add the matched node
+    parts.push(earliest.node)
+
+    // Continue after the match
+    remaining = remaining.substring(earliest.index + earliest.length)
+  }
+
+  return parts
+}
+
 export default function BlogPostClient({
   post,
   related,
@@ -152,8 +224,12 @@ export default function BlogPostClient({
         </header>
 
         {/* Hero gradient banner */}
-        <div className={`rounded-2xl bg-gradient-to-br ${post.heroGradient} h-32 sm:h-40 flex items-center justify-center text-6xl mb-8`}>
-          {post.heroEmoji}
+        <div className={`rounded-2xl bg-gradient-to-br ${post.heroGradient} h-32 sm:h-40 flex items-center justify-center text-6xl mb-8 overflow-hidden relative`}>
+          {post.heroImage ? (
+            <img src={post.heroImage} alt={post.title} className="absolute inset-0 w-full h-full object-cover opacity-80" />
+          ) : (
+            post.heroEmoji
+          )}
         </div>
 
         {/* Key takeaways box */}
@@ -240,7 +316,7 @@ export default function BlogPostClient({
                 </h2>
                 {section.body.split('\n\n').map((para, pi) => (
                   <p key={pi} className="text-base text-muted-foreground leading-relaxed mb-4">
-                    {para}
+                    {renderRichText(para)}
                   </p>
                 ))}
                 {section.bullets && (
@@ -248,7 +324,7 @@ export default function BlogPostClient({
                     {section.bullets.map((b, bi) => (
                       <li key={bi} className="flex items-start gap-2.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0 mt-2.5" />
-                        <span className="text-base text-muted-foreground leading-relaxed">{b}</span>
+                        <span className="text-base text-muted-foreground leading-relaxed">{renderRichText(b)}</span>
                       </li>
                     ))}
                   </ul>
