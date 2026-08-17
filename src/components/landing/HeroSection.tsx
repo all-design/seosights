@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useAnalytics } from '@/hooks/useAnalytics'
 import {
   ArrowRight,
   Globe,
@@ -72,6 +73,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
   const [isScanning, setIsScanning] = useState(false)
   const [scanResult, setScanResult] = useState<QuickAuditResult | null>(null)
   const [scanError, setScanError] = useState('')
+  const analytics = useAnalytics()
 
   const handleQuickScan = async () => {
     if (!scanUrl.trim()) {
@@ -94,6 +96,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
     setScanError('')
     setIsScanning(true)
     setScanResult(null)
+    analytics.auditStarted(cleanUrl)
 
     try {
       const response = await fetch('/api/quick-audit', {
@@ -109,6 +112,7 @@ export default function HeroSection({ onStartFree }: HeroSectionProps) {
 
       const data = await response.json()
       setScanResult(data)
+      analytics.auditCompleted(cleanUrl, data.scores?.seo ?? 0)
     } catch (err) {
       setScanError(err instanceof Error ? err.message : 'Scan failed. Please try again.')
     } finally {

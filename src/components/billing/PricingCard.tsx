@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { PLAN_PRICES } from '@/lib/pricing-constants'
+import { trackEvent } from '@/components/GoogleAnalytics'
 import {
   Check,
   ArrowRight,
@@ -75,6 +76,9 @@ export default function PricingCard({
   const [error, setError] = useState<string | null>(null)
 
   const handleSubscribe = async () => {
+    // Track checkout started event
+    trackEvent('checkout_started', { tier: planKey, price: price })
+
     // "Contact Us" / Managed tier → open agency registration
     if (ctaAction === 'contact' || ctaAction === 'managed') {
       if (onTierSelect) {

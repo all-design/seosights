@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { trackEvent } from '@/components/GoogleAnalytics'
 import {
   Dialog,
   DialogContent,
@@ -146,6 +147,9 @@ export default function RegistrationDialog({
         setIsLoading(false)
         return
       }
+
+      // Track successful signup
+      trackEvent('signup_completed', { method: 'email', tier })
 
       const userId = registerData.user?.id
 

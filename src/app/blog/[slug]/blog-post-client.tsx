@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Clock, ChevronRight, ArrowRight, BookOpen, Check, Mail } from 'lucide-react'
 import type { UnifiedBlogPost, AIBlogPost } from '@/data/blog-types'
 import { isAIPost } from '@/data/blog-types'
+import { trackEvent } from '@/components/GoogleAnalytics'
 
 /**
  * Render rich text with:
@@ -89,6 +90,11 @@ export default function BlogPostClient({
 }) {
   const [activeSection, setActiveSection] = useState<string>('')
   const isAI = isAIPost(post)
+
+  // Track blog read event on mount
+  useEffect(() => {
+    trackEvent('blog_read', { slug: post.slug, category: post.category.name, isAI })
+  }, [post.slug, post.category.name, isAI])
 
   // Parse HTML content for TOC sections from AI posts
   const aiSections = useMemo(() => {

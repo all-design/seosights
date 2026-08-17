@@ -5,6 +5,7 @@ import { useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import PricingCard from '@/components/billing/PricingCard'
 import type { RegistrationTier } from '@/components/auth/RegistrationDialog'
+import { useAnalytics } from '@/hooks/useAnalytics'
 import {
   Check,
   Bot,
@@ -238,6 +239,7 @@ const plans = [
 export default function PricingSection({ onStartFree, onAgencyRegister, onTierSelect, userId }: PricingSectionProps) {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, margin: '-100px' })
+  const analytics = useAnalytics()
 
   return (
     <section className="py-24 relative" ref={ref} id="pricing">
