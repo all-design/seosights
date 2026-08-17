@@ -237,6 +237,13 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className="dark" data-scroll-behavior="smooth">
       <head>
         {/* next/font/google automatically injects preconnect for fonts.gstatic.com */}
+        {/* Google Search Console site verification */}
+        {process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && (
+          <meta
+            name="google-site-verification"
+            content={process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
+          />
+        )}
         {/* JSON-LD Structured Data */}
         <script
           type="application/ld+json"
