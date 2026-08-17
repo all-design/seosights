@@ -4,8 +4,9 @@ import Script from 'next/script'
 
 /**
  * Google Analytics 4 component.
- * Loads gtag.js only when NEXT_PUBLIC_GA_MEASUREMENT_ID is set.
- * Works in production only (skipped in dev to avoid polluting real data).
+ * Loads gtag.js when NEXT_PUBLIC_GA_MEASUREMENT_ID is set.
+ * In development: loads gtag + logs events to console for debugging.
+ * In production: loads gtag silently.
  */
 
 declare global {
@@ -16,10 +17,11 @@ declare global {
 }
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+const IS_DEV = process.env.NODE_ENV === 'development'
 
 export default function GoogleAnalytics() {
-  // Skip if no measurement ID or in development
-  if (!GA_ID || process.env.NODE_ENV === 'development') return null
+  // Skip if no measurement ID
+  if (!GA_ID) return null
 
   return (
     <>
@@ -30,12 +32,20 @@ export default function GoogleAnalytics() {
           window.dataLayer = window.dataLayer || []
           window.gtag = function (...args: unknown[]) {
             window.dataLayer.push(args)
+            // Log events in dev for debugging
+            if (IS_DEV && args[0] === 'event') {
+              console.log(`[GA4] event: ${args[1]}`, args[2] || '')
+            }
           }
           window.gtag('js', new Date())
           window.gtag('config', GA_ID, {
-            send_page_view: true, // automatic page views with Next.js router
+            send_page_view: true,
+            ...(IS_DEV ? { debug_mode: true } : {}),
             cookie_flags: 'SameSite=None;Secure',
           })
+          if (IS_DEV) {
+            console.log(`[GA4] Loaded with ID: ${GA_ID} (debug mode)`)
+          }
         }}
       />
     </>
