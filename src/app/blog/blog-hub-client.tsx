@@ -105,11 +105,19 @@ export default function BlogHubClient({
                         </p>
                         <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5">
                           <span className="text-xs text-muted-foreground">
-                            {ai ? 'seosights AI' : new Date(post.publishedAt).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
+                            {ai
+                              ? new Date(post.publishedAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : new Date(post.publishedAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
                           </span>
                           <span className={`text-xs font-medium ${ai ? 'text-teal-400' : 'text-purple-400'} flex items-center gap-1 group-hover:gap-2 transition-all`}>
                             Read <ArrowRight className="w-3 h-3" />

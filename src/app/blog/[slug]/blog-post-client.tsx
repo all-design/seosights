@@ -131,17 +131,34 @@ export default function BlogPostClient({
   const slugify = (s: string) =>
     s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-  const publishedDate = new Date(post.publishedAt).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-  const updatedDate = post.updatedAt
-    ? new Date(post.updatedAt).toLocaleDateString('en-US', {
+  // Format date — AI posts show date + time, static posts show date only
+  const publishedDate = isAI
+    ? new Date(post.publishedAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : new Date(post.publishedAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
       })
+  const updatedDate = post.updatedAt
+    ? isAI
+      ? new Date(post.updatedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : new Date(post.updatedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
     : null
 
   // For AI posts, add IDs to headings in the HTML content
