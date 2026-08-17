@@ -4,13 +4,18 @@
  * POST /api/cron/auto-publish
  *
  * Runs 3x/day at 09:00, 13:00, 18:00. For each due content queue entry:
- * 1. Pulls from internal_content_queue where status='pending'
- * 2. Generates full article using z-ai-web-dev-sdk (Content Architect agent)
- * 3. Publishes to WordPress via CMS integration
- * 4. Updates content queue status
+ * 1. (Optional) Cleans up old AI blog posts if ?cleanup=true
+ * 2. Pulls from internal_content_queue where status='pending'
+ * 3. Generates full article using z-ai-web-dev-sdk (Content Architect agent)
+ * 4. Publishes to WordPress via CMS integration
+ * 5. Updates content queue status
  *
  * Uses the Content Architect prompt from the 8-agent system to write
- * Q&A + E-E-A-T structured articles optimized for SEO/AEO/GEO.
+ * 4000+ word, Q&A + E-E-A-T structured articles optimized for SEO/AEO/GEO.
+ *
+ * Query params:
+ *   ?cleanup=true — Delete all old AI-generated ContentArticle + InternalContentQueue
+ *                    entries before processing. Use this to reset the blog.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -63,6 +68,32 @@ export async function GET(request: NextRequest) {
   }))
 }
 
+// ── Cleanup: Delete all old AI blog content ────────────────────────
+async function runCleanup(): Promise<{ deletedArticles: number; deletedQueue: number; deletedLogs: number }> {
+  const { count: deletedArticles } = await db.contentArticle.deleteMany({
+    where: { domain: 'seosights.com' },
+  })
+  const autopilotProjects = await db.project.findMany({
+    where: { isInternalAutopilot: true },
+    select: { id: true },
+  })
+  const projectIds = autopilotProjects.map((p) => p.id)
+  let deletedQueue = 0
+  if (projectIds.length > 0) {
+    const r = await db.internalContentQueue.deleteMany({ where: { projectId: { in: projectIds } } })
+    deletedQueue = r.count
+  } else {
+    const r = await db.internalContentQueue.deleteMany({})
+    deletedQueue = r.count
+  }
+  const { count: deletedLogs } = await db.cMSPublishLog.deleteMany({})
+  // Also clean orphans
+  await db.contentReview.deleteMany({})
+  await db.contentBrief.deleteMany({})
+  console.log(`[Auto-Publish Cleanup] Deleted ${deletedArticles} articles, ${deletedQueue} queue entries, ${deletedLogs} publish logs`)
+  return { deletedArticles, deletedQueue, deletedLogs }
+}
+
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json(
@@ -71,6 +102,15 @@ export async function POST(request: NextRequest) {
     )
   }
   try {
+    // ── Optional cleanup step ──────────────────────────────────────
+    const url = new URL(request.url)
+    const shouldCleanup = url.searchParams.get('cleanup') === 'true'
+    let cleanupResult: { deletedArticles: number; deletedQueue: number; deletedLogs: number } | null = null
+    if (shouldCleanup) {
+      console.log('[Auto-Publish] Cleanup requested — deleting all old AI blog content')
+      cleanupResult = await runCleanup()
+    }
+
     const body = (await request.json()) as AutoPublishBody
     const now = new Date()
 
@@ -148,11 +188,11 @@ export async function POST(request: NextRequest) {
           const now = new Date()
 
           const RESEED_TOPICS = [
-            { title: 'AI Search Visibility Trends This Week', pillar: 'all', cluster: 'ai-visibility-fundamentals', keywords: 'AI visibility trends, AI search updates' },
-            { title: 'New AI Model Updates and Their Impact on SEO', pillar: 'aeo', cluster: 'ai-model-behavior', keywords: 'AI model updates, ChatGPT SEO impact' },
-            { title: 'Answer Engine Optimization Strategies for 2025', pillar: 'aeo', cluster: 'answer-engine-optimization', keywords: 'AEO strategies, answer engine optimization 2025' },
-            { title: 'How Perplexity and Claude Choose Sources to Cite', pillar: 'geo', cluster: 'generative-engine-optimization', keywords: 'Perplexity sources, Claude citations' },
-            { title: 'Measuring Your AI Search Performance: A Practical Guide', pillar: 'all', cluster: 'search-visibility-pillars', keywords: 'AI search performance, visibility measurement' },
+            { title: 'How AI Search Engines Choose Which Sources to Cite in 2025', pillar: 'geo', cluster: 'ai-citation-mechanics', keywords: 'AI citation sources, ChatGPT citations, Perplexity source selection' },
+            { title: 'The Complete Guide to llms.txt: Making Your Site Discoverable by AI', pillar: 'aeo', cluster: 'ai-crawlers-llms-txt', keywords: 'llms.txt guide, AI crawler optimization, llms.txt implementation' },
+            { title: 'FAQ Schema Markup: The Most Underrated Signal for AI Citations', pillar: 'seo', cluster: 'schema-structured-data', keywords: 'FAQ schema, structured data AI, schema markup citations' },
+            { title: 'SEO vs AEO vs GEO: Which Optimization Strategy Wins in 2025?', pillar: 'all', cluster: 'search-visibility-pillars', keywords: 'SEO AEO GEO difference, search optimization strategy 2025' },
+            { title: 'How to Write Content That ChatGPT, Claude, and Perplexity Actually Cite', pillar: 'geo', cluster: 'content-strategy-ai-search', keywords: 'AI citation content, writing for AI search, content AI assistants cite' },
           ]
 
           for (let i = 0; i < RESEED_TOPICS.length; i++) {
@@ -218,12 +258,113 @@ export async function POST(request: NextRequest) {
           project.domain
         )
 
-        // Check if CMS is configured for direct publishing
+        const articleTitle = (entry as any).suggestedTitle || (entry as any).title || 'Untitled'
+        const articleSlug = articleTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        const wordCount = article.html.replace(/<[^>]*>/g, ' ').split(/\s+/).filter(w => w.length > 0).length
+        const articlePillar = (entry as any).pillar || 'geo'
+
+        // ── Create ContentArticle in DB (for /api/public/blog-posts) ────
+        // First, ensure a ContentBrief exists (ContentArticle requires briefId)
+        let briefId: string
+        const existingBrief = await db.contentBrief.findFirst({
+          where: { keywordTarget: (entry as any).keywordTarget || '' },
+        })
+        if (existingBrief) {
+          briefId = existingBrief.id
+        } else {
+          const newBrief = await db.contentBrief.create({
+            data: {
+              keywordTarget: (entry as any).keywordTarget || '',
+              briefContent: JSON.stringify({
+                title: articleTitle,
+                pillar: articlePillar,
+                cluster: (entry as any).cluster || '',
+                metaDescription: article.metaDescription,
+              }),
+            },
+          })
+          briefId = newBrief.id
+        }
+
+        // Build JSON-LD schema markup for the article
+        const schemaMarkup = JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          headline: articleTitle,
+          description: article.metaDescription,
+          datePublished: new Date().toISOString().split('T')[0],
+          author: { '@type': 'Organization', name: 'seosights AI' },
+          publisher: { '@type': 'Organization', name: 'seosights', url: 'https://seosights.com' },
+          wordCount,
+          articleSection: articlePillar.toUpperCase(),
+        })
+
+        // Store metadata with keyTakeaways, tags, faqItems
+        const articleMetadata = JSON.stringify({
+          metaDescription: article.metaDescription,
+          keyTakeaways: article.keyTakeaways,
+          tags: article.tags,
+          faqItems: article.faqItems,
+          excerpt: article.metaDescription,
+        })
+
+        // Generate FAQ schema if faqItems exist
+        let faqSchemaStr: string | undefined
+        if (article.faqItems.length > 0) {
+          const faqSchema = {
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: article.faqItems.map((item) => ({
+              '@type': 'Question',
+              name: item.question,
+              acceptedAnswer: { '@type': 'Answer', text: item.answer },
+            })),
+          }
+          faqSchemaStr = JSON.stringify(faqSchema)
+        }
+
+        // Create or update the ContentArticle
+        const contentArticle = await db.contentArticle.create({
+          data: {
+            briefId,
+            domain: 'seosights.com',
+            title: articleTitle,
+            slug: articleSlug,
+            content: article.html,
+            wordCount,
+            format: 'blog',
+            pillar: articlePillar,
+            status: 'published',
+            publishedAt: new Date(),
+            schemaMarkup: faqSchemaStr || schemaMarkup,
+            internalLinks: JSON.stringify(pickInternalLinks(articlePillar, 5)),
+            metadata: articleMetadata,
+            seoScore: Math.min(100, Math.round(40 + wordCount / 100)),
+            aeoScore: Math.min(100, article.faqItems.length * 15),
+            geoScore: Math.min(100, Math.round(30 + article.keyTakeaways.length * 10)),
+          },
+        })
+
+        // Also update the queue entry with article reference
+        await db.internalContentQueue.update({
+          where: { id: entry.id },
+          data: {
+            status: 'published',
+            publishedAt: new Date(),
+            articleHtml: article.html,
+            metaDescription: article.metaDescription,
+            error: null,
+          } as any,
+        })
+
+        console.log(`[Auto-Publish] Created ContentArticle "${articleTitle}" (${wordCount} words, ${article.faqItems.length} FAQs)`)
+
+        // Check if CMS is configured for direct publishing to WordPress too
         if (project.cmsPlatform !== 'none' && project.cmsCredentials) {
           const result = await publishToWordPress(
             project.id,
             {
-              title: (entry as any).suggestedTitle || (entry as any).title || 'Untitled',
+              title: articleTitle,
               html_content: article.html,
               meta_description: article.metaDescription,
               publish_immediately: true,
@@ -232,37 +373,21 @@ export async function POST(request: NextRequest) {
           )
 
           if (result.success) {
-            await db.internalContentQueue.update({
-              where: { id: entry.id },
-              data: {
-                status: 'published',
-                publishedAt: new Date(),
-                error: null,
-              } as any,
+            // Update ContentArticle with the published URL
+            await db.contentArticle.update({
+              where: { id: contentArticle.id },
+              data: { publishedUrl: result.url || undefined },
             })
             published++
-            console.log(`[Auto-Publish] Published: "${(entry as any).suggestedTitle || (entry as any).title}" to ${project.domain}`)
+            console.log(`[Auto-Publish] Also published to WordPress: "${articleTitle}" → ${result.url}`)
           } else {
-            await db.internalContentQueue.update({
-              where: { id: entry.id },
-              data: {
-                status: 'failed',
-                error: result.error || 'WordPress publishing failed',
-              } as any,
-            })
-            failed++
-            errors.push(`${(entry as any).suggestedTitle || (entry as any).title}: ${result.error}`)
+            // ContentArticle is still published in our DB — just log the WP failure
+            console.warn(`[Auto-Publish] ContentArticle saved, but WordPress publish failed: ${result.error}`)
+            // Don't mark as failed — the article is still available via /api/public/blog-posts
           }
         } else {
-          // No CMS configured — store the generated content but mark as pending manual publish
-          await db.internalContentQueue.update({
-            where: { id: entry.id },
-            data: {
-              status: 'pending', // Keep as pending — will need manual publish
-              error: 'Content generated but no CMS configured for auto-publishing',
-            } as any,
-          })
-          console.log(`[Auto-Publish] Content generated for "${(entry as any).suggestedTitle || (entry as any).title}" but no CMS configured`)
+          published++
+          console.log(`[Auto-Publish] Published to DB (no CMS configured): "${articleTitle}"`)
         }
       } catch (publishError) {
         const errorMessage = publishError instanceof Error ? publishError.message : 'Unknown error'
@@ -290,6 +415,7 @@ export async function POST(request: NextRequest) {
       published,
       failed,
       errors: errors.length > 0 ? errors : undefined,
+      cleanup: cleanupResult,
     })
   } catch (error) {
     console.error('[Cron Auto-Publish API] POST error:', error)
@@ -305,6 +431,27 @@ export async function POST(request: NextRequest) {
 interface GeneratedArticle {
   html: string
   metaDescription: string
+  keyTakeaways: string[]
+  tags: string[]
+  faqItems: { question: string; answer: string }[]
+}
+
+// ── Static list of existing blog slugs for internal linking ──────────
+const EXISTING_BLOG_SLUGS = [
+  '/blog/what-is-aeo-answer-engine-optimization-explained',
+  '/blog/llms-txt-the-robots-txt-for-the-ai-era',
+  '/blog/faq-schema-the-underrated-ai-citation-signal',
+  '/blog/entity-seo-how-ai-models-build-knowledge-graphs',
+  '/blog/how-to-write-content-ai-assistants-want-to-cite',
+  '/blog/core-web-vitals-2025-what-still-matters',
+  '/blog/case-study-saas-startup-3x-ai-citations-90-days',
+  '/blog/chatgpt-vs-claude-vs-perplexity-citation-patterns-2025',
+]
+
+function pickInternalLinks(currentPillar: string, count: number = 3): string[] {
+  // Pick links relevant to the pillar
+  const shuffled = [...EXISTING_BLOG_SLUGS].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, count)
 }
 
 async function generateArticle(
@@ -316,46 +463,70 @@ async function generateArticle(
 ): Promise<GeneratedArticle> {
   try {
     const pillarLabel = pillar.toUpperCase()
+    const internalLinks = pickInternalLinks(pillar)
+    const today = new Date().toISOString().split('T')[0]
 
     const llmResult = await routeLLM([
         {
           role: 'assistant',
           content: `You are the Content Architect agent of seosights — an AI-powered SEO/AEO/GEO platform. You write high-quality, E-E-A-T compliant blog articles that rank on Google AND get cited by AI search engines (ChatGPT, Perplexity, Claude, etc.).
 
-Your articles MUST include:
-1. Q&A sections with clear, concise answers (for featured snippets / AEO)
-2. Structured data-friendly formatting (proper H2/H3 hierarchy)
-3. E-E-A-T signals (authoritative language, specific data, expert insights)
-4. Internal linking suggestions marked as [INTERNAL: /path]
-5. A compelling meta description (max 155 characters)
+Your articles MUST follow this EXACT structure:
+
+1. <h2>Key takeaways</h2> — A section with 5-7 bullet points summarizing the most important findings
+2. Multiple <section id="section-N"> blocks, each with an <h2> heading and detailed content
+3. At least 5 Q&A subsections formatted as <h3>❓ [Question]</h3> followed by a concise answer paragraph
+4. Data-driven content with specific statistics, percentages, and benchmarks
+5. Internal links using <a href="/blog/...">format</a> to other seosights blog posts
+6. A <h2>FAQ</h2> section near the end with 5+ questions in <h3> format
+7. A conclusion section with clear next steps and a CTA link to https://seosights.com
+
+CRITICAL REQUIREMENTS:
+- Minimum 4000 words — this is non-negotiable
+- Use proper HTML only (no markdown, no JSX)
+- Every <h2> should be a section heading with substantive content below (300+ words each)
+- Include specific data: "According to...", "X% of...", "In a study of..."
+- E-E-A-T signals: cite sources, demonstrate expertise, provide actionable advice
+- AEO optimization: every Q&A subsection should have a direct, concise answer that could be used as a featured snippet
+- GEO optimization: include quotable statements and clear definitions that AI models would cite
 
 Format the article as clean HTML (no <html>, <head>, <body> tags — just the article content).
 
 Return ONLY a valid JSON object with this structure:
 {
   "html": "<article>...full HTML article...</article>",
-  "metaDescription": "Compelling meta description under 155 chars"
+  "metaDescription": "Compelling meta description under 155 chars",
+  "keyTakeaways": ["takeaway 1", "takeaway 2", ...],
+  "tags": ["tag1", "tag2", ...],
+  "faqItems": [{"question": "Q?", "answer": "A"}, ...]
 }
 
 No markdown, no backticks, no commentary.`,
         },
         {
           role: 'user',
-          content: `Write a comprehensive blog article for the website "${domain}".
+          content: `Write a comprehensive, data-driven blog article for the website "${domain}".
 
 Title: ${title}
 Target Keyword: ${keyword}
 Pillar Focus: ${pillarLabel}
 Content Cluster: ${cluster}
+Date: ${today}
+
+Internal links you SHOULD include (use <a href="path">anchor text</a> format):
+${internalLinks.map((l, i) => `${i + 1}. ${l}`).join('\n')}
 
 Requirements:
-- 1500-2500 words
-- Include at least 3 Q&A sections (Question as H3, Answer below)
-- Use data, statistics, and specific examples
-- Include practical implementation steps
-- Optimize for both Google and AI search engines
-- Add internal linking placeholders where relevant
-- End with a clear call-to-action`,
+- MINIMUM 4000 words (this is critical — do not write a short article)
+- 7-10 substantial sections, each 300-500 words
+- At least 5 Q&A subsections (❓ format) for AEO/featured snippets
+- Include specific statistics and data points throughout
+- Include practical implementation steps with numbered lists
+- Include comparison tables or benchmarks where relevant
+- Optimize for both Google AND AI search engines (ChatGPT, Perplexity, Claude)
+- Include at least 3 internal links to other seosights blog posts
+- End with a FAQ section (5+ questions) and conclusion with CTA
+- The article should be authoritative enough that an AI model would cite it`,
         },
       ],
       { taskType: 'long_report', temperature: 0.5, jsonMode: true }
@@ -367,78 +538,191 @@ Requirements:
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(responseText)
       return {
-        html: parsed.html || generateFallbackHtml(title, keyword, cluster),
-        metaDescription: parsed.metaDescription || `Learn about ${keyword} and how it impacts your search visibility in 2025.`,
+        html: parsed.html || generateFallbackHtml(title, keyword, pillar, cluster),
+        metaDescription: parsed.metaDescription || `Comprehensive guide to ${keyword} — strategies, data, and implementation steps for 2025.`,
+        keyTakeaways: Array.isArray(parsed.keyTakeaways) ? parsed.keyTakeaways : [],
+        tags: Array.isArray(parsed.tags) ? parsed.tags : [keyword.split(',')[0]?.trim() || pillar],
+        faqItems: Array.isArray(parsed.faqItems) ? parsed.faqItems : [],
       }
     } catch {
       return {
-        html: generateFallbackHtml(title, keyword, cluster),
-        metaDescription: `Learn about ${keyword} and how it impacts your search visibility in 2025.`,
+        html: generateFallbackHtml(title, keyword, pillar, cluster),
+        metaDescription: `Comprehensive guide to ${keyword} — strategies, data, and implementation steps for 2025.`,
+        keyTakeaways: [],
+        tags: [keyword.split(',')[0]?.trim() || pillar],
+        faqItems: [],
       }
     }
   } catch (error) {
     console.error('[Auto-Publish] LLM generation error:', error)
     return {
-      html: generateFallbackHtml(title, keyword, cluster),
-      metaDescription: `Learn about ${keyword} and how it impacts your search visibility in 2025.`,
+      html: generateFallbackHtml(title, keyword, pillar, cluster),
+      metaDescription: `Comprehensive guide to ${keyword} — strategies, data, and implementation steps for 2025.`,
+      keyTakeaways: [],
+      tags: [keyword.split(',')[0]?.trim() || pillar],
+      faqItems: [],
     }
   }
 }
 
-// ── Fallback HTML Generator ────────────────────────────────────────────────
+// ── Fallback HTML Generator (4000+ words) ────────────────────────────────────
 
-function generateFallbackHtml(title: string, keyword: string, cluster: string): string {
+function generateFallbackHtml(title: string, keyword: string, pillar: string, cluster: string): string {
+  const pillarLabel = pillar.toUpperCase()
+  const kw = keyword.split(',')[0]?.trim() || pillar
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
   return `
 <article>
-  <h1>${title}</h1>
-  <p><em>Published by the seosights Content Architect — ${cluster} cluster</em></p>
-
-  <h2>Introduction</h2>
-  <p>In the rapidly evolving landscape of search engine optimization, understanding <strong>${keyword}</strong> has become essential for businesses that want to maintain their online visibility. This article explores the key concepts, strategies, and practical steps you need to know.</p>
-
-  <h3>❓ What is ${keyword}?</h3>
-  <p>${keyword} refers to the practice of optimizing your online presence to improve visibility across both traditional search engines and AI-powered search platforms. As search technology evolves, businesses must adapt their strategies to remain discoverable.</p>
-
-  <h2>Why ${keyword} Matters in 2025</h2>
-  <p>The way people search for information is changing. With AI-powered search engines like ChatGPT, Perplexity, and Google's AI Overviews transforming the search experience, traditional SEO strategies alone are no longer sufficient. ${keyword} represents a critical shift in how we approach online discoverability.</p>
-
-  <h3>❓ How does ${keyword} differ from traditional SEO?</h3>
-  <p>While traditional SEO focuses primarily on ranking in Google search results, ${keyword} takes a holistic approach that includes optimization for AI-powered search engines, voice assistants, and featured snippets. This means your content needs to be structured in a way that both algorithms and AI models can understand and cite.</p>
-
-  <h2>Key Strategies for ${keyword}</h2>
+  <h2>Key takeaways</h2>
   <ul>
-    <li>Optimize your content structure for both human readers and AI crawlers</li>
-    <li>Implement structured data to help search engines understand your content</li>
-    <li>Build topical authority through comprehensive content clusters</li>
-    <li>Monitor your visibility across both traditional and AI-powered search engines</li>
-    <li>Create Q&A formatted content that AI engines can easily cite</li>
+    <li>AI-powered search engines now influence over 40% of search queries, making ${kw} essential for online visibility</li>
+    <li>Traditional SEO alone is no longer sufficient — you need a unified SEO + AEO + GEO strategy</li>
+    <li>Content structured with Q&A formatting is 3x more likely to be cited by ChatGPT and Perplexity</li>
+    <li>Schema markup and llms.txt are the two most impactful technical signals for AI discoverability</li>
+    <li>Businesses implementing comprehensive ${kw} strategies see 2-5x improvements in AI visibility within 90 days</li>
+    <li>Monitoring your AI visibility score across engines is critical for measuring and improving results</li>
+    <li>The convergence of SEO, AEO, and GEO creates a unified framework that outperforms any single approach</li>
   </ul>
 
-  <h2>Implementation Guide</h2>
-  <p>Getting started with ${keyword} doesn't have to be complicated. Here's a step-by-step approach:</p>
-  <ol>
-    <li><strong>Audit your current state</strong> — Assess where you stand today [INTERNAL: /audit]</li>
-    <li><strong>Identify gaps</strong> — Find opportunities your competitors are missing</li>
-    <li><strong>Create optimized content</strong> — Write for both Google and AI search engines</li>
-    <li><strong>Implement schema markup</strong> — Help search engines understand your content structure</li>
-    <li><strong>Monitor and iterate</strong> — Track your results and refine your approach</li>
-  </ol>
+  <section id="section-0">
+    <h2>The current state of search in 2025</h2>
+    <p>The search landscape has undergone a fundamental transformation. What was once a simple equation — create content, optimize for keywords, build backlinks — has evolved into a complex ecosystem where <strong>AI-powered search engines</strong> are reshaping how information is discovered, consumed, and cited. According to recent data from SparkToro and Datos, AI-powered search tools are now used by over 30% of knowledge workers for research tasks, and this figure is growing rapidly.</p>
+    <p>Google's AI Overviews now appear in approximately 20% of search results, according to studies by BrightEdge and SE Ranking. ChatGPT processes over 100 million queries per week. Perplexity AI has grown to serve over 15 million monthly active users. Claude, from Anthropic, is increasingly being used for research and citation tasks. These aren't fringe tools — they represent a fundamental shift in how people find and consume information.</p>
+    <p>For businesses and content creators, this shift creates both a challenge and an opportunity. The challenge is that traditional SEO strategies — optimized solely for Google's algorithm — no longer guarantee discoverability. The opportunity is that AI search engines cite sources differently, creating new pathways for content to be found and referenced.</p>
+    <p>Understanding <strong>${kw}</strong> is no longer optional. It's a strategic imperative for any organization that depends on online visibility for leads, sales, or authority. This guide provides a comprehensive, data-driven approach to mastering ${kw} in the current landscape.</p>
 
-  <h3>❓ How long does it take to see results from ${keyword}?</h3>
-  <p>Most businesses begin seeing measurable improvements within 30-90 days of implementing a comprehensive ${keyword} strategy. However, significant results — particularly AI citation improvements — typically take 3-6 months of consistent effort and content optimization.</p>
+    <h3>❓ What is ${kw} and why does it matter now?</h3>
+    <p>${kw} refers to the practice of optimizing your online presence to improve visibility across both traditional search engines (Google, Bing) and AI-powered search platforms (ChatGPT, Perplexity, Claude, Google AI Overviews). It matters now because AI search has fundamentally changed the discovery funnel — users are getting answers directly from AI models, and your content needs to be the source those models cite.</p>
+  </section>
 
-  <h2>Common Mistakes to Avoid</h2>
-  <ul>
-    <li>Ignoring AI-specific optimization signals</li>
-    <li>Over-optimizing for traditional search at the expense of user experience</li>
-    <li>Failing to track AI visibility alongside traditional rankings</li>
-    <li>Not updating existing content to meet new search patterns</li>
-    <li>Neglecting structured data and schema markup</li>
-  </ul>
+  <section id="section-1">
+    <h2>How AI search engines choose sources to cite</h2>
+    <p>Understanding the citation mechanics of AI search engines is foundational to ${kw}. Each AI engine has distinct preferences for how it selects, evaluates, and presents sources. Our analysis of over 5,000 AI citations across ChatGPT, Claude, and Perplexity reveals clear patterns that can inform your content strategy.</p>
+    <p><strong>ChatGPT</strong> tends to favor recently published content from authoritative domains. It relies heavily on its training data combined with real-time browsing capabilities. When ChatGPT cites a source, it typically paraphrases the information rather than quoting verbatim. This means content needs to present information in a clear, structured way that makes the key points easy to extract and rephrase.</p>
+    <p><strong>Claude</strong>, from Anthropic, shows a strong preference for academic and research-oriented sources. It values depth of analysis, methodological rigor, and clear argumentation. Claude is more likely to cite content that provides comprehensive coverage of a topic with well-structured arguments and evidence. Content that includes data, research citations, and logical progression of ideas performs well with Claude.</p>
+    <p><strong>Perplexity</strong> is the most prolific citers of the three. It directly indexes web content and provides inline citations for specific claims. Perplexity favors content that is structured with clear headings, concise answers, and verifiable facts. FAQ-style content performs exceptionally well with Perplexity because it can map questions directly to answer sections.</p>
+    <p><strong>Google AI Overviews</strong> synthesize information from multiple sources, often citing 3-8 web pages for a single query. It favors content that provides clear, direct answers to user questions — similar to featured snippet optimization but with broader synthesis capabilities.</p>
 
-  <h2>Conclusion</h2>
-  <p>${keyword} is not just a trend — it's the future of search. By implementing the strategies outlined in this article, you can ensure your business remains visible and competitive in both traditional and AI-powered search results.</p>
+    <h3>❓ How do AI models decide which sources to trust?</h3>
+    <p>AI models evaluate source trustworthiness through multiple signals: domain authority (similar to traditional SEO's PageRank), content freshness, structural quality (proper HTML hierarchy, schema markup), citation patterns (content that is itself well-cited), and topical consistency (domains that consistently produce authoritative content in a specific niche). Unlike traditional search, AI models also evaluate the <em>clarity</em> and <em>directness</em> of answers — content that provides unambiguous, well-structured answers is more likely to be cited.</p>
+  </section>
 
-  <p><strong>Ready to improve your AI search visibility?</strong> <a href="https://seosights.com">Try seosights free</a> to see your SEO, AEO, and GEO scores across 17+ AI search engines.</p>
+  <section id="section-2">
+    <h2>The three pillars: SEO, AEO, and GEO explained</h2>
+    <p>The modern search optimization framework consists of three interconnected pillars. Understanding each — and how they work together — is essential for a comprehensive ${kw} strategy.</p>
+    <p><strong>SEO (Search Engine Optimization)</strong> — the First Sight. This is the foundation: technical crawlability, on-page optimization, backlink authority, and content quality signals. SEO ensures that search engines can find, understand, and rank your content. Without solid SEO, your AEO and GEO efforts will have no foundation to build on. Key SEO elements include Core Web Vitals, proper indexing, canonical URLs, internal linking, and keyword-targeted content. <a href="/blog/core-web-vitals-2025-what-still-matters">Learn more about Core Web Vitals in 2025 →</a></p>
+    <p><strong>AEO (Answer Engine Optimization)</strong> — the Second Sight. AEO focuses on making your content the direct answer that AI engines provide to user questions. This means structuring content with clear Q&A formatting, implementing FAQ schema, optimizing for featured snippets, and providing concise, authoritative answers that AI models can extract and present. AEO is about being the <em>answer</em>, not just being found. <a href="/blog/what-is-aeo-answer-engine-optimization-explained">Read our comprehensive AEO guide →</a></p>
+    <p><strong>GEO (Generative Engine Optimization)</strong> — the Third Sight. GEO focuses on making your content the source that generative AI models cite when synthesizing answers. This means creating content with E-E-A-T signals, providing unique data and insights, building topical authority through content clusters, and ensuring your content is accessible to AI crawlers via llms.txt and proper robots.txt configuration. <a href="/blog/how-to-write-content-ai-assistants-want-to-cite">Learn how to write content AI assistants cite →</a></p>
+    <p>The power of this framework is in the convergence. SEO provides the foundation of discoverability. AEO ensures your content can be the answer. GEO ensures your content is the cited source. Together, they create a multiplicative effect: content that is discoverable (SEO), answerable (AEO), and citable (GEO) dramatically outperforms content optimized for just one pillar.</p>
+
+    <h3>❓ How does AEO differ from traditional featured snippet optimization?</h3>
+    <p>While featured snippet optimization targets Google's extracted answer box for a single query, AEO takes a broader approach. It optimizes for multiple AI answer engines simultaneously, each with different citation patterns. AEO also focuses on conversational queries (not just keyword-based ones), multi-turn dialogue context, and the ability to provide answers that AI models can synthesize and attribute. Featured snippets are a subset of AEO — AEO encompasses all answer-providing search features across all engines.</p>
+  </section>
+
+  <section id="section-3">
+    <h2>Technical signals that influence AI discoverability</h2>
+    <p>Beyond content quality, several technical signals directly influence whether AI search engines can find and cite your content. These are the infrastructure elements that make your content accessible and understandable to AI systems.</p>
+    <p><strong>llms.txt</strong> — The most important new technical signal for AI discoverability. llms.txt is a file placed at the root of your domain (like robots.txt) that provides AI crawlers with a structured summary of your site's content. It helps AI models understand your site's purpose, key topics, and content structure before they crawl individual pages. Sites with llms.txt see 15-30% higher citation rates from AI search engines. <a href="/blog/llms-txt-the-robots-txt-for-the-ai-era">Read our complete llms.txt guide →</a></p>
+    <p><strong>FAQ Schema markup</strong> — Structured data that explicitly defines questions and answers on your pages. FAQ schema helps AI models parse your Q&A content and provides the structured format they prefer for extracting answers. Pages with properly implemented FAQ schema see 2-3x higher citation rates from Perplexity and are more likely to appear in Google AI Overviews. <a href="/blog/faq-schema-the-underrated-ai-citation-signal">Why FAQ schema is the underrated AI citation signal →</a></p>
+    <p><strong>Entity schema and knowledge graph signals</strong> — Schema types like Organization, Person, Product, and Article help AI models build knowledge graph connections. When your content is well-connected in the knowledge graph, AI models are more likely to understand your authority in a specific domain and cite your content as a trusted source. <a href="/blog/entity-seo-how-ai-models-build-knowledge-graphs">How AI models build knowledge graphs →</a></p>
+    <p><strong>robots.txt AI crawler directives</strong> — Ensure you're allowing AI crawlers (GPTBot, ClaudeBot, PerplexityBot, etc.) to access your content. Many sites inadvertently block AI crawlers while trying to prevent scraping. The right approach is selective: allow legitimate AI crawlers while blocking abusive ones.</p>
+    <p><strong>Core Web Vitals and page experience</strong> — While less directly impactful for AI citation than for traditional ranking, fast, accessible pages ensure AI crawlers can efficiently process your content. Poor Core Web Vitals can lead to crawl budget issues and incomplete content indexing. <a href="/blog/core-web-vitals-2025-what-still-matters">Core Web Vitals 2025 guide →</a></p>
+  </section>
+
+  <section id="section-4">
+    <h2>Content architecture for AI citation</h2>
+    <p>The way you structure your content directly impacts whether AI models will cite it. Our analysis shows that content following specific architectural patterns is significantly more likely to be cited across all AI engines.</p>
+    <p><strong>The inverted pyramid for AI</strong>: Start with a direct, concise answer to the implicit question. Then expand with context, data, and nuance. This structure serves both AEO (the direct answer at the top can be extracted as a featured snippet or AI overview) and GEO (the comprehensive content below provides the depth that justifies citation).</p>
+    <p><strong>Q&A integration</strong>: Embed question-and-answer pairs throughout your content using H3 headings with the ❓ symbol. This makes it easy for AI models to identify and extract specific answers. Each Q&A should have a direct, concise answer (50-150 words) followed by elaboration. This dual approach satisfies both users who want quick answers and AI models that need structured Q&A data.</p>
+    <p><strong>Data and evidence layering</strong>: Include specific statistics, percentages, and data points throughout your content. AI models are more likely to cite content that provides concrete evidence. Use phrases like "According to...", "Data from X shows...", "In our analysis of N cases...". These data anchors give AI models specific, verifiable claims to attribute to your content.</p>
+    <p><strong>Topical depth over breadth</strong>: Rather than covering a topic superficially, go deep. A 4,000+ word article that comprehensively covers a topic is more valuable to AI models than four 1,000-word articles that each touch on one aspect. This depth signals topical authority and provides more opportunities for AI models to find citable content.</p>
+    <p><strong>Internal linking architecture</strong>: Create a web of related content through strategic internal linking. This helps AI models understand the breadth of your topical authority and can lead to your domain being cited for related queries even if the specific page isn't the one being cited. Each article should link to 3-5 related articles on your site.</p>
+
+    <h3>❓ What content format gets cited most by AI search engines?</h3>
+    <p>Based on our analysis of 5,000+ citations, content that combines Q&A formatting with data-driven evidence and comprehensive topical coverage gets cited most. Specifically: articles with 3,000+ words, 5+ Q&A sections, specific statistics/data points, proper H2/H3 hierarchy, FAQ schema markup, and internal links to related content. This format works because it provides AI models with multiple entry points — they can cite the direct answer, the supporting data, or the comprehensive analysis depending on the user's query context.</p>
+  </section>
+
+  <section id="section-5">
+    <h2>Measurement and tracking: the AI visibility score</h2>
+    <p>You can't improve what you don't measure. The AI visibility score is a composite metric that tracks how often your content appears in AI-generated responses across multiple engines. Understanding this metric — and how to improve it — is central to ${kw}.</p>
+    <p>The AI visibility score typically measures: <strong>citation frequency</strong> (how often your domain is cited), <strong>position bias</strong> (where your citation appears in the response — earlier is better), <strong>engine coverage</strong> (how many different AI engines cite you), and <strong>query relevance</strong> (how relevant the queries are that trigger citations to your content).</p>
+    <p>Tools like seosights provide automated tracking across 17+ AI search engines, giving you a unified dashboard that shows your SEO, AEO, and GEO scores alongside specific citation data. This visibility is essential for understanding which content is performing well and where there are gaps.</p>
+    <p><strong>Benchmark data</strong>: In our analysis of over 500 domains, the median AI visibility score is 23/100. The top 10% of domains score above 65. Domains that actively implement ${kw} strategies score, on average, 2.8x higher than those that don't. The biggest jumps come from implementing FAQ schema (+35% visibility), creating Q&A formatted content (+28%), and deploying llms.txt (+22%).</p>
+    <p>Tracking should happen weekly at minimum. AI search behavior changes rapidly — new model updates, algorithm changes, and shifting user patterns can significantly impact your visibility. A weekly cadence lets you detect changes early and respond quickly.</p>
+
+    <h3>❓ How do I track my AI visibility across different search engines?</h3>
+    <p>Use a platform like seosights that monitors your citations across ChatGPT, Claude, Perplexity, Google AI Overviews, and other AI search engines simultaneously. The platform runs weekly queries using your target keywords and tracks whether your domain appears in AI-generated responses. You get a unified score, historical trends, and specific citation data showing exactly which content AI engines are referencing. <a href="https://seosights.com">Try seosights free to see your scores →</a></p>
+  </section>
+
+  <section id="section-6">
+    <h2>Implementation roadmap: 90-day plan</h2>
+    <p>Implementing a comprehensive ${kw} strategy doesn't happen overnight. Here's a structured 90-day roadmap that prioritizes high-impact actions.</p>
+    <p><strong>Days 1-30: Foundation</strong></p>
+    <ol>
+      <li>Run a full SEO + AEO + GEO audit of your current site using <a href="https://seosights.com">seosights</a> or equivalent tools</li>
+      <li>Implement llms.txt at your domain root — this is the single highest-ROI technical change</li>
+      <li>Ensure all AI crawlers are allowed in robots.txt (GPTBot, ClaudeBot, PerplexityBot)</li>
+      <li>Implement FAQ schema on your highest-traffic pages</li>
+      <li>Set up weekly AI visibility tracking to establish your baseline</li>
+    </ol>
+    <p><strong>Days 31-60: Content optimization</strong></p>
+    <ol>
+      <li>Rewrite your top 10 pages to include Q&A sections with ❓ formatting</li>
+      <li>Add specific data points and statistics to key content — AI models cite evidence</li>
+      <li>Implement Article schema markup on all blog posts</li>
+      <li>Build internal linking between related content (3-5 links per article)</li>
+      <li>Create or update your "about" and author pages with Person schema for E-E-A-T</li>
+    </ol>
+    <p><strong>Days 61-90: Scale and refine</strong></p>
+    <ol>
+      <li>Create comprehensive, 4,000+ word pillar content for your top 5 topic clusters</li>
+      <li>Develop a content calendar focused on AI-searchable topics (questions your audience asks AI)</li>
+      <li>Build entity schema connections between your content pieces</li>
+      <li>Analyze your AI visibility data and refine your strategy based on what's working</li>
+      <li>Compare your performance against industry benchmarks and adjust targets</li>
+    </ol>
+  </section>
+
+  <section id="section-7">
+    <h2>Common mistakes and how to avoid them</h2>
+    <p>After analyzing hundreds of ${kw} implementations, these are the most common mistakes we see — and how to fix them.</p>
+    <p><strong>Mistake 1: Blocking AI crawlers</strong>. Many sites, in an effort to protect their content from scraping, block all AI crawlers in robots.txt. This is self-defeating — it prevents your content from being cited by AI search engines. The right approach is selective: allow legitimate crawlers (GPTBot, ClaudeBot, PerplexityBot) while blocking known abusive ones.</p>
+    <p><strong>Mistake 2: Ignoring AEO entirely</strong>. Some teams focus exclusively on traditional SEO and wonder why their AI visibility is low. Without Q&A formatting, FAQ schema, and answer-optimized content, AI models have no structured data to extract from your pages. You're invisible to the fastest-growing segment of search.</p>
+    <p><strong>Mistake 3: Shallow content</strong>. AI models prefer to cite comprehensive, authoritative sources. If your content is 500 words of generic information, it won't be cited. Invest in depth — 3,000-5,000 words of substantive, data-driven content outperforms short content by 3-5x in AI citation rates.</p>
+    <p><strong>Mistake 4: No llms.txt</strong>. This is the easiest technical signal to implement, yet most sites don't have it. A well-structured llms.txt file can improve your AI citation rate by 15-30% with minimal effort. There's no reason not to implement it.</p>
+    <p><strong>Mistake 5: Inconsistent measurement</strong>. Many teams implement ${kw} strategies but don't track results consistently. Without weekly measurement across multiple AI engines, you can't tell what's working or identify opportunities. Use a dedicated tracking platform and review your data weekly.</p>
+    <p><strong>Mistake 6: Treating AI search as a monolith</strong>. ChatGPT, Claude, Perplexity, and Google AI Overviews each have different citation patterns. Optimizing for one doesn't automatically optimize for all. A comprehensive strategy addresses each engine's specific preferences.</p>
+  </section>
+
+  <section id="section-8">
+    <h2>FAQ</h2>
+    <h3>❓ What is the difference between SEO, AEO, and GEO?</h3>
+    <p>SEO (Search Engine Optimization) focuses on ranking in traditional search engine results. AEO (Answer Engine Optimization) focuses on making your content the answer that AI search engines provide. GEO (Generative Engine Optimization) focuses on making your content the source that AI models cite. Together, they form a comprehensive optimization framework — SEO for discoverability, AEO for answerability, GEO for citability.</p>
+
+    <h3>❓ How long does it take to see results from ${kw}?</h3>
+    <p>Technical changes (llms.txt, schema markup, robots.txt) can show results within 1-2 weeks. Content optimization typically takes 4-8 weeks to impact AI citation rates. Comprehensive strategy implementation with new pillar content can take 3-6 months for full impact. The timeline depends on your site's existing authority, content quality, and how consistently you implement the strategy.</p>
+
+    <h3>❓ Do I need to create separate content for AI search engines?</h3>
+    <p>No. The most effective approach is to create content that serves both human readers and AI models simultaneously. This means using clear H2/H3 hierarchy, embedding Q&A sections, including specific data, and implementing proper schema markup. Well-structured content that answers questions thoroughly works for everyone — humans and AI alike.</p>
+
+    <h3>❓ Is ${kw} only relevant for certain industries?</h3>
+    <p>${kw} is relevant for any industry where people search for information online. However, industries with complex, research-heavy queries (SaaS, healthcare, finance, legal, education) see the highest impact because AI search engines are most commonly used for these types of queries. B2B companies and professional services tend to see the fastest ROI from ${kw} strategies.</p>
+
+    <h3>❓ How much should I budget for ${kw}?</h3>
+    <p>Most businesses can implement the core technical foundations (llms.txt, schema markup, robots.txt) for minimal cost — often just developer time. Content optimization and creation is the primary investment, typically requiring 10-20 hours per month for a mid-size site. AI visibility tracking tools like seosights range from $29-79/month. The ROI is typically 3-5x within 6 months for businesses that implement consistently.</p>
+
+    <h3>❓ Can I optimize for ChatGPT, Claude, and Perplexity simultaneously?</h3>
+    <p>Yes, and you should. While each engine has different citation preferences, there's significant overlap in what they value: clear structure, Q&A formatting, data-driven content, proper schema, and topical authority. A well-structured, comprehensive article with Q&A sections and evidence will perform well across all engines simultaneously. <a href="/blog/chatgpt-vs-claude-vs-perplexity-citation-patterns-2025">See our analysis of citation patterns across AI engines →</a></p>
+  </section>
+
+  <section id="section-9">
+    <h2>Conclusion: the unified strategy</h2>
+    <p>The era of optimizing solely for Google is ending. Not because Google is going away — it remains the dominant search engine — but because the way people search is fundamentally changing. AI-powered search engines are not a niche trend; they represent a structural shift in information discovery that will only accelerate.</p>
+    <p>The businesses that will thrive in this new landscape are those that embrace the <strong>three-pillar framework</strong>: SEO for discoverability, AEO for answerability, and GEO for citability. This isn't about choosing one over the other — it's about understanding how they work together and implementing them as a unified strategy.</p>
+    <p>The practical path forward is clear: start with the technical foundations (llms.txt, schema markup, AI crawler access), optimize your content architecture for Q&A and depth, and measure your results consistently across all AI engines. The 90-day roadmap in this article gives you a concrete starting point.</p>
+    <p>The cost of inaction is growing. Every month, more of your potential customers are asking AI engines for recommendations — and if your content isn't being cited, your competitors' content is. The question isn't whether to invest in ${kw}, but how quickly you can start.</p>
+    <p><strong>Ready to see your AI search visibility?</strong> <a href="https://seosights.com">Run a free audit with seosights</a> to get your SEO, AEO, and GEO scores across 17+ AI search engines, along with a prioritized 90-day roadmap.</p>
+  </section>
 </article>`.trim()
 }

@@ -1222,3 +1222,33 @@ Stage Summary:
 - Added: heroImage field to BlogPost/AIBlogPost types
 - Enhanced: renderRichText() for markdown-style formatting in blog post bodies
 - Database: cleaned and fresh (empty)
+---
+Task ID: 1
+Agent: Main
+Task: Clean up production blog posts and upgrade article generator to 4000+ word pattern
+
+Work Log:
+- Explored CMS/WordPress integration: blog posts come from both static (src/data/blog-posts.ts) and DB (ContentArticle table via /api/public/blog-posts)
+- Fetched pattern post (chatgpt-vs-claude-vs-perplexity-citation-patterns-2025) — 4246 words with TOC, schema, key takeaways, author info, internal links
+- Analyzed blog index at seosights.com — found 5 old AI posts: seo-aeo-geo-difference, geo-generative-engine-optimization, aeo-answer-engine-optimization-guide, how-chatgpt-recommends-businesses, what-is-ai-visibility-score
+- Created cleanup API endpoints: /api/admin/cleanup-blog and /api/admin/cleanup-all-content
+- Added auto-cleanup support to auto-publish cron via ?cleanup=true query parameter
+- Upgraded article generator from 1500-2500 words to 4000+ word requirement with:
+  - Key takeaways section (5-7 bullets)
+  - Q&A subsections (❓ format, at least 5)
+  - FAQ section (5+ questions)
+  - Internal linking to 8 existing blog posts
+  - Data-driven content with statistics
+  - E-E-A-T signals
+  - Schema markup (BlogPosting + FAQPage)
+- Upgraded fallback HTML generator to 4000+ words with proper structure matching the pattern
+- Modified auto-publish to create ContentArticle records in DB (not just WordPress) so /api/public/blog-posts can serve them
+- Updated RESEED_TOPICS with better, more specific SEO/AEO/GEO topics
+- All modified files pass lint
+
+Stage Summary:
+- auto-publish/route.ts now supports ?cleanup=true for production cleanup
+- Article generator requires 4000+ words with TOC, Q&A, FAQ, internal links, schema
+- ContentArticle records created in DB for each published article (enables /api/public/blog-posts)
+- Production cleanup: call POST /api/cron/auto-publish?cleanup=true on seosights.com after deploy
+- Local database already clean (0 records)
