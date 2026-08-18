@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getGoogleClientId, getGoogleClientSecret } from '@/lib/gsc-config'
 
 /**
  * Google OAuth2 callback for Search Console integration.
@@ -9,9 +10,6 @@ import { NextRequest, NextResponse } from 'next/server'
  * 3. We exchange code for tokens → display refresh token for admin
  * 4. Redirect back to dashboard
  */
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -24,7 +22,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`${returnTo}?gsc_error=${encodeURIComponent(error)}`, request.url))
   }
 
-  if (!code || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+  const clientId = getGoogleClientId()
+  const clientSecret = getGoogleClientSecret()
+
+  if (!code || !clientId || !clientSecret) {
     return NextResponse.json({ error: 'Missing authorization code or Google credentials' }, { status: 400 })
   }
 
@@ -35,9 +36,9 @@ export async function GET(request: NextRequest) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: `${new URL(request.url).origin}/api/gsc/auth/callback`,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: 'https://seosights.com/api/gsc/auth/callback',
         grant_type: 'authorization_code',
       }).toString(),
     })
@@ -73,11 +74,11 @@ body{font-family:system-ui;max-width:640px;margin:80px auto;padding:0 20px;backg
 </style></head>
 <body>
 <h1 class="success">✅ Google Search Console Connected!</h1>
-<p>Your refresh token has been generated. Add it as an environment variable:</p>
+<p>Your refresh token has been generated. Add it as an environment variable on Vercel:</p>
 <div class="code">GOOGLE_REFRESH_TOKEN=${refreshToken}</div>
 <p class="warn">⚠️ Store this securely! This token grants read access to your Search Console data.</p>
-<p>Also ensure these env vars are set:</p>
-<div class="code">GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+<p>Also ensure these env vars are set on Vercel:</p>
+<div class="code">GOOGLE_CLIENT_ID=${clientId}
 GOOGLE_CLIENT_SECRET=***hidden***
 GOOGLE_REFRESH_TOKEN=${refreshToken}
 GSC_SITE_URL=https://seosights.com</div>

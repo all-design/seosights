@@ -4,17 +4,14 @@
  * Uses Google OAuth2 + Search Console API to fetch real data.
  * Falls back to mock data when credentials are not configured.
  * 
- * Required env vars:
- * - GOOGLE_CLIENT_ID       — OAuth2 client ID
- * - GOOGLE_CLIENT_SECRET   — OAuth2 client secret
+ * Required env vars (after OAuth setup):
  * - GOOGLE_REFRESH_TOKEN   — OAuth2 refresh token (obtained via OAuth flow)
  * - GSC_SITE_URL           — Site URL in Search Console (e.g. https://seosights.com)
+ * 
+ * Client ID and Secret are managed via gsc-config.ts
  */
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
-const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN
-const GSC_SITE_URL = process.env.GSC_SITE_URL || 'https://seosights.com'
+import { getGoogleClientId, getGoogleClientSecret, getGoogleRefreshToken, getGscSiteUrl } from './gsc-config'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -58,7 +55,11 @@ export interface GSCSearchResponse {
 let cachedAccessToken: { token: string; expiresAt: number } | null = null
 
 async function getAccessToken(): Promise<string | null> {
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
+  const clientId = getGoogleClientId()
+  const clientSecret = getGoogleClientSecret()
+  const refreshToken = getGoogleRefreshToken()
+
+  if (!clientId || !clientSecret || !refreshToken) {
     return null
   }
 
@@ -72,9 +73,9 @@ async function getAccessToken(): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        refresh_token: GOOGLE_REFRESH_TOKEN,
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }).toString(),
     })
@@ -102,7 +103,7 @@ async function getAccessToken(): Promise<string | null> {
  * Check if GSC API credentials are configured.
  */
 export function isGSCConfigured(): boolean {
-  return !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN)
+  return !!(getGoogleClientId() && getGoogleClientSecret() && getGoogleRefreshToken())
 }
 
 /**
@@ -115,7 +116,7 @@ async function querySearchAnalytics(
   const accessToken = await getAccessToken()
   if (!accessToken) return null
 
-  const siteUrl = params.siteUrl || GSC_SITE_URL
+  const siteUrl = params.siteUrl || getGscSiteUrl()
 
   try {
     const res = await fetch(
@@ -173,9 +174,7 @@ export async function listSites(): Promise<string[] | null> {
 }
 
 /**
- * Get site error counts from Search Console.
- * Note: The API doesn't have a direct crawl errors endpoint anymore,
- * but we can use the URL inspection API for indexing status.
+ * Get site info from Search Console.
  */
 export async function getSiteInfo(siteUrl?: string): Promise<{
   verified: boolean
@@ -184,7 +183,7 @@ export async function getSiteInfo(siteUrl?: string): Promise<{
   const accessToken = await getAccessToken()
   if (!accessToken) return null
 
-  const url = siteUrl || GSC_SITE_URL
+  const url = siteUrl || getGscSiteUrl()
   try {
     const res = await fetch(
       `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(url)}`,

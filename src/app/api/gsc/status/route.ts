@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { isGSCConfigured, listSites, getSiteInfo } from '@/lib/gsc-api'
+import { isGSCFullyConfigured } from '@/lib/gsc-config'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,13 +10,16 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   const configured = isGSCConfigured()
+  const fullyConfigured = isGSCFullyConfigured()
 
   if (!configured) {
     return NextResponse.json({
       connected: false,
-      configured: false,
-      message: 'Google Search Console API not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN env vars.',
-      authUrl: '/api/gsc/auth/url', // Frontend can use this to start OAuth flow
+      configured: fullyConfigured,
+      message: fullyConfigured
+        ? 'Credentials configured but refresh token missing. Complete the OAuth flow.'
+        : 'Google Search Console API not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN env vars.',
+      authUrl: '/api/gsc/auth/url',
     })
   }
 
