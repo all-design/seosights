@@ -5,6 +5,12 @@ import {
   Target, TrendingUp, Eye, BarChart3, Clock, CheckCircle2,
   AlertTriangle, Activity, Brain, Database, Sparkles, Zap,
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+const GSCClientsDashboard = dynamic(
+  () => import('@/components/dashboard/GSCClientsDashboard'),
+  { ssr: false }
+)
 
 // ── API Types ────────────────────────────────────────────────
 // Matches /api/client-zero/dashboard response shape
@@ -377,6 +383,11 @@ export default function ClientZeroPage() {
           <p className="text-[11px] text-slate-600 mt-2">Client Zero is SeoSights validating itself as its own first customer. Once the AI Visibility engine starts tracking and the engagement loop generates score deltas, data will populate here.</p>
         </div>
       )}
+
+      {/* Client Sites — Real GSC Data */}
+      <div className="pt-6 border-t border-slate-800">
+        <GSCClientsDashboard />
+      </div>
     </div>
   )
 }
