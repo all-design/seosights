@@ -1279,3 +1279,64 @@ Stage Summary:
 - Verified sites: seosights.com, kilim.rs, investiciono-zlato.rs, zlatnistandard.rs
 - seosights.com will show real data once it gets organic search traffic
 - All credentials stored securely with offset encoding in gsc-config.ts
+
+---
+Task ID: CLIENT-DASHBOARD
+Agent: main
+Task: Transform Client Zero dashboard into a polished, end-customer-facing product. Make Client One/Two/Three clickable to open a complete, marketing-ready dashboard per client (for selling subscriptions).
+
+Work Log:
+- Read existing /control/client-zero/page.tsx (hosted GSCClientsDashboard with expand/collapse cards)
+- Read existing /api/gsc/clients/route.ts (returns 3 clients with weak points summary)
+- Read existing GSCClientsDashboard.tsx (cards were expandable, not navigable)
+- Created NEW API: /api/gsc/clients/[clientId]/route.ts — returns rich per-client data:
+  * 7d, 28d, 90d summary metrics with WoW deltas
+  * Top 50 queries + top 50 pages + 90-day daily performance + query/page correlation
+  * Opportunities (re-framed weak points with impact + effort + estimated uplift + recommended action)
+  * Health score with 4 weighted factors (CTR, Position, Visibility, Issue Burden)
+  * Auto-generated recommendations (P0/P1/P2 priority with category, impact, timeframe)
+  * 3-tier plan comparison (Starter $99, Pro $299 highlighted, Enterprise $999) for upgrade CTA
+- Created NEW page: /control/client-zero/[clientId]/page.tsx — full client-facing dashboard:
+  * Hero with site domain, industry, live data pill, health score ring (animated SVG)
+  * KPI grid with WoW deltas (impressions, clicks, CTR, avg position)
+  * 90-day performance trend chart (impressions + clicks, with hover tooltips)
+  * Health score breakdown (4 factors with weighted progress bars)
+  * Tabbed content: SEO Opportunities | Top Queries | Top Pages | Action Plan
+  * Opportunities shown as cards with severity, impact, effort, estimated uplift, recommended action
+  * Top Queries table (25 rows) with CTR/position color coding + trend arrows
+  * Top Pages list (25) with full path, domain, impressions/clicks/CTR/position
+  * Action Plan with P0/P1/P2 priority badges, category icons, impact + timeframe
+  * Upgrade CTA section with 3 pricing tiers (Pro highlighted as "Most Popular")
+  * Sales contact link + footer with "Data from Google Search Console" timestamp
+  * "No data" state for clients without GSC data (Client Three)
+- Rewrote GSCClientsDashboard.tsx: replaced expand/collapse with clickable Link cards
+  * Grid of 3 cards (md:2 cols, lg:3 cols)
+  * Each card shows: label, domain, live pill, health score, 4 KPIs, opportunity summary, 14-day sparkline
+  * "Open" CTA with hover animation
+  * Portfolio overview stats (active clients, total impressions, total clicks, avg health)
+  * Sales pitch banner at bottom with "View Plans" link to /pricing
+- Verified via Agent Browser (logged in as superadmin):
+  * Client list renders all 3 clients with real GSC data (Client One: 20K imp, Client Two: 374K imp, Client Three: no data)
+  * Clicking Client One navigates to /control/client-zero/client-one → full dashboard renders
+  * All 4 tabs work (Opportunities shows 2 warnings, Queries shows real "pirotski cilim" keywords, Pages shows real URLs, Action Plan shows 3 recommendations)
+  * Client Two (zlatnistandard.rs) correctly shows "No SEO issues detected" (100 health score)
+  * Back button returns to client list
+  * Mobile responsive at 390px width (all elements render)
+  * Pricing tiers + upgrade CTAs visible at bottom of each client dashboard
+- Verified API returns real data:
+  * Client One (kilim.rs): 20,079 impressions, 1,509 clicks, 7.52% CTR, avg pos #4.5
+  * Client Two (zlatnistandard.rs): 373,833 impressions, 28,011 clicks, 7.49% CTR, avg pos #6.8
+  * Client Three (investiciono-zlato.rs): no_data (OAuth token lacks permission for this site — 403 from Google)
+- Lint: no new errors from new files (pre-existing errors in generate-docx.js, control/layout.tsx, scheduler/page.tsx, EngagementShell.tsx remain unchanged)
+- Dev server running on port 3000, no compile errors for new routes
+
+Stage Summary:
+- Client Zero dashboard is now a polished, end-customer-facing product suitable for sales demos
+- Each client card is a clickable link to a complete, full-page dashboard at /control/client-zero/[clientId]
+- The dashboard includes real GSC data, weak-point analysis (reframed as "SEO Opportunities" with impact/effort/estimated uplift), an auto-generated prioritized Action Plan, and a 3-tier pricing upgrade CTA
+- Verified end-to-end: login → client list → click client → full dashboard → tabs work → back button works → mobile responsive
+- Produced files:
+  * /home/z/my-project/src/app/api/gsc/clients/[clientId]/route.ts (new)
+  * /home/z/my-project/src/app/control/client-zero/[clientId]/page.tsx (new)
+  * /home/z/my-project/src/components/dashboard/GSCClientsDashboard.tsx (rewritten)
+- Screenshots saved: client-list.png, client-one-dashboard.png, client-two-dashboard.png, client-one-mobile.png

@@ -67,7 +67,8 @@ db/*.db-journal
 # Local scripts state
 /.zscripts/
 
-# QA screenshots (local verification only)
+# QA screenshots (local verification only) — ignore ALL png files at root
+/*.png
 qa-*.png
 screenshot-*.png
 verification-*.png
@@ -77,5 +78,6 @@ dashboard-*.png
 scan-*.png
 analyzing-*.png
 mobile-*.png
+client-*.png
 footer.png
 superadmin*.png

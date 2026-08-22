@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
-  Globe, AlertTriangle, TrendingUp, TrendingDown, Eye, MousePointerClick,
-  Search, ShieldAlert, Info, ChevronDown, ChevronUp, BarChart3,
-  ArrowUpRight, ArrowDownRight, Target, Zap, FileText,
+  Globe, AlertTriangle, TrendingUp, Eye, MousePointerClick,
+  Search, ShieldAlert, Info, BarChart3,
+  ArrowUpRight, ArrowDownRight, Target, ChevronRight,
+  Sparkles, Crown, Activity, Zap,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -73,62 +75,22 @@ interface ClientsResponse {
   generatedAt?: string
 }
 
-// ── Severity helpers ───────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────
 
-const severityConfig = {
-  critical: { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: ShieldAlert, label: 'Critical' },
-  warning: { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: AlertTriangle, label: 'Warning' },
-  info: { color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', icon: Info, label: 'Opportunity' },
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
+  return n.toLocaleString()
 }
 
-const weakTypeLabels: Record<string, string> = {
-  low_ctr: 'Low CTR',
-  declining_position: 'Declining Position',
-  high_impression_low_click: 'Title/Description Issue',
-  content_gap: 'Content Gap',
-  poor_performance: 'Performance Issue',
-}
+// ── Client Card (clickable to full dashboard) ──────────────────
 
-// ── KPI Card ───────────────────────────────────────────────────
-
-function KPICard({ icon: Icon, label, value, color, sub }: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: string
-  color: 'emerald' | 'amber' | 'red' | 'cyan'
-  sub?: string
-}) {
-  const colorMap = {
-    emerald: 'text-emerald-400',
-    amber: 'text-amber-400',
-    red: 'text-red-400',
-    cyan: 'text-cyan-400',
-  }
-
-  return (
-    <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg p-3">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Icon className={`w-3.5 h-3.5 ${colorMap[color]}`} />
-        <span className="text-[10px] text-slate-500 uppercase">{label}</span>
-      </div>
-      <div className="text-lg font-bold text-white">{value}</div>
-      {sub && <div className="text-[10px] text-amber-400 mt-0.5">{sub}</div>}
-    </div>
-  )
-}
-
-// ── Client Card ────────────────────────────────────────────────
-
-function ClientCard({ client, isExpanded, onToggle }: {
-  client: ClientResult
-  isExpanded: boolean
-  onToggle: () => void
-}) {
-  const { data, weakPoints, weakPointSummary, dataSource, label, domain, siteUrl } = client
+function ClientCard({ client }: { client: ClientResult }) {
+  const { data, weakPointSummary, dataSource, label, domain, id } = client
   const hasData = data !== null && dataSource === 'google_search_console'
   const summary = data?.summary
 
-  // Health score based on weak points
+  // Health score based on weak points (mirrors detail page logic)
   const healthScore = hasData && weakPointSummary
     ? Math.max(0, 100 - (weakPointSummary.critical * 20 + weakPointSummary.warning * 8 + weakPointSummary.info * 3))
     : null
@@ -137,290 +99,163 @@ function ClientCard({ client, isExpanded, onToggle }: {
     ? healthScore >= 70 ? 'emerald' : healthScore >= 40 ? 'amber' : 'red'
     : null
 
+  const healthBg = healthColor === 'emerald' ? 'from-emerald-500/20 to-emerald-500/5 text-emerald-400 border-emerald-500/30' :
+                   healthColor === 'amber' ? 'from-amber-500/20 to-amber-500/5 text-amber-400 border-amber-500/30' :
+                   healthColor === 'red' ? 'from-red-500/20 to-red-500/5 text-red-400 border-red-500/30' : ''
+
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={onToggle}
-        className="w-full p-5 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
-      >
-        <div className="flex items-center gap-4">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-            hasData ? 'bg-emerald-500/10' : 'bg-slate-800'
-          }`}>
-            <Globe className={`w-5 h-5 ${hasData ? 'text-emerald-400' : 'text-slate-500'}`} />
-          </div>
-          <div className="text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">{label}</span>
-              <span className="text-xs text-slate-500">{domain}</span>
-              {hasData && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">
-                  Live
-                </span>
-              )}
-              {!hasData && dataSource === 'no_data' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500">
-                  No Data
-                </span>
-              )}
-              {!hasData && dataSource === 'error' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">
-                  Error
-                </span>
-              )}
+    <Link
+      href={`/control/client-zero/${id}`}
+      className="block group"
+    >
+      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden transition-all duration-200 group-hover:border-emerald-500/40 group-hover:shadow-lg group-hover:shadow-emerald-500/5">
+        {/* Top accent bar — appears on hover */}
+        <div className="h-0.5 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:from-emerald-500 group-hover:via-emerald-400 group-hover:to-cyan-400 transition-all duration-300" />
+
+        <div className="p-5">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                hasData ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-slate-800 border border-slate-700'
+              }`}>
+                <Globe className={`w-5 h-5 ${hasData ? 'text-emerald-400' : 'text-slate-500'}`} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-white">{label}</span>
+                  {hasData && (
+                    <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                      Live
+                    </span>
+                  )}
+                  {!hasData && dataSource === 'no_data' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500">
+                      No Data
+                    </span>
+                  )}
+                  {!hasData && dataSource === 'error' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">
+                      Error
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5 truncate">{domain}</div>
+              </div>
             </div>
-            {summary && (
-              <div className="text-xs text-slate-400 mt-0.5">
-                {summary.totalImpressions.toLocaleString()} impressions · {summary.totalClicks.toLocaleString()} clicks · CTR {summary.avgCtr}% · Avg pos #{summary.avgPosition.toFixed(1)}
+
+            {/* Health Score Badge */}
+            {healthScore !== null && healthColor && (
+              <div className={`text-right flex-shrink-0`}>
+                <div className={`text-2xl font-bold ${
+                  healthColor === 'emerald' ? 'text-emerald-400' :
+                  healthColor === 'amber' ? 'text-amber-400' : 'text-red-400'
+                }`}>
+                  {healthScore}
+                </div>
+                <div className="text-[9px] text-slate-500 uppercase tracking-wider">Health</div>
               </div>
             )}
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          {/* Health Score Badge */}
-          {healthScore !== null && healthColor && (
-            <div className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
-              healthColor === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' :
-              healthColor === 'amber' ? 'bg-amber-500/10 text-amber-400' :
-              'bg-red-500/10 text-red-400'
-            }`}>
-              {healthScore}/100
+          {/* Stats grid */}
+          {hasData && summary ? (
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="p-2 rounded-lg bg-slate-800/40">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <Eye className="w-3 h-3 text-emerald-400" />
+                  <span className="text-[9px] text-slate-500 uppercase">Imp</span>
+                </div>
+                <div className="text-sm font-bold text-white">{formatNumber(summary.totalImpressions)}</div>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-800/40">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <MousePointerClick className="w-3 h-3 text-cyan-400" />
+                  <span className="text-[9px] text-slate-500 uppercase">Clicks</span>
+                </div>
+                <div className="text-sm font-bold text-white">{formatNumber(summary.totalClicks)}</div>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-800/40">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <Target className="w-3 h-3 text-amber-400" />
+                  <span className="text-[9px] text-slate-500 uppercase">CTR</span>
+                </div>
+                <div className={`text-sm font-bold ${
+                  summary.avgCtr >= 3 ? 'text-emerald-400' : summary.avgCtr >= 1.5 ? 'text-amber-400' : 'text-red-400'
+                }`}>{summary.avgCtr}%</div>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-800/40">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <TrendingUp className="w-3 h-3 text-violet-400" />
+                  <span className="text-[9px] text-slate-500 uppercase">Pos</span>
+                </div>
+                <div className={`text-sm font-bold ${
+                  summary.avgPosition <= 10 ? 'text-emerald-400' : summary.avgPosition <= 20 ? 'text-amber-400' : 'text-red-400'
+                }`}>#{summary.avgPosition.toFixed(1)}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-[72px] flex items-center justify-center bg-slate-800/20 rounded-lg mb-4">
+              <span className="text-xs text-slate-600">Awaiting search data</span>
             </div>
           )}
 
-          {/* Weak Points Summary Pills */}
-          {weakPointSummary && weakPointSummary.total > 0 && (
-            <div className="flex items-center gap-1.5">
+          {/* Weak points summary */}
+          {hasData && weakPointSummary && weakPointSummary.total > 0 && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <span className="text-[10px] text-slate-500 uppercase">Opportunities:</span>
               {weakPointSummary.critical > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
                   {weakPointSummary.critical} critical
                 </span>
               )}
               {weakPointSummary.warning > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
-                  {weakPointSummary.warning}
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  {weakPointSummary.warning} warnings
                 </span>
               )}
               {weakPointSummary.info > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">
-                  {weakPointSummary.info}
+                <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  {weakPointSummary.info} opportunities
                 </span>
               )}
             </div>
           )}
 
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-slate-500" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-slate-500" />
-          )}
-        </div>
-      </button>
-
-      {/* Expanded Content */}
-      {isExpanded && (
-        <div className="border-t border-slate-800 p-5 space-y-5">
-          {!hasData ? (
-            <div className="text-center py-8">
-              <Globe className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-sm font-semibold text-white">No search data available</h3>
-              <p className="text-xs text-slate-500 mt-1">
-                {dataSource === 'no_data'
-                  ? 'This site may be newly verified or has no recent search traffic.'
-                  : dataSource === 'error'
-                  ? 'Failed to fetch data from Google Search Console.'
-                  : 'GSC API is not configured.'}
-              </p>
+          {/* Mini sparkline (last 14 days) */}
+          {hasData && data && data.performanceOverTime.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-end gap-px h-10">
+                {data.performanceOverTime.slice(-14).map((d, i) => {
+                  const maxImp = Math.max(...data.performanceOverTime.slice(-14).map(x => x.impressions), 1)
+                  const h = (d.impressions / maxImp) * 100
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-t bg-gradient-to-t from-emerald-500/20 to-emerald-500/50 group-hover:from-emerald-500/40 group-hover:to-emerald-500/70 transition-colors"
+                      style={{ height: `${Math.max(h, 5)}%` }}
+                    />
+                  )
+                })}
+              </div>
+              <div className="text-[9px] text-slate-600 mt-1">14-day impression trend</div>
             </div>
-          ) : (
-            <>
-              {/* Summary KPIs */}
-              {summary && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <KPICard
-                    icon={Eye}
-                    label="Impressions"
-                    value={summary.totalImpressions.toLocaleString()}
-                    color="emerald"
-                  />
-                  <KPICard
-                    icon={MousePointerClick}
-                    label="Clicks"
-                    value={summary.totalClicks.toLocaleString()}
-                    color="cyan"
-                  />
-                  <KPICard
-                    icon={TrendingUp}
-                    label="CTR"
-                    value={`${summary.avgCtr}%`}
-                    color={summary.avgCtr >= 3 ? 'emerald' : summary.avgCtr >= 1.5 ? 'amber' : 'red'}
-                    sub={summary.avgCtr < 3 ? 'Below 3% benchmark' : undefined}
-                  />
-                  <KPICard
-                    icon={Target}
-                    label="Avg Position"
-                    value={`#${summary.avgPosition.toFixed(1)}`}
-                    color={summary.avgPosition <= 10 ? 'emerald' : summary.avgPosition <= 20 ? 'amber' : 'red'}
-                    sub={summary.avgPosition > 10 ? 'Goal: top 10' : undefined}
-                  />
-                </div>
-              )}
-
-              {/* Performance Chart */}
-              {data.performanceOverTime.length > 0 && (
-                <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg p-4">
-                  <h3 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
-                    <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
-                    14-Day Performance
-                  </h3>
-                  <div className="flex items-end gap-1 h-16">
-                    {data.performanceOverTime.map((d, i) => {
-                      const maxImp = Math.max(...data.performanceOverTime.map(x => x.impressions))
-                      const h = maxImp > 0 ? (d.impressions / maxImp) * 100 : 0
-                      return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                          <div
-                            className="w-full rounded-t bg-emerald-500/40 transition-all"
-                            style={{ height: `${Math.max(h, 2)}%`, minHeight: '2px' }}
-                          />
-                          {i % 3 === 0 && (
-                            <span className="text-[8px] text-slate-600">
-                              {d.date.slice(8)}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Weak Points */}
-              {weakPoints.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                    SEO Weak Points
-                    <span className="text-slate-500 font-normal">({weakPoints.length} found)</span>
-                  </h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {weakPoints.slice(0, 12).map((wp, i) => {
-                      const sc = severityConfig[wp.severity]
-                      const WpIcon = sc.icon
-                      return (
-                        <div
-                          key={i}
-                          className={`p-3 rounded-lg border ${sc.bg} ${sc.border} flex items-start gap-3`}
-                        >
-                          <WpIcon className={`w-4 h-4 ${sc.color} flex-shrink-0 mt-0.5`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${sc.bg} ${sc.color}`}>
-                                {weakTypeLabels[wp.type] || wp.type}
-                              </span>
-                              <span className={`text-[10px] ${sc.color}`}>
-                                {sc.label}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-300">{wp.message}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className={`text-xs font-mono ${sc.color}`}>{wp.value.toFixed(1)}</div>
-                            <div className="text-[9px] text-slate-500">goal: {wp.benchmark}</div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {weakPoints.length > 12 && (
-                      <p className="text-xs text-slate-500 text-center py-2">
-                        +{weakPoints.length - 12} more issues
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Top Queries */}
-              {data.topQueries.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
-                    <Search className="w-3.5 h-3.5 text-emerald-400" />
-                    Top Search Queries
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-slate-500 border-b border-slate-800">
-                          <th className="text-left py-2 pr-3 font-medium">Query</th>
-                          <th className="text-right py-2 px-2 font-medium">Impressions</th>
-                          <th className="text-right py-2 px-2 font-medium">Clicks</th>
-                          <th className="text-right py-2 px-2 font-medium">CTR</th>
-                          <th className="text-right py-2 px-2 font-medium">Position</th>
-                          <th className="text-right py-2 pl-2 font-medium">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.topQueries.slice(0, 10).map((q, i) => (
-                          <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                            <td className="py-2 pr-3 text-slate-300 font-medium">{q.query}</td>
-                            <td className="text-right py-2 px-2 text-slate-400">{q.impressions.toLocaleString()}</td>
-                            <td className="text-right py-2 px-2 text-slate-400">{q.clicks.toLocaleString()}</td>
-                            <td className={`text-right py-2 px-2 font-mono ${
-                              q.ctr >= 5 ? 'text-emerald-400' : q.ctr >= 2 ? 'text-amber-400' : 'text-red-400'
-                            }`}>{q.ctr}%</td>
-                            <td className={`text-right py-2 px-2 font-mono ${
-                              q.position <= 5 ? 'text-emerald-400' : q.position <= 10 ? 'text-amber-400' : 'text-red-400'
-                            }`}>#{q.position.toFixed(1)}</td>
-                            <td className="text-right py-2 pl-2">
-                              {q.position <= 5 ? (
-                                <ArrowUpRight className="w-3 h-3 text-emerald-400 inline" />
-                              ) : q.position > 10 ? (
-                                <ArrowDownRight className="w-3 h-3 text-red-400 inline" />
-                              ) : (
-                                <TrendingUp className="w-3 h-3 text-amber-400 inline" />
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Top Pages */}
-              {data.topPages.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-white mb-3 flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                    Top Pages
-                  </h3>
-                  <div className="space-y-1.5">
-                    {data.topPages.slice(0, 5).map((p, i) => {
-                      const path = p.url.replace(siteUrl, '').replace('https://' + domain, '') || '/'
-                      return (
-                        <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/30">
-                          <span className="text-xs text-slate-300 flex-1 truncate font-mono">{path}</span>
-                          <span className="text-xs text-slate-400">{p.impressions.toLocaleString()} imp</span>
-                          <span className={`text-xs font-mono ${
-                            p.ctr >= 5 ? 'text-emerald-400' : p.ctr >= 2 ? 'text-amber-400' : 'text-red-400'
-                          }`}>{p.ctr}%</span>
-                          <span className={`text-xs font-mono ${
-                            p.position <= 5 ? 'text-emerald-400' : p.position <= 10 ? 'text-amber-400' : 'text-red-400'
-                          }`}>#{p.position.toFixed(1)}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
           )}
+
+          {/* CTA footer */}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+            <span className="text-xs text-slate-500">
+              {hasData ? 'View full dashboard' : 'View details'}
+            </span>
+            <div className="flex items-center gap-1 text-xs font-medium text-emerald-400 group-hover:gap-2 transition-all">
+              Open
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
         </div>
-      )}
-    </div>
+      </div>
+    </Link>
   )
 }
 
@@ -430,7 +265,6 @@ export default function GSCClientsDashboard() {
   const [data, setData] = useState<ClientsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expandedClient, setExpandedClient] = useState<string | null>('client-one')
 
   useEffect(() => {
     async function loadData() {
@@ -453,9 +287,11 @@ export default function GSCClientsDashboard() {
     return (
       <div className="space-y-4">
         <div className="animate-pulse bg-slate-800 rounded h-8 w-64" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-32" />
-        ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="animate-pulse bg-slate-800 rounded-xl h-64" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -479,61 +315,101 @@ export default function GSCClientsDashboard() {
   const totalWeakPoints = clients.reduce((sum, c) => sum + (c.weakPointSummary?.total || 0), 0)
   const criticalCount = clients.reduce((sum, c) => sum + (c.weakPointSummary?.critical || 0), 0)
   const clientsWithData = clients.filter(c => c.dataSource === 'google_search_console')
+  const totalImpressions = clientsWithData.reduce((s, c) => s + (c.data?.summary?.totalImpressions || 0), 0)
+  const totalClicks = clientsWithData.reduce((s, c) => s + (c.data?.summary?.totalClicks || 0), 0)
+  const avgHealthScore = clientsWithData.length > 0
+    ? Math.round(clientsWithData.reduce((s, c) => {
+        const wp = c.weakPointSummary
+        if (!wp) return s
+        return s + Math.max(0, 100 - (wp.critical * 20 + wp.warning * 8 + wp.info * 3))
+      }, 0) / clientsWithData.length)
+    : 0
 
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <Globe className="w-5 h-5 text-emerald-400" />
-          Client Sites — SEO Analysis
-        </h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Real Google Search Console data with weak point detection
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Globe className="w-5 h-5 text-emerald-400" />
+            Client Portfolio
+          </h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Real Google Search Console data · Click any client to open full dashboard
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            {clientsWithData.length} active
+          </span>
+        </div>
       </div>
 
-      {/* Overview Stats */}
+      {/* Portfolio Overview Stats */}
       {clientsWithData.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-[10px] text-slate-500 uppercase mb-1">Active Clients</div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[10px] text-slate-500 uppercase">Active Clients</span>
+            </div>
             <div className="text-xl font-bold text-emerald-400">{clientsWithData.length}</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-[10px] text-slate-500 uppercase mb-1">Total Impressions</div>
-            <div className="text-xl font-bold text-white">
-              {clientsWithData.reduce((s, c) => s + (c.data?.summary?.totalImpressions || 0), 0).toLocaleString()}
+            <div className="flex items-center gap-1.5 mb-1">
+              <Eye className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[10px] text-slate-500 uppercase">Total Impressions</span>
             </div>
+            <div className="text-xl font-bold text-white">{formatNumber(totalImpressions)}</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-[10px] text-slate-500 uppercase mb-1">Total Clicks</div>
-            <div className="text-xl font-bold text-cyan-400">
-              {clientsWithData.reduce((s, c) => s + (c.data?.summary?.totalClicks || 0), 0).toLocaleString()}
+            <div className="flex items-center gap-1.5 mb-1">
+              <MousePointerClick className="w-3.5 h-3.5 text-violet-400" />
+              <span className="text-[10px] text-slate-500 uppercase">Total Clicks</span>
             </div>
+            <div className="text-xl font-bold text-white">{formatNumber(totalClicks)}</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-[10px] text-slate-500 uppercase mb-1">Issues Found</div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[10px] text-slate-500 uppercase">Avg Health / Issues</span>
+            </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-red-400">{totalWeakPoints}</span>
-              {criticalCount > 0 && (
-                <span className="text-xs text-red-400">({criticalCount} critical)</span>
-              )}
+              <span className="text-xl font-bold text-amber-400">{avgHealthScore}</span>
+              <span className="text-xs text-slate-500">· {totalWeakPoints} issues ({criticalCount} crit)</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Client Cards */}
-      <div className="space-y-3">
+      {/* Client Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {clients.map((client) => (
-          <ClientCard
-            key={client.id}
-            client={client}
-            isExpanded={expandedClient === client.id}
-            onToggle={() => setExpandedClient(expandedClient === client.id ? null : client.id)}
-          />
+          <ClientCard key={client.id} client={client} />
         ))}
+      </div>
+
+      {/* Sales Pitch Banner */}
+      <div className="bg-gradient-to-r from-emerald-500/10 via-slate-900 to-slate-900 border border-emerald-500/20 rounded-xl p-5">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+            <Crown className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-white">Want a dashboard like this for your site?</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              SeoSights connects to your Google Search Console and delivers AI-powered SEO insights, weekly audits, and competitor tracking.
+            </p>
+          </div>
+          <Link
+            href="/pricing"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-medium transition-colors flex-shrink-0"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            View Plans
+          </Link>
+        </div>
       </div>
 
       {/* Timestamp */}
