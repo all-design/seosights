@@ -1340,3 +1340,48 @@ Stage Summary:
   * /home/z/my-project/src/app/control/client-zero/[clientId]/page.tsx (new)
   * /home/z/my-project/src/components/dashboard/GSCClientsDashboard.tsx (rewritten)
 - Screenshots saved: client-list.png, client-one-dashboard.png, client-two-dashboard.png, client-one-mobile.png
+
+---
+Task ID: PDF-EXPORT
+Agent: main
+Task: Implement real "Export PDF" functionality for client dashboard (user reported it doesn't work — button was visual-only with no handler)
+
+Work Log:
+- Discovered the Export PDF button in /control/client-zero/[clientId]/page.tsx had no onClick handler (just a styled button)
+- Confirmed jspdf ^4.2.1 and jspdf-autotable ^5.0.8 are already in dependencies
+- Created NEW server-side API: /api/gsc/clients/[clientId]/export-pdf/route.ts
+  * Fetches ALL client data fresh from GSC API (28d + 90d summaries, top 50 queries, top 50 pages)
+  * Runs opportunity analysis, health score calculation, recommendation generation (mirrors detail API logic)
+  * Generates branded, multi-page PDF using jsPDF + autoTable
+  * PDF structure (7 pages for Client One):
+    - Page 1: Cover (dark hero with SeoSights branding, client domain, health score ring, executive summary)
+    - Page 2: Performance Overview (4 KPI cards with 90d sub-stats + Health Score Breakdown with progress bars)
+    - Page 3: SEO Opportunities (cards with severity badges, impact/effort, estimated uplift, recommended actions)
+    - Page 4: Top 25 Search Queries (striped table with CTR/position color coding + status column)
+    - Page 5: Top 25 Pages (striped table with URL paths, impressions, clicks, CTR, position)
+    - Page 6: AI-Powered Action Plan (P0/P1/P2 priority cards with category, impact, timeframe)
+    - Page 7: Pricing/Next Steps (3-tier plans: Starter $99, Pro $299 highlighted, Enterprise $999 + contact)
+  * Handles all 3 states: full data, no issues detected, no data available
+  * Returns PDF as Buffer with proper Content-Type/Content-Disposition headers
+  * Filename format: seosights-seo-report-{domain}-{date}.pdf
+- Updated client page /control/client-zero/[clientId]/page.tsx:
+  * Added exportingPdf + exportError state
+  * Created handleExportPdf() function: fetches API, converts to blob, triggers download via <a> element, extracts filename from Content-Disposition header
+  * Wired Export PDF button with onClick, disabled state during export, spinner + "Generating..." text
+  * Added fixed error toast (top-right) that appears on export failure with dismiss button + 5s auto-clear
+  * Added Loader2 + XCircle icon imports
+- Fixed bug: jsPDF v4 setTextColor doesn't accept spread array — changed to explicit r,g,b args
+- Verified via curl:
+  * Client One (kilim.rs): 200 OK, 126KB, 7 pages — valid PDF
+  * Client Two (zlatnistandard.rs): 200 OK, 119KB, 6 pages — valid PDF
+  * Client Three (investiciono-zlato.rs): 200 OK, 20KB, 3 pages — valid PDF (no-data state)
+- Verified via Agent Browser: clicked Export PDF button → file downloaded to ~/Downloads/seosights-seo-report-kilim.rs-2026-08-22.pdf (126KB, 7 pages)
+- Dev log confirms: GET /api/gsc/clients/client-one/export-pdf 200 in 893ms
+
+Stage Summary:
+- Export PDF button now works end-to-end: click → loading state → server generates comprehensive branded PDF → browser downloads it
+- PDF includes ALL client data (not just visible tab), making it suitable for sharing with clients/stakeholders as a sales report
+- Handles all 3 data states gracefully (full data, no issues, no data)
+- Produced files:
+  * /home/z/my-project/src/app/api/gsc/clients/[clientId]/export-pdf/route.ts (new, ~1150 lines)
+  * /home/z/my-project/src/app/control/client-zero/[clientId]/page.tsx (updated: +40 lines for export handler, state, error toast)

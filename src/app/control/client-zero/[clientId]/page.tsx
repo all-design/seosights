@@ -8,7 +8,7 @@ import {
   ShieldAlert, AlertTriangle, Info, CheckCircle2, Sparkles, Zap,
   Search, FileText, BarChart3, Crown, ArrowRight,
   Gauge, Lightbulb, Rocket, Building2, Mail, ArrowUpRight,
-  ArrowDownRight, Minus, Calendar, Download, Bell, Star, Tag,
+  ArrowDownRight, Minus, Calendar, Download, Bell, Star, Tag, Loader2, XCircle,
 } from 'lucide-react'
 
 // ── Types (mirror the API response) ──────────────────────────────
@@ -339,6 +339,42 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'opportunities' | 'queries' | 'pages' | 'recommendations'>('opportunities')
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const handleExportPdf = async () => {
+    setExportingPdf(true)
+    setExportError(null)
+    try {
+      const res = await fetch(`/api/gsc/clients/${clientId}/export-pdf`)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `Server returned ${res.status}`)
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      // Extract filename from Content-Disposition header, fallback to generated name
+      const disposition = res.headers.get('Content-Disposition')
+      let filename = `seosights-seo-report-${clientId}-${new Date().toISOString().split('T')[0]}.pdf`
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        if (match) filename = match[1]
+      }
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Failed to export PDF')
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setExportError(null), 5000)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -399,7 +435,23 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
   const healthColor = healthScore.score >= 70 ? 'emerald' : healthScore.score >= 40 ? 'amber' : 'red'
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 relative">
+      {/* Export error toast */}
+      {exportError && (
+        <div className="fixed top-4 right-4 z-50 max-w-sm p-4 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-md shadow-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+          <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-red-400">PDF Export Failed</div>
+            <div className="text-xs text-slate-300 mt-0.5">{exportError}</div>
+          </div>
+          <button
+            onClick={() => setExportError(null)}
+            className="text-slate-500 hover:text-white"
+          >
+            <span className="sr-only">Dismiss</span>✕
+          </button>
+        </div>
+      )}
       {/* Breadcrumb / Back */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Link
@@ -414,9 +466,23 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
             <Calendar className="w-3.5 h-3.5" />
             Last 28 days
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs transition-colors">
-            <Download className="w-3.5 h-3.5" />
-            Export PDF
+          <button
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs transition-colors disabled:opacity-50 disabled:cursor-wait"
+            title="Download a complete PDF report with all data, opportunities, and recommendations"
+          >
+            {exportingPdf ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                Export PDF
+              </>
+            )}
           </button>
           <button className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs transition-colors">
             <Bell className="w-3.5 h-3.5" />
